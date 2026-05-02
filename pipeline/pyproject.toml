@@ -1,0 +1,9 @@
+[project]
+name = "pipeline"
+version = "0.1.0"
+description = "Chunk and embed UBC course/program JSON for browser RAG"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "numpy>=2.4.4",
+    "sentence-transformers>=5.4.1",
+]

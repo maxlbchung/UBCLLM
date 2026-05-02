@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>UBCLLM &mdash; Gemma 4 E2B WebGPU Smoke Test</title>
+    <style>
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        background: #0b0d12;
+        color: #e5e7eb;
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+        padding: 32px 16px;
+      }
+      main { width: 100%; max-width: 880px; display: flex; flex-direction: column; gap: 16px; }
+      h1 { margin: 0; font-size: 22px; font-weight: 600; }
+      .sub { color: #9ca3af; font-size: 13px; margin: 0; }
+      .panel {
+        background: #12151c;
+        border: 1px solid #1f2330;
+        border-radius: 10px;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      label { font-size: 12px; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.5px; }
+      select, textarea, input, button {
+        font: inherit;
+        background: #0b0d12;
+        color: #e5e7eb;
+        border: 1px solid #2a2f3d;
+        border-radius: 6px;
+        padding: 8px 10px;
+      }
+      textarea { min-height: 70px; resize: vertical; font-family: inherit; }
+      button {
+        background: #2563eb;
+        border-color: #2563eb;
+        cursor: pointer;
+        padding: 8px 14px;
+        font-weight: 500;
+      }
+      button:disabled { background: #374151; border-color: #374151; cursor: not-allowed; opacity: 0.7; }
+      .row { display: flex; gap: 8px; align-items: center; }
+      .row > * { flex: 1; }
+      .row > button { flex: 0 0 auto; }
+      .badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 600;
+        background: #1f2937;
+        color: #9ca3af;
+      }
+      .badge.ok { background: #064e3b; color: #6ee7b7; }
+      .badge.warn { background: #78350f; color: #fcd34d; }
+      .badge.err { background: #7f1d1d; color: #fca5a5; }
+      pre {
+        margin: 0;
+        background: #0b0d12;
+        border: 1px solid #1f2330;
+        border-radius: 6px;
+        padding: 12px;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        min-height: 100px;
+        font-size: 13px;
+        line-height: 1.5;
+        max-height: 400px;
+        overflow-y: auto;
+      }
+      .progress {
+        height: 6px;
+        background: #1f2937;
+        border-radius: 3px;
+        overflow: hidden;
+      }
+      .progress > div {
+        height: 100%;
+        background: #2563eb;
+        width: 0%;
+        transition: width 0.2s ease;
+      }
+      .meta { font-size: 12px; color: #9ca3af; }
+      .meta b { color: #e5e7eb; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>UBCLLM &mdash; Gemma 4 E2B WebGPU Smoke Test</h1>
+        <p class="sub">
+          Verifies (a) WebGPU is enabled in this browser, (b) WebLLM can download Gemma 4 E2B,
+          and (c) generation actually streams. Runs entirely on your machine. First load downloads
+          ~1.5&ndash;2&nbsp;GB; cached in IndexedDB after that.
+        </p>
+      </header>
+
+      <section class="panel">
+        <div class="row">
+          <div>
+            <label>WebGPU</label><br />
+            <span id="webgpu-badge" class="badge">checking&hellip;</span>
+          </div>
+          <div>
+            <label>Adapter</label><br />
+            <span id="adapter-info" class="meta">&mdash;</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <label for="model-select">Model (auto-filtered to Gemma 4 E2B variants)</label>
+        <div class="row">
+          <select id="model-select" disabled>
+            <option>Loading model list&hellip;</option>
+          </select>
+          <button id="load-btn" disabled>Load model</button>
+        </div>
+        <div class="progress"><div id="progress-bar"></div></div>
+        <div id="progress-text" class="meta">Idle.</div>
+      </section>
+
+      <section class="panel">
+        <label for="prompt">Prompt</label>
+        <textarea id="prompt" disabled placeholder="What are the prerequisites for CPSC 110 at UBC?">What are three things to consider when choosing a CS specialization?</textarea>
+        <div class="row">
+          <div></div>
+          <button id="send-btn" disabled>Generate</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <label>Output</label>
+        <pre id="output">(generation will stream here)</pre>
+        <div id="stats" class="meta">&mdash;</div>
+      </section>
+    </main>
+
+    <script type="module">
+      const webgpuBadge = document.getElementById("webgpu-badge");
+      const adapterInfo = document.getElementById("adapter-info");
+      const modelSelect = document.getElementById("model-select");
+      const loadBtn = document.getElementById("load-btn");
+      const sendBtn = document.getElementById("send-btn");
+      const promptEl = document.getElementById("prompt");
+      const progressBar = document.getElementById("progress-bar");
+      const progressText = document.getElementById("progress-text");
+      const output = document.getElementById("output");
+      const stats = document.getElementById("stats");
+
+      // 1. WebGPU check
+      let adapter = null;
+      if (!("gpu" in navigator)) {
+        webgpuBadge.textContent = "unavailable";
+        webgpuBadge.className = "badge err";
+        adapterInfo.textContent = "navigator.gpu is undefined. Use Chrome 113+ or Edge 113+.";
+      } else {
+        try {
+          adapter = await navigator.gpu.requestAdapter();
+          if (!adapter) throw new Error("requestAdapter() returned null");
+          webgpuBadge.textContent = "available";
+          webgpuBadge.className = "badge ok";
+          const info = adapter.info ?? {};
+          adapterInfo.textContent = [info.vendor, info.architecture, info.device].filter(Boolean).join(" / ") || "(adapter info hidden by browser)";
+        } catch (err) {
+          webgpuBadge.textContent = "error";
+          webgpuBadge.className = "badge err";
+          adapterInfo.textContent = err.message || String(err);
+        }
+      }
+
+      // 2. Load WebLLM and surface Gemma 4 E2B variants
+      let webllm;
+      try {
+        webllm = await import("https://esm.run/@mlc-ai/web-llm");
+      } catch (err) {
+        progressText.textContent = "Failed to import @mlc-ai/web-llm from esm.run: " + (err?.message || err);
+        progressText.style.color = "#fca5a5";
+      }
+
+      let engine = null;
+      let selectedModelId = null;
+
+      if (webllm) {
+        const models = webllm.prebuiltAppConfig?.model_list ?? [];
+        // Match anything that smells like Gemma 4 E2B; if none, fall back to all Gemma models so the user can see options.
+        const isE2B = (id) => /gemma[\-_]?4.*e2b/i.test(id);
+        const isGemma = (id) => /gemma/i.test(id);
+        let candidates = models.filter((m) => isE2B(m.model_id));
+        let note = "";
+        if (candidates.length === 0) {
+          candidates = models.filter((m) => isGemma(m.model_id));
+          note = " (no Gemma 4 E2B match found; showing all Gemma variants)";
+        }
+        if (candidates.length === 0) {
+          modelSelect.innerHTML = `<option>No Gemma models in WebLLM prebuilt list (${models.length} total models)</option>`;
+          progressText.textContent = "WebLLM has " + models.length + " prebuilt models but none match Gemma. Check the WebLLM version or model registry.";
+          progressText.style.color = "#fcd34d";
+        } else {
+          modelSelect.innerHTML = candidates.map((m) => `<option value="${m.model_id}">${m.model_id}</option>`).join("");
+          modelSelect.disabled = false;
+          loadBtn.disabled = false;
+          progressText.textContent = `Found ${candidates.length} candidate model(s)${note}. Pick one and click Load.`;
+        }
+      }
+
+      // 3. Load model on click
+      loadBtn.addEventListener("click", async () => {
+        if (!webllm) return;
+        selectedModelId = modelSelect.value;
+        loadBtn.disabled = true;
+        modelSelect.disabled = true;
+        progressBar.style.width = "0%";
+        progressText.textContent = "Initializing engine for " + selectedModelId + "...";
+        progressText.style.color = "";
+        try {
+          engine = await webllm.CreateMLCEngine(selectedModelId, {
+            initProgressCallback: (report) => {
+              const pct = Math.round((report.progress ?? 0) * 100);
+              progressBar.style.width = pct + "%";
+              progressText.textContent = report.text || `Loading... ${pct}%`;
+            },
+          });
+          progressBar.style.width = "100%";
+          progressText.textContent = "Model loaded. Ready to generate.";
+          promptEl.disabled = false;
+          sendBtn.disabled = false;
+        } catch (err) {
+          progressText.textContent = "Failed to load model: " + (err?.message || err);
+          progressText.style.color = "#fca5a5";
+          loadBtn.disabled = false;
+          modelSelect.disabled = false;
+        }
+      });
+
+      // 4. Generate on click
+      sendBtn.addEventListener("click", async () => {
+        if (!engine) return;
+        const prompt = promptEl.value.trim();
+        if (!prompt) return;
+        sendBtn.disabled = true;
+        promptEl.disabled = true;
+        output.textContent = "";
+        stats.textContent = "Generating...";
+        const t0 = performance.now();
+        let tokens = 0;
+        try {
+          const stream = await engine.chat.completions.create({
+            messages: [
+              { role: "system", content: "You are a helpful assistant. Answer concisely." },
+              { role: "user", content: prompt },
+            ],
+            stream: true,
+            temperature: 0.7,
+            max_tokens: 256,
+          });
+          for await (const chunk of stream) {
+            const delta = chunk.choices?.[0]?.delta?.content ?? "";
+            if (delta) {
+              output.textContent += delta;
+              tokens += 1;
+              output.scrollTop = output.scrollHeight;
+            }
+          }
+          const dt = (performance.now() - t0) / 1000;
+          const tps = tokens / dt;
+          stats.textContent = `Done. ~${tokens} chunks in ${dt.toFixed(1)}s (~${tps.toFixed(1)} chunks/s).`;
+        } catch (err) {
+          stats.textContent = "Generation error: " + (err?.message || err);
+          stats.style.color = "#fca5a5";
+        } finally {
+          sendBtn.disabled = false;
+          promptEl.disabled = false;
+        }
+      });
+    </script>
+  </body>
+</html>

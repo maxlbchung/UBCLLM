@@ -1,0 +1,35 @@
+# Node
+node_modules/
+dist/
+*.log
+.vite/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# Scraper cache (raw HTML)
+scraper/cache/
+scraper/output/*.json
+
+# Pipeline output (regenerable)
+pipeline/output/
+
+# Generated data assets (regenerable from scraper + pipeline)
+web/public/data/*.bin
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Env / secrets
+.env
+.env.local
+.env.*.local

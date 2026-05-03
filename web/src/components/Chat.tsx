@@ -71,7 +71,7 @@ export function Chat() {
   }
 
   return (
-    <div className="flex flex-col h-screen flex-1 p-4 gap-4">
+    <div className="flex flex-col h-screen flex-1 py-4 px-16 gap-4">
       <header className="flex items-baseline justify-between border-b border-zinc-800 pb-2">
         <h1 className="text-lg font-semibold">Advisor</h1>
         <span className="text-xs text-zinc-500">

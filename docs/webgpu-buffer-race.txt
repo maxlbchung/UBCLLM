@@ -1,0 +1,139 @@
+WebGPU "Buffer was unmapped before mapping was resolved" — 2026-05-03
+=====================================================================
+
+What you'd see
+--------------
+After Gemma 4 E2B finished its first reply, sending a second chat message
+crashed the stream with:
+
+  Error: Failed to execute 'mapAsync' on 'GPUBuffer': Buffer was unmapped
+  before mapping was resolved.
+
+The first turn worked. The second one always failed. Reloading the page
+fixed it for one more turn — same error on the third send.
+
+Pinpointed in commit 9d76871; live fix landed in v0.1.x patch chain.
+
+
+Why it happened
+---------------
+WebGPU's GPUBuffer.mapAsync() is asynchronous — you call it, get back a
+promise, and the promise resolves once the GPU has made the buffer's
+memory readable from JS. While that promise is pending, the buffer is in
+a "mapping pending" state. If somebody calls .unmap() (or destroys the
+buffer / clears the underlying state) before the promise resolves, the
+runtime throws this exact error.
+
+WebLLM (which is built on TVM's WebGPU backend) holds a pool of GPU
+buffers for its KV cache and intermediate tensors. When a chat
+completion stream finishes, the engine releases / unmaps those buffers
+in a teardown step that itself runs asynchronously, after the for-await
+loop on the stream returns.
+
+Our flow was:
+
+  1. User sends message → streamChat() awaits engine.chat.completions
+     .create({stream: true}) and iterates the result.
+  2. Stream finishes; the for-await exits, our `streaming` state flips
+     to false, the input becomes enabled again.
+  3. WebLLM's internal teardown is *still running* (unmapping buffers,
+     clearing KV cache).
+  4. User clicks send again immediately. We call create() again, which
+     internally allocates / maps fresh buffers — sometimes the *same*
+     buffers that step 3 is in the middle of unmapping.
+  5. mapAsync from step 4 races with unmap from step 3. unmap wins.
+     The promise rejects with the message above.
+
+The "first call worked" part was the giveaway: it wasn't a config /
+permissions issue, it was state left over by the previous call.
+
+Two structural facts that made this easy to hit:
+ - WebLLM's chat.completions API is OpenAI-compatible, so it *looks*
+   stateless. It isn't — the KV cache and GPU buffer pool are reused
+   across calls, and their lifecycle straddles the stream boundary.
+ - Our `disabled={streaming}` UX guard is bound to the stream-iteration
+   completion, not to engine teardown completion. The guard releases
+   before WebLLM is actually idle.
+
+
+How we fixed it
+---------------
+web/src/lib/llm.ts — two changes:
+
+  // Module-scoped promise that always resolves when the *previous*
+  // streamChat() has fully finished (including the try/finally below).
+  let chainTail: Promise<void> = Promise.resolve()
+
+  export async function* streamChat(messages, opts = {}) {
+    const engine = await getLLM()
+    const previous = chainTail
+    let release: () => void
+    chainTail = new Promise<void>(r => { release = r })
+
+    try {
+      // 1) Wait for any prior call's GPU teardown to finish.
+      await previous
+      // 2) Belt-and-braces: reset KV cache + buffer state explicitly.
+      //    No-op for output because we re-send full history each call.
+      await engine.resetChat()
+
+      const stream = await engine.chat.completions.create({
+        messages,
+        stream: true,
+        temperature: opts.temperature ?? 0.4,
+      })
+      for await (const chunk of stream) {
+        const delta = chunk.choices[0]?.delta?.content
+        if (delta) yield delta
+      }
+    } finally {
+      release!()  // signal the next call that we're done
+    }
+  }
+
+The `chainTail` pattern guarantees serialization even if a second call
+arrives before the first generator has been consumed — the new call's
+`await previous` blocks until the first call's `finally` runs. The
+`engine.resetChat()` is defensive: if some teardown step is still in
+flight, resetChat() at minimum touches the same internal state and
+forces it to a known-clean point before allocating new buffers.
+
+This is functionally a no-op for the model output because we already
+pass the full conversation history in `messages` on every call —
+resetting WebLLM's internal context just discards a cache, not memory.
+
+
+How to avoid it elsewhere
+-------------------------
+1. Treat any WebGPU-backed runtime (WebLLM, TVM-web, ONNX-runtime-web's
+   WebGPU EP, transformers.js GPU mode, ort-web GPU EP) as a *shared,
+   serialized resource*. Even with an OpenAI-shaped API, do not start
+   call N+1 until call N has fully settled — including post-stream
+   teardown, not just stream completion.
+
+2. Don't tie UI guards (a "streaming" flag, button disabled state) to
+   the stream's last token. Tie them to the wrapper's outer `finally`,
+   so the guard outlives any async cleanup the runtime does behind your
+   back.
+
+3. If the API gives you a reset / clear method, call it at the start
+   of each call rather than the end. End-of-call cleanup is exactly
+   what races with the next call's allocation; start-of-call reset
+   happens after `await previous` and is therefore safe.
+
+4. For raw WebGPU code: never call buffer.mapAsync(...) on a buffer
+   that might be unmap()'d by another code path concurrently. Either
+   serialize the operations through a single async chain, or give each
+   logical operation its own buffer and destroy it only when its own
+   mapAsync chain has resolved/rejected.
+
+5. When you see "Buffer was unmapped before mapping was resolved" or
+   "Buffer is destroyed" or "GPUDevice was lost", check first whether
+   your call is racing with a previous call's cleanup. The first call
+   succeeding while the second always fails is the classic shape of
+   this bug.
+
+6. If you're streaming from a generator that the consumer might abandon
+   (`break` out of the for-await), make sure the generator's `return()`
+   handler still releases the chain tail. Otherwise an abandoned stream
+   leaves the next call waiting forever.

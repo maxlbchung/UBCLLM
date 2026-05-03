@@ -17,10 +17,10 @@ type ParsedQuery =
  *   - exact:   "CPSC 110"            → single course
  *   - subject: "CPSC"                → all courses in that subject
  *   - filter:  "CPSC 100 =" / "+" / "-" → all courses in subject whose first
- *              digit equals / is ≥ / is ≤ the query's first digit
+ *              digit equals / is ≥ / is < the query's first digit
  *
- * Both bounds are inclusive: `200 +` covers 2xx upward, `250 -` covers 2xx
- * downward, `100 =` is exactly 1xx.
+ * "+" includes the boundary digit; "-" excludes it. So `200 +` covers 2xx
+ * upward, `250 -` covers 1xx only, `100 =` is exactly 1xx.
  */
 function parseQuery(raw: string): ParsedQuery {
   const q = raw.toUpperCase().trim()
@@ -55,7 +55,7 @@ function describeFilter(p: Extract<ParsedQuery, { kind: 'filter' }>): string {
   const lvl = `${p.digit}xx`
   if (p.op === '=') return `${p.subject} courses at the ${lvl} level`
   if (p.op === '+') return `${p.subject} courses at ${lvl} and above`
-  return `${p.subject} courses at ${lvl} and below`
+  return `${p.subject} courses below the ${lvl} level`
 }
 
 export function CourseLookup() {
@@ -124,7 +124,7 @@ export function CourseLookup() {
         if (Number.isNaN(d)) return false
         if (op === '=') return d === digit
         if (op === '+') return d >= digit
-        return d <= digit
+        return d < digit
       })
     }
 
@@ -166,7 +166,7 @@ export function CourseLookup() {
           subject, or add an operator: <span className="font-mono text-zinc-300">CPSC 100 =</span>{' '}
           (only 1xx),{' '}
           <span className="font-mono text-zinc-300">CPSC 200 +</span> (2xx and up),{' '}
-          <span className="font-mono text-zinc-300">CPSC 250 -</span> (2xx and below).
+          <span className="font-mono text-zinc-300">CPSC 250 -</span> (below 2xx).
         </p>
       </header>
 

@@ -20,6 +20,11 @@ export interface Chunk {
   title: string
   text: string
   url: string
+  // Set by topK on returned chunks (post-boost ranking score; cosine in
+  // [-1, 1] for pure-semantic hits, ~+2 higher for course-code matches).
+  // Undefined for chunks read straight from the corpus or rehydrated from
+  // older persisted conversations that pre-date this field.
+  score?: number
 }
 
 interface Corpus {
@@ -91,7 +96,7 @@ export async function topK(
   // []; userPromptWithContext + the SCOPE rule then handle the empty case.
   const indices = Array.from(scores.keys()).filter((i) => scores[i] >= minScore)
   indices.sort((a, b) => scores[b] - scores[a])
-  return indices.slice(0, k).map((i) => chunks[i])
+  return indices.slice(0, k).map((i) => ({ ...chunks[i], score: scores[i] }))
 }
 
 // ---------- Course-only helpers (used by CourseLookup + PrereqTree) ----------

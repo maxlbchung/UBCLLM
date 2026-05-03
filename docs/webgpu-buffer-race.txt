@@ -137,3 +137,73 @@ How to avoid it elsewhere
    (`break` out of the for-await), make sure the generator's `return()`
    handler still releases the chain tail. Otherwise an abandoned stream
    leaves the next call waiting forever.
+
+
+Sequel — same error, different trigger (v0.9.0)
+------------------------------------------------
+After the chainTail fix the back-to-back race was gone, but the same
+error string kept resurfacing later in the app's life:
+
+  - After leaving the tab idle for a while, the first send threw
+    "Buffer was unmapped before mapping was resolved" mid-stream, and
+    every subsequent send threw "Model not loaded before trying to
+    complete ChatCompletionRequest". A page reload always fixed it.
+  - Occasionally the unmapped-buffer error appeared with no idle
+    period at all, just during an ordinary turn.
+
+Reading WebLLM's source pinned this on GPU device loss, not on a race
+in our code:
+
+  web-llm/lib/index.js:12191
+    gpuDetectOutput.device.lost.then(info => {
+      if (this.deviceLostIsError) {
+        log.error(...)
+        this.unload()           // ← clears loadedModelIdToPipeline,
+                                //   destroys all GPU buffers, rejecting
+                                //   any in-flight mapAsync promises
+        deviceLostInReload = true
+      }
+    })
+
+When Chrome (or the OS, via Windows TDR) yanks the GPUDevice for any
+reason — backgrounded tab being throttled, a single compute pass
+exceeding the 2 s TDR limit, VRAM pressure, driver crash — WebLLM
+treats it as fatal and unloads. The first symptom is whatever
+mapAsync was in flight rejecting (the unmap error). After that the
+engine has zero loaded models, so every subsequent
+`chat.completions.create` short-circuits to ModelNotLoadedError.
+
+Two-layer fix:
+
+  Layer 1 (recovery, v0.8.7): isStaleEngineError() in streamChat
+  detects the error strings ("Buffer was unmapped", "Model not loaded",
+  "device was lost", "Buffer is destroyed"), nulls the cached engine
+  promise so the next getLLM() rebuilds via CreateMLCEngine (fast,
+  weights stay in IndexedDB), and transparently retries the current
+  call once if no tokens have been yielded yet. Mid-stream failures
+  rethrow but still mark the engine stale, so the *next* user send
+  recovers automatically instead of failing forever.
+
+  Layer 2 (root, v0.9.0): move the MLCEngine into a Web Worker via
+  CreateWebWorkerMLCEngine. The worker owns the GPUDevice; brief tab
+  visibility changes and main-thread back-pressure no longer cost us
+  the device. The worker also terminates cleanly on discardEngine()
+  so a fresh GPUDevice is requested on respawn. This doesn't help
+  against Windows TDR or true VRAM exhaustion (those are GPU-side and
+  out of reach), but it eliminates the most common production trigger
+  and keeps the layer-1 recovery available as a safety net for the
+  rest.
+
+How to avoid it elsewhere — addendum
+------------------------------------
+7. Treat MLCEngine on the main thread as a debug-only shape. For
+   anything user-facing, run it in a Worker via the
+   WebWorkerMLCEngine{Handler} pair WebLLM ships. Same call surface
+   (`engine.chat.completions.create(...)`), but the GPU resources are
+   owned outside the page lifecycle.
+
+8. When you wrap a long-lived GPU runtime in a singleton promise,
+   pair it with a discard step that *also* terminates whatever process
+   owns the GPUDevice (worker.terminate(), or unload() on a main-thread
+   engine). Otherwise you re-attach to a corpse and the next call still
+   sees "Model not loaded".

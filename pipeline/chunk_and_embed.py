@@ -1,0 +1,211 @@
+"""Chunk + embed UBC course/program JSON for the browser RAG runtime.
+
+Inputs:
+  ../scraper/output/courses.json
+  ../scraper/output/programs.json
+
+Outputs:
+  ../web/public/data/chunks.json    list[{id, kind, code, title, text, url}]
+  ../web/public/data/embeddings.bin Float32Array, row-major, N x 384, L2-normalized
+
+The model used here MUST stay compatible with what the browser uses
+(`Xenova/all-MiniLM-L6-v2`). They share weights but ship under different
+distributions; the underlying tokenizer + pooling are identical.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import logging
+from dataclasses import asdict, dataclass
+from pathlib import Path
+
+import numpy as np
+from sentence_transformers import SentenceTransformer
+
+ROOT = Path(__file__).resolve().parent.parent
+COURSES_JSON = ROOT / "scraper" / "output" / "courses.json"
+PROGRAMS_JSON = ROOT / "scraper" / "output" / "programs.json"
+OUTPUT_DIR = ROOT / "web" / "public" / "data"
+CHUNKS_JSON = OUTPUT_DIR / "chunks.json"
+EMBEDDINGS_BIN = OUTPUT_DIR / "embeddings.bin"
+
+MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
+EMBED_DIM = 384
+TARGET_CHARS = 1600  # ~400 tokens; MiniLM ceiling is 512 tokens
+
+log = logging.getLogger("ubcllm.pipeline")
+
+
+@dataclass
+class Chunk:
+    id: str
+    kind: str            # "course" | "program"
+    code: str | None     # e.g. "CPSC 110" for course chunks; None for programs
+    title: str
+    text: str
+    url: str
+
+
+# ---------- chunk builders ----------
+
+def course_chunk(c: dict) -> Chunk:
+    parts = [f"{c['code']}: {c['title']}"]
+    if c.get("credits"):
+        parts.append(f"Credits: {c['credits']}")
+    if c.get("description"):
+        parts.append(c["description"])
+    if c.get("prerequisites"):
+        parts.append(f"Prerequisites: {c['prerequisites']}")
+    if c.get("corequisites"):
+        parts.append(f"Corequisites: {c['corequisites']}")
+    if c.get("equivalency"):
+        parts.append(f"Equivalency: {c['equivalency']}")
+    if c.get("recommended"):
+        parts.append(f"Recommended: {c['recommended']}")
+    return Chunk(
+        id=f"course:{c['subject']}_{c['number']}",
+        kind="course",
+        code=c["code"],
+        title=c["title"],
+        text="\n".join(parts),
+        url=c["url"],
+    )
+
+
+def program_chunks(p: dict) -> list[Chunk]:
+    text = (p.get("text") or "").strip()
+    if not text:
+        return []
+    paragraphs = [pg for pg in text.split("\n") if pg.strip()]
+
+    bins: list[list[str]] = []
+    cur: list[str] = []
+    cur_len = 0
+    for pg in paragraphs:
+        if cur and cur_len + len(pg) > TARGET_CHARS:
+            bins.append(cur)
+            cur = [pg]
+            cur_len = len(pg)
+        else:
+            cur.append(pg)
+            cur_len += len(pg) + 1
+    if cur:
+        bins.append(cur)
+
+    title = p.get("title") or ""
+    breadcrumbs = p.get("breadcrumbs") or []
+    crumb = " > ".join(breadcrumbs[1:]) if len(breadcrumbs) > 1 else ""
+    base_id = (p["url"].rstrip("/").rsplit("/", 1)[-1] or "root").lower()
+
+    out: list[Chunk] = []
+    for i, pg_lines in enumerate(bins):
+        prefix = title
+        if crumb:
+            prefix = f"{title}\n{crumb}"
+        body = "\n".join(pg_lines)
+        full = f"{prefix}\n\n{body}" if prefix else body
+        out.append(Chunk(
+            id=f"program:{base_id}:{i}",
+            kind="program",
+            code=None,
+            title=title,
+            text=full,
+            url=p["url"],
+        ))
+    return out
+
+
+# ---------- main ----------
+
+def main() -> None:
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--batch-size", type=int, default=64)
+    ap.add_argument("--limit", type=int, help="Cap number of chunks (debug)")
+    ap.add_argument("--no-courses", action="store_true")
+    ap.add_argument("--no-programs", action="store_true")
+    ap.add_argument("--verbose", "-v", action="store_true")
+    args = ap.parse_args()
+
+    logging.basicConfig(
+        level=logging.DEBUG if args.verbose else logging.INFO,
+        format="%(asctime)s %(levelname)s %(message)s",
+        datefmt="%H:%M:%S",
+    )
+
+    chunks: list[Chunk] = []
+
+    if not args.no_courses:
+        log.info("Loading %s", COURSES_JSON)
+        courses = json.loads(COURSES_JSON.read_text(encoding="utf-8"))
+        log.info("  %d courses", len(courses))
+        for c in courses:
+            chunks.append(course_chunk(c))
+
+    if not args.no_programs:
+        log.info("Loading %s", PROGRAMS_JSON)
+        programs = json.loads(PROGRAMS_JSON.read_text(encoding="utf-8"))
+        log.info("  %d program pages", len(programs))
+        for p in programs:
+            chunks.extend(program_chunks(p))
+
+    seen: set[str] = set()
+    deduped: list[Chunk] = []
+    for ch in chunks:
+        if ch.id in seen:
+            continue
+        seen.add(ch.id)
+        deduped.append(ch)
+    chunks = deduped
+
+    if args.limit:
+        chunks = chunks[: args.limit]
+
+    n_course = sum(1 for c in chunks if c.kind == "course")
+    n_program = sum(1 for c in chunks if c.kind == "program")
+    log.info("Total chunks: %d (%d course, %d program)", len(chunks), n_course, n_program)
+
+    log.info("Loading embedding model %s", MODEL_NAME)
+    model = SentenceTransformer(MODEL_NAME)
+
+    texts = [c.text for c in chunks]
+    log.info("Embedding %d chunks (batch=%d)…", len(texts), args.batch_size)
+    embeddings = model.encode(
+        texts,
+        batch_size=args.batch_size,
+        show_progress_bar=True,
+        convert_to_numpy=True,
+        normalize_embeddings=True,  # so cosine == dot product
+    )
+    embeddings = embeddings.astype(np.float32, copy=False)
+    if embeddings.shape != (len(texts), EMBED_DIM):
+        raise RuntimeError(
+            f"unexpected embedding shape {embeddings.shape}, "
+            f"expected ({len(texts)}, {EMBED_DIM})"
+        )
+
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+    # chunks.json: pretty-print disabled to keep payload small. The browser
+    # parses this once at load time.
+    payload = [asdict(c) for c in chunks]
+    CHUNKS_JSON.write_text(
+        json.dumps(payload, ensure_ascii=False, separators=(",", ":")),
+        encoding="utf-8",
+    )
+    log.info(
+        "Wrote chunks.json: %d entries, %.1f MB",
+        len(payload),
+        CHUNKS_JSON.stat().st_size / 1024 / 1024,
+    )
+
+    embeddings.tofile(EMBEDDINGS_BIN)
+    log.info(
+        "Wrote embeddings.bin: shape %s, %.1f MB",
+        embeddings.shape,
+        EMBEDDINGS_BIN.stat().st_size / 1024 / 1024,
+    )
+
+
+if __name__ == "__main__":
+    main()

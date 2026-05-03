@@ -14,13 +14,14 @@ venv/
 
 # Scraper cache (raw HTML)
 scraper/cache/
-scraper/output/*.json
+# scraper/output/*.json is committed: it's the corpus snapshot the CI build
+# feeds into the pipeline. Re-running the scraper hits UBC servers, so we'd
+# rather pin a known-good crawl than regenerate every deploy.
 
-# Pipeline output (regenerable)
+# Pipeline output (regenerated in CI from scraper/output/)
 pipeline/output/
-
-# Generated data assets (regenerable from scraper + pipeline)
 web/public/data/*.bin
+web/public/data/chunks.json
 
 # Editor / OS
 .DS_Store
@@ -33,3 +34,6 @@ Thumbs.db
 .env
 .env.local
 .env.*.local
+
+# Claude Code local workspace
+.claude/

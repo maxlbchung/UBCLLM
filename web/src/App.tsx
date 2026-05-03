@@ -1,16 +1,28 @@
+import { ModelLoader } from './components/ModelLoader'
+import { Sidebar } from './components/Sidebar'
+import { Chat } from './components/Chat'
+import { CourseLookup } from './components/CourseLookup'
+import { PrereqTree } from './components/PrereqTree'
+import { useConversations } from './store/conversations'
+
 export default function App() {
   return (
-    <div className="flex h-full items-center justify-center">
-      <div className="max-w-xl text-center space-y-3 px-6">
-        <h1 className="text-3xl font-semibold text-white">UBCLLM</h1>
-        <p className="text-sm text-zinc-400">
-          Browser-native UBC academic advisor. Scaffold ready &mdash; chat UI, RAG retrieval, and
-          Gemma 4 E2B integration land in the next session.
-        </p>
-        <p className="text-xs text-zinc-500">
-          Verify your machine first: open the smoke-test page and confirm Gemma 4 E2B loads under WebGPU.
-        </p>
-      </div>
+    <ModelLoader>
+      <Shell />
+    </ModelLoader>
+  )
+}
+
+function Shell() {
+  const view = useConversations((s) => s.view)
+  return (
+    <div className="flex h-screen w-screen overflow-hidden">
+      <Sidebar />
+      <main className="flex-1 min-w-0 flex flex-col">
+        {view === 'chat' && <Chat />}
+        {view === 'lookup' && <CourseLookup />}
+        {view === 'prereq' && <PrereqTree />}
+      </main>
     </div>
   )
 }

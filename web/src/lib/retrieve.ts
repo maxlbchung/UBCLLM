@@ -5,6 +5,14 @@ import { embed } from './embed'
 
 const EMBED_DIM = 384
 
+// Minimum cosine similarity (post-boost) for a chunk to be returned by topK.
+// MiniLM-L6 puts unrelated short strings around 0.0–0.2 and same-topic
+// chunks at 0.3+, so this is a sane first cut to reject greetings and
+// off-topic queries entirely. Course-code matches get +2 from the boost
+// below and always pass. Tune by editing this constant: raise if irrelevant
+// chunks still leak through, lower if real questions return empty.
+const MIN_SCORE = 0.3
+
 export interface Chunk {
   id: string
   kind: 'course' | 'program'
@@ -50,7 +58,11 @@ function dot(a: Float32Array, b: Float32Array, offset: number): number {
   return s
 }
 
-export async function topK(query: string, k = 8): Promise<Chunk[]> {
+export async function topK(
+  query: string,
+  k = 8,
+  minScore = MIN_SCORE,
+): Promise<Chunk[]> {
   const [{ chunks, matrix }, qVec] = await Promise.all([loadCorpus(), embed(query)])
   const scores = new Float32Array(chunks.length)
   for (let i = 0; i < chunks.length; i++) {
@@ -62,7 +74,8 @@ export async function topK(query: string, k = 8): Promise<Chunk[]> {
   // and "CPSC 320", so pure semantic top-K can miss the literal course the
   // user asked about. If the query mentions explicit course codes, push their
   // chunks above any cosine-only match. Cosine scores live in [-1, 1] after
-  // normalization; +2 guarantees the boosted chunk lands in the top slice.
+  // normalization; +2 guarantees the boosted chunk lands in the top slice
+  // (and trivially passes the minScore floor below).
   const requested = new Set(extractCourseCodes(query))
   if (requested.size > 0) {
     for (let i = 0; i < chunks.length; i++) {
@@ -73,7 +86,10 @@ export async function topK(query: string, k = 8): Promise<Chunk[]> {
     }
   }
 
-  const indices = Array.from(scores.keys())
+  // Drop chunks below the relevance floor before sorting. For greetings and
+  // off-topic queries every chunk's cosine sits near zero, so this returns
+  // []; userPromptWithContext + the SCOPE rule then handle the empty case.
+  const indices = Array.from(scores.keys()).filter((i) => scores[i] >= minScore)
   indices.sort((a, b) => scores[b] - scores[a])
   return indices.slice(0, k).map((i) => chunks[i])
 }

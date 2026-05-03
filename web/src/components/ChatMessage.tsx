@@ -27,7 +27,7 @@ function renderWithCitations(content: string, sources: Chunk[]): ReactNode[] {
           target="_blank"
           rel="noopener noreferrer"
           title={src.code ?? src.title}
-          className="inline-block align-super text-[10px] font-mono px-1 mx-0.5 rounded bg-blue-500/30 text-blue-200 hover:bg-blue-500/60 hover:text-white no-underline"
+          className="inline-block align-super text-[0.625rem] font-mono px-1 mx-0.5 rounded bg-blue-500/30 text-blue-200 hover:bg-blue-500/60 hover:text-white no-underline"
         >
           {idx + 1}
         </a>,
@@ -92,7 +92,7 @@ export function ChatMessage({ message }: { message: Message }) {
               <ul className="mt-1 space-y-1">
                 {cited1Indexed.map(({ s, i }) => (
                   <li key={s.id} className="flex items-baseline gap-1.5">
-                    <span className="text-[10px] font-mono text-blue-300/90 w-4 text-right">
+                    <span className="text-[0.625rem] font-mono text-blue-300/90 w-4 text-right">
                       [{i}]
                     </span>
                     <a
@@ -110,13 +110,13 @@ export function ChatMessage({ message }: { message: Message }) {
 
             {uncited.length > 0 && (
               <>
-                <p className="mt-2 text-[10px] uppercase tracking-wider text-zinc-600">
+                <p className="mt-2 text-[0.625rem] uppercase tracking-wider text-zinc-600">
                   Other retrieved context
                 </p>
                 <ul className="mt-1 space-y-1 opacity-60">
                   {uncited.map(({ s, i }) => (
                     <li key={s.id} className="flex items-baseline gap-1.5">
-                      <span className="text-[10px] font-mono text-zinc-600 w-4 text-right">
+                      <span className="text-[0.625rem] font-mono text-zinc-600 w-4 text-right">
                         [{i}]
                       </span>
                       <a

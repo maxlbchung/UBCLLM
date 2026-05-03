@@ -4,8 +4,11 @@ html, body, #root {
   height: 100%;
 }
 
-#root {
-  zoom: 1.25;
+/* Bumps the rem base from 16px → 20px so all rem-based Tailwind sizes
+   (text, spacing, icons rendered as text/emoji) scale up by 1.25x.
+   Use rem for pixel-text classes so they scale with this. */
+html {
+  font-size: 20px;
 }
 
 body {

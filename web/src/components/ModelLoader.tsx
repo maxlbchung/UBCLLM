@@ -4,7 +4,7 @@ import { APP_VERSION } from '../version'
 
 function VersionBadge() {
   return (
-    <div className="fixed bottom-2 left-3 text-[11px] text-zinc-500 font-mono pointer-events-none select-none">
+    <div className="fixed bottom-2 left-3 text-[0.6875rem] text-zinc-500 font-mono pointer-events-none select-none">
       v{APP_VERSION}
     </div>
   )
@@ -122,7 +122,7 @@ export function ModelLoader({ children }: { children: ReactNode }) {
                   Try again
                 </button>
               </div>
-              <p className="text-[11px] text-zinc-500 max-w-md mt-2">
+              <p className="text-[0.6875rem] text-zinc-500 max-w-md mt-2">
                 A persistent failure usually means a corrupted cached shard from an earlier interrupted download. Clearing the cache forces a clean re-download.
               </p>
             </>
@@ -149,7 +149,7 @@ export function ModelLoader({ children }: { children: ReactNode }) {
             />
           </div>
           <p className="text-xs text-zinc-400 max-w-md text-center">{s.text}</p>
-          <p className="text-[11px] text-zinc-500 max-w-md text-center">
+          <p className="text-[0.6875rem] text-zinc-500 max-w-md text-center">
             First load downloads the model (~1–2 GB). It's cached in your browser, so the next visit starts instantly.
           </p>
         </div>

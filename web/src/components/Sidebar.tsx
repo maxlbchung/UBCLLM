@@ -12,16 +12,43 @@ export function Sidebar() {
   const order = useConversations((s) => s.order)
   const activeId = useConversations((s) => s.activeId)
   const view = useConversations((s) => s.view)
+  const collapsed = useConversations((s) => s.sidebarCollapsed)
   const newConversation = useConversations((s) => s.newConversation)
   const setActive = useConversations((s) => s.setActive)
   const deleteConversation = useConversations((s) => s.deleteConversation)
   const setView = useConversations((s) => s.setView)
+  const toggleSidebar = useConversations((s) => s.toggleSidebar)
+
+  if (collapsed) {
+    return (
+      <aside className="w-12 shrink-0 flex flex-col items-center bg-zinc-950 border-r border-zinc-800 py-3 gap-2 h-screen">
+        <button
+          onClick={toggleSidebar}
+          className="text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900 rounded p-1.5 text-base leading-none"
+          aria-label="Expand sidebar"
+          title="Expand sidebar"
+        >
+          ▶
+        </button>
+      </aside>
+    )
+  }
 
   return (
-    <aside className="w-64 shrink-0 flex flex-col bg-zinc-950 border-r border-zinc-800 p-3 gap-3 h-screen">
+    <aside className="w-80 shrink-0 flex flex-col bg-zinc-950 border-r border-zinc-800 p-3 gap-3 h-screen">
       <div className="flex items-center justify-between">
-        <h1 className="text-sm font-semibold tracking-wide">UBCLLM</h1>
-        <span className="text-[10px] text-zinc-500">in-browser</span>
+        <div className="flex items-baseline gap-2 min-w-0">
+          <h1 className="text-sm font-semibold tracking-wide">UBCLLM</h1>
+          <span className="text-[0.625rem] text-zinc-500">in-browser</span>
+        </div>
+        <button
+          onClick={toggleSidebar}
+          className="text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900 rounded p-1 text-base leading-none shrink-0"
+          aria-label="Collapse sidebar"
+          title="Collapse sidebar"
+        >
+          ◀
+        </button>
       </div>
 
       <button
@@ -49,7 +76,7 @@ export function Sidebar() {
         ))}
       </div>
 
-      <div className="border-t border-zinc-800 pt-2 text-[11px] uppercase tracking-wider text-zinc-500">
+      <div className="border-t border-zinc-800 pt-2 text-[0.6875rem] uppercase tracking-wider text-zinc-500">
         History
       </div>
 
@@ -88,10 +115,10 @@ export function Sidebar() {
         })}
       </div>
 
-      <div className="text-[10px] text-zinc-600 leading-tight">
+      <div className="text-[0.625rem] text-zinc-600 leading-tight">
         Gemma 4 E2B · WebGPU · MiniLM embeddings · UBC Vancouver calendar 2026/27.
       </div>
-      <div className="text-[10px] text-zinc-500 font-mono">v{APP_VERSION}</div>
+      <div className="text-[0.625rem] text-zinc-500 font-mono">v{APP_VERSION}</div>
     </aside>
   )
 }

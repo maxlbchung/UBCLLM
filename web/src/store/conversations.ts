@@ -21,6 +21,7 @@ interface State {
   order: string[] // newest first
   activeId: string | null
   view: View
+  sidebarCollapsed: boolean
 
   newConversation: () => string
   setActive: (id: string) => void
@@ -28,6 +29,7 @@ interface State {
   setView: (v: View) => void
   saveCurrent: () => void
   ensureActive: () => string
+  toggleSidebar: () => void
 }
 
 function newId(): string {
@@ -53,6 +55,7 @@ export const useConversations = create<State>()(
       order: [],
       activeId: null,
       view: 'chat',
+      sidebarCollapsed: false,
 
       newConversation: () => {
         const id = newId()
@@ -130,6 +133,9 @@ export const useConversations = create<State>()(
         if (activeId) return activeId
         return get().newConversation()
       },
+
+      toggleSidebar: () =>
+        set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
     }),
     {
       name: 'ubcllm-conversations',

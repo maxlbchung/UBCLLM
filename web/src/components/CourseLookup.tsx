@@ -11,6 +11,7 @@ type ParsedQuery =
   | { kind: 'exact'; code: string }
   | { kind: 'subject'; subject: string }
   | { kind: 'filter'; subject: string; digit: number; op: '=' | '+' | '-' }
+  | { kind: 'invalidFilter'; reason: string }
 
 /**
  * Parse a lookup-bar input into one of:
@@ -21,20 +22,34 @@ type ParsedQuery =
  *
  * "+" includes the boundary digit; "-" excludes it. So `200 +` covers 2xx
  * upward, `250 -` covers 1xx only, `100 =` is exactly 1xx.
+ *
+ * Filters are only accepted when the number is in X00 form (the canonical
+ * level boundary — 100, 200, …). A trailing operator on any other number
+ * yields an `invalidFilter` so the UI can explain instead of silently
+ * dropping the query.
  */
 function parseQuery(raw: string): ParsedQuery {
   const q = raw.toUpperCase().trim()
   if (!q) return { kind: 'none' }
 
-  const filterMatch = q.match(
-    /^([A-Z]{2,5})(?:_V)?\s*(\d{2,4}[A-Z]?)\s*([=+\-])$/,
-  )
-  if (filterMatch) {
+  // Trailing operator means the user is asking for a level filter.
+  const opMatch = q.match(/^(.+?)\s*([=+\-])$/)
+  if (opMatch) {
+    const prefix = opMatch[1].trim()
+    const op = opMatch[2] as '=' | '+' | '-'
+    const filterMatch = prefix.match(/^([A-Z]{2,5})(?:_V)?\s*(\d)00$/)
+    if (filterMatch) {
+      return {
+        kind: 'filter',
+        subject: filterMatch[1],
+        digit: Number(filterMatch[2]),
+        op,
+      }
+    }
     return {
-      kind: 'filter',
-      subject: filterMatch[1],
-      digit: Number(filterMatch[2][0]),
-      op: filterMatch[3] as '=' | '+' | '-',
+      kind: 'invalidFilter',
+      reason:
+        'Filters need the X00 form, e.g. CPSC 100 =, DSCI 200 +, WRDS 100 -.',
     }
   }
 
@@ -88,6 +103,15 @@ export function CourseLookup() {
       setMatches([])
       setMatchHeading('')
       setSuggestions([])
+      return
+    }
+
+    if (parsed.kind === 'invalidFilter') {
+      setCourse(null)
+      setMatches([])
+      setMatchHeading('')
+      setSuggestions([])
+      setError(parsed.reason)
       return
     }
 
@@ -163,10 +187,10 @@ export function CourseLookup() {
         <p className="text-xs text-zinc-500 mt-1">
           Type <span className="font-mono text-zinc-300">CPSC 110</span> for one course,{' '}
           <span className="font-mono text-zinc-300">CPSC</span> for the whole
-          subject, or add an operator: <span className="font-mono text-zinc-300">CPSC 100 =</span>{' '}
-          (only 1xx),{' '}
+          subject, or add an operator after an X00 number:{' '}
+          <span className="font-mono text-zinc-300">CPSC 100 =</span> (only 1xx),{' '}
           <span className="font-mono text-zinc-300">CPSC 200 +</span> (2xx and up),{' '}
-          <span className="font-mono text-zinc-300">CPSC 250 -</span> (below 2xx).
+          <span className="font-mono text-zinc-300">CPSC 200 -</span> (below 2xx).
         </p>
       </header>
 

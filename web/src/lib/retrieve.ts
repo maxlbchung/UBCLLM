@@ -6,12 +6,15 @@ import { embed } from './embed'
 const EMBED_DIM = 384
 
 // Minimum cosine similarity (post-boost) for a chunk to be returned by topK.
-// MiniLM-L6 puts unrelated short strings around 0.0–0.2 and same-topic
-// chunks at 0.3+, so this is a sane first cut to reject greetings and
-// off-topic queries entirely. Course-code matches get +2 from the boost
-// below and always pass. Tune by editing this constant: raise if irrelevant
-// chunks still leak through, lower if real questions return empty.
-const MIN_SCORE = 0.3
+// Course-code matches get +2 from the boost below and always pass; for
+// pure-semantic hits this is the floor. MiniLM-L6 puts most unrelated
+// short strings around 0.0–0.2, but a few greetings like "hi" cluster
+// surprisingly close to specific subjects (e.g. "hi" lands at 0.315 vs
+// HINU because the model learned "hi" → "hindi" in pretraining). 0.4
+// excludes those edge cases while real questions still sit at 0.5–0.7.
+// Tune: raise if irrelevant chunks leak through, lower if real questions
+// return empty.
+const MIN_SCORE = 0.4
 
 export interface Chunk {
   id: string
@@ -81,6 +84,13 @@ export async function topK(
   // chunks above any cosine-only match. Cosine scores live in [-1, 1] after
   // normalization; +2 guarantees the boosted chunk lands in the top slice
   // (and trivially passes the minScore floor below).
+  //
+  // The `requested.has(c.code)` check requires an EXACT canonical code
+  // ("CPSC 110") match against the chunk's code, so partial subject typos
+  // can't hijack the boost: extractCourseCodes("CPS 110") yields
+  // "CPS 110", which is not a real chunk code, so no chunk gets boosted.
+  // Likewise "hi" extracts to nothing (regex needs both letters and
+  // digits) and triggers no boost at all.
   const requested = new Set(extractCourseCodes(query))
   if (requested.size > 0) {
     for (let i = 0; i < chunks.length; i++) {

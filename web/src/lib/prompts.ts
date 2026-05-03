@@ -17,7 +17,16 @@ using the same square-bracketed number that appears in the context, e.g.
     information in the UBC calendar."
 The UI parses these brackets to highlight the actual sources you used, so
 omitting them defeats the feature. When citing a specific course, also
-include its code (e.g., CPSC 110) inline alongside the bracketed number.`.trim()
+include its code (e.g., CPSC 110) inline alongside the bracketed number.
+
+FORMATTING — your replies are rendered as Markdown. Use it where it helps:
+  - **bold** for course codes, headings of short sections, or key terms.
+  - Bulleted or numbered lists when enumerating prerequisites, steps, or
+    requirements.
+  - Backtick code spans for course codes when listing many in a row, or
+    for short literal text.
+  - Tables (GitHub-flavored) when comparing a few options side by side.
+Keep formatting purposeful — short answers can stay as plain prose.`.trim()
 
 export function buildContext(chunks: Chunk[]): string {
   return chunks

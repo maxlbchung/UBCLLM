@@ -1,44 +1,62 @@
-import type { ReactNode } from 'react'
+import type { ComponentPropsWithoutRef, ReactNode } from 'react'
+import { Children } from 'react'
+import ReactMarkdown, { type Components } from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import type { Message } from '../store/chat'
 import type { Chunk } from '../lib/retrieve'
 
 const CITATION_RE = /\[(\d+)\]/g
 
+function citationChip(idx: number, sources: Chunk[], key: string | number): ReactNode {
+  const src = sources[idx - 1]
+  if (!src) return `[${idx}]`
+  return (
+    <a
+      key={key}
+      href={src.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={src.code ?? src.title}
+      className="inline-block align-super text-[0.625rem] font-mono px-1 mx-0.5 rounded bg-blue-500/30 text-blue-200 hover:bg-blue-500/60 hover:text-white no-underline"
+    >
+      {idx}
+    </a>
+  )
+}
+
 /**
- * Walk the assistant text, replacing every `[N]` (where 1 ≤ N ≤ sources.length)
- * with a clickable superscript anchor that opens the cited chunk's UBC URL.
- * Out-of-range numbers and stray brackets stay as literal text.
+ * Replace `[N]` markers in a plain string with citation chips. Out-of-range
+ * numbers and stray brackets stay as literal text.
  */
-function renderWithCitations(content: string, sources: Chunk[]): ReactNode[] {
-  const parts: ReactNode[] = []
+function injectCitations(text: string, sources: Chunk[]): ReactNode[] {
+  const out: ReactNode[] = []
   let last = 0
   let m: RegExpExecArray | null
   CITATION_RE.lastIndex = 0
-  while ((m = CITATION_RE.exec(content)) !== null) {
-    const idx = Number(m[1]) - 1
-    const inRange = idx >= 0 && idx < sources.length
-    if (m.index > last) parts.push(content.slice(last, m.index))
-    if (inRange) {
-      const src = sources[idx]
-      parts.push(
-        <a
-          key={`cit-${m.index}`}
-          href={src.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          title={src.code ?? src.title}
-          className="inline-block align-super text-[0.625rem] font-mono px-1 mx-0.5 rounded bg-blue-500/30 text-blue-200 hover:bg-blue-500/60 hover:text-white no-underline"
-        >
-          {idx + 1}
-        </a>,
-      )
-    } else {
-      parts.push(m[0])
-    }
+  while ((m = CITATION_RE.exec(text)) !== null) {
+    const idx = Number(m[1])
+    const inRange = idx >= 1 && idx <= sources.length
+    if (m.index > last) out.push(text.slice(last, m.index))
+    if (inRange) out.push(citationChip(idx, sources, `cit-${m.index}`))
+    else out.push(m[0])
     last = m.index + m[0].length
   }
-  if (last < content.length) parts.push(content.slice(last))
-  return parts
+  if (last < text.length) out.push(text.slice(last))
+  return out
+}
+
+/**
+ * Walk immediate children of a markdown element and decorate any string
+ * children with citation chips. Nested elements keep their own component
+ * overrides so decoration recurses naturally.
+ */
+function decorate(children: ReactNode, sources: Chunk[]): ReactNode {
+  return Children.map(children, (child, i) => {
+    if (typeof child === 'string') {
+      return <span key={`txt-${i}`}>{injectCitations(child, sources)}</span>
+    }
+    return child
+  })
 }
 
 function citedIndices(content: string, sourceCount: number): Set<number> {
@@ -50,6 +68,129 @@ function citedIndices(content: string, sourceCount: number): Set<number> {
     if (i >= 1 && i <= sourceCount) out.add(i)
   }
   return out
+}
+
+function buildComponents(sources: Chunk[]): Components {
+  const dec = (children: ReactNode) => decorate(children, sources)
+  return {
+    p: ({ children, ...rest }: ComponentPropsWithoutRef<'p'>) => (
+      <p className="my-2 first:mt-0 last:mb-0" {...rest}>
+        {dec(children)}
+      </p>
+    ),
+    ul: ({ children, ...rest }: ComponentPropsWithoutRef<'ul'>) => (
+      <ul className="list-disc pl-5 my-2 space-y-1" {...rest}>
+        {children}
+      </ul>
+    ),
+    ol: ({ children, ...rest }: ComponentPropsWithoutRef<'ol'>) => (
+      <ol className="list-decimal pl-5 my-2 space-y-1" {...rest}>
+        {children}
+      </ol>
+    ),
+    li: ({ children, ...rest }: ComponentPropsWithoutRef<'li'>) => (
+      <li {...rest}>{dec(children)}</li>
+    ),
+    strong: ({ children, ...rest }: ComponentPropsWithoutRef<'strong'>) => (
+      <strong className="font-semibold" {...rest}>
+        {dec(children)}
+      </strong>
+    ),
+    em: ({ children, ...rest }: ComponentPropsWithoutRef<'em'>) => (
+      <em className="italic" {...rest}>
+        {dec(children)}
+      </em>
+    ),
+    del: ({ children, ...rest }: ComponentPropsWithoutRef<'del'>) => (
+      <del {...rest}>{dec(children)}</del>
+    ),
+    h1: ({ children, ...rest }: ComponentPropsWithoutRef<'h1'>) => (
+      <h1 className="text-base font-semibold mt-3 mb-1" {...rest}>
+        {dec(children)}
+      </h1>
+    ),
+    h2: ({ children, ...rest }: ComponentPropsWithoutRef<'h2'>) => (
+      <h2 className="text-base font-semibold mt-3 mb-1" {...rest}>
+        {dec(children)}
+      </h2>
+    ),
+    h3: ({ children, ...rest }: ComponentPropsWithoutRef<'h3'>) => (
+      <h3 className="text-sm font-semibold mt-2 mb-1" {...rest}>
+        {dec(children)}
+      </h3>
+    ),
+    h4: ({ children, ...rest }: ComponentPropsWithoutRef<'h4'>) => (
+      <h4 className="text-sm font-semibold mt-2 mb-1" {...rest}>
+        {dec(children)}
+      </h4>
+    ),
+    h5: ({ children, ...rest }: ComponentPropsWithoutRef<'h5'>) => (
+      <h5 className="text-sm font-semibold mt-2 mb-1" {...rest}>
+        {dec(children)}
+      </h5>
+    ),
+    h6: ({ children, ...rest }: ComponentPropsWithoutRef<'h6'>) => (
+      <h6 className="text-sm font-semibold mt-2 mb-1" {...rest}>
+        {dec(children)}
+      </h6>
+    ),
+    a: ({ href, children, ...rest }: ComponentPropsWithoutRef<'a'>) => (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="underline text-blue-300 hover:text-blue-200"
+        {...rest}
+      >
+        {children}
+      </a>
+    ),
+    code: ({ children, ...rest }: ComponentPropsWithoutRef<'code'>) => (
+      <code
+        className="px-1 py-0.5 rounded bg-zinc-900/70 font-mono text-[0.85em]"
+        {...rest}
+      >
+        {children}
+      </code>
+    ),
+    pre: ({ children, ...rest }: ComponentPropsWithoutRef<'pre'>) => (
+      <pre
+        className="my-2 p-2 rounded bg-zinc-900/70 overflow-x-auto text-xs font-mono"
+        {...rest}
+      >
+        {children}
+      </pre>
+    ),
+    blockquote: ({ children, ...rest }: ComponentPropsWithoutRef<'blockquote'>) => (
+      <blockquote
+        className="border-l-2 border-zinc-600 pl-3 my-2 text-zinc-300"
+        {...rest}
+      >
+        {children}
+      </blockquote>
+    ),
+    hr: () => <hr className="my-3 border-zinc-700" />,
+    table: ({ children, ...rest }: ComponentPropsWithoutRef<'table'>) => (
+      <div className="my-2 overflow-x-auto">
+        <table className="border-collapse text-xs" {...rest}>
+          {children}
+        </table>
+      </div>
+    ),
+    th: ({ children, ...rest }: ComponentPropsWithoutRef<'th'>) => (
+      <th
+        className="px-2 py-1 border border-zinc-700 text-left font-semibold bg-zinc-900/40"
+        {...rest}
+      >
+        {dec(children)}
+      </th>
+    ),
+    td: ({ children, ...rest }: ComponentPropsWithoutRef<'td'>) => (
+      <td className="px-2 py-1 border border-zinc-700 align-top" {...rest}>
+        {dec(children)}
+      </td>
+    ),
+  }
 }
 
 export function ChatMessage({ message }: { message: Message }) {
@@ -68,17 +209,26 @@ export function ChatMessage({ message }: { message: Message }) {
     <div className={isUser ? 'flex justify-end' : 'flex justify-start'}>
       <div
         className={
-          'rounded-lg px-3 py-2 max-w-[85%] whitespace-pre-wrap text-sm leading-relaxed ' +
+          'rounded-lg px-3 py-2 max-w-[85%] text-sm leading-relaxed ' +
           (isUser
-            ? 'bg-blue-600 text-white'
+            ? 'bg-blue-600 text-white whitespace-pre-wrap'
             : 'bg-zinc-800 text-zinc-100 border border-zinc-700')
         }
       >
-        {message.content
-          ? isUser
-            ? message.content
-            : renderWithCitations(message.content, sources)
-          : !isUser && <span className="text-zinc-500">…</span>}
+        {message.content ? (
+          isUser ? (
+            message.content
+          ) : (
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={buildComponents(sources)}
+            >
+              {message.content}
+            </ReactMarkdown>
+          )
+        ) : (
+          !isUser && <span className="text-zinc-500">…</span>
+        )}
 
         {!isUser && sources.length > 0 && (
           <details className="mt-2 text-xs text-zinc-400" open={cited1Indexed.length > 0}>

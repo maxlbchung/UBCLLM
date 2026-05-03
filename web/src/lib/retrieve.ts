@@ -56,6 +56,23 @@ export async function topK(query: string, k = 8): Promise<Chunk[]> {
   for (let i = 0; i < chunks.length; i++) {
     scores[i] = dot(matrix, qVec, i * EMBED_DIM)
   }
+
+  // Hybrid boost: course numbers are dense, low-frequency tokens that MiniLM
+  // doesn't distinguish well — embed("CPSC 110") sits very close to "CPSC 121"
+  // and "CPSC 320", so pure semantic top-K can miss the literal course the
+  // user asked about. If the query mentions explicit course codes, push their
+  // chunks above any cosine-only match. Cosine scores live in [-1, 1] after
+  // normalization; +2 guarantees the boosted chunk lands in the top slice.
+  const requested = new Set(extractCourseCodes(query))
+  if (requested.size > 0) {
+    for (let i = 0; i < chunks.length; i++) {
+      const c = chunks[i]
+      if (c.kind === 'course' && c.code && requested.has(c.code)) {
+        scores[i] += 2
+      }
+    }
+  }
+
   const indices = Array.from(scores.keys())
   indices.sort((a, b) => scores[b] - scores[a])
   return indices.slice(0, k).map((i) => chunks[i])
@@ -139,18 +156,19 @@ export function parseCourseChunk(c: Chunk): ParsedCourse {
 }
 
 /**
- * Pull "CPSC 110"-style course codes out of free-form prereq/coreq text. UBC
- * uses both "CPSC_V 110" (with the Vancouver suffix) and "CPSC 110"; we fold
- * them to the canonical short form so they match getCourseIndex() keys.
+ * Pull "CPSC 110"-style course codes out of free-form text (user queries or
+ * prereq/coreq strings). Folds:
+ *   - case ("cpsc 110", "Cpsc110", "CPSC 110")
+ *   - optional Vancouver suffix ("CPSC_V 110")
+ *   - optional space between subject and number ("CPSC110")
+ * to the canonical "CPSC 110" form so it matches getCourseIndex() keys.
  */
 export function extractCourseCodes(text: string | undefined): string[] {
   if (!text) return []
-  const re = /\b([A-Z]{2,5})(?:_V)?\s+(\d{2,3}[A-Z]?)\b/g
   const seen = new Set<string>()
   const out: string[] = []
-  let m: RegExpExecArray | null
-  while ((m = re.exec(text)) !== null) {
-    const code = `${m[1]} ${m[2]}`
+  for (const m of text.matchAll(/\b([A-Z]{3,5})(?:_V)?\s*(\d{2,4}[A-Z]?)\b/gi)) {
+    const code = `${m[1].toUpperCase()} ${m[2].toUpperCase()}`
     if (!seen.has(code)) {
       seen.add(code)
       out.push(code)

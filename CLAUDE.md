@@ -92,6 +92,7 @@ Single source of truth: `web/src/version.ts` (`APP_VERSION`). Mirror it in `web/
 - **WebLLM model IDs** — the smoke test auto-discovers Gemma 4 E2B variants from `prebuiltAppConfig.model_list` rather than hardcoding an ID. Do the same in `web/src/lib/llm.ts` so we don't break when WebLLM bumps versions.
 - **Bash tool cwd persists across calls in this session.** Don't `cd web && npm install` in parallel with other directory-scoped commands — use `npm install --prefix <abs-path>` and `uv add --directory <abs-path>` instead. (Discovered the hard way during setup.)
 - **Smoke test was confirmed working** on the user's hardware on 2026-05-02. Don't make them re-run it unless something materially changes (WebLLM version bump, switching browsers, etc.).
+- **Citation contract in `SYSTEM_PROMPT`** — `web/src/lib/prompts.ts` instructs the model to cite context entries as `[N]`, and `ChatMessage.tsx` parses those markers to highlight which retrieved chunks the LLM actually used. Don't strip those instructions thinking they're filler — the UI's "Sources used" panel goes silent if you do, since it has no other signal.
 
 ## Running things
 

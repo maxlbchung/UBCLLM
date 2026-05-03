@@ -7,6 +7,47 @@ import type { Chunk } from '../lib/retrieve'
 
 const CITATION_RE = /\[(\d+)\]/g
 
+const ICON_CLASS =
+  'shrink-0 w-6 h-6 mt-1 text-zinc-500 [&>svg]:w-full [&>svg]:h-full'
+
+function BotIcon() {
+  return (
+    <div className={ICON_CLASS} aria-hidden>
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <rect x="4" y="8" width="16" height="12" rx="2" />
+        <line x1="12" y1="4" x2="12" y2="8" />
+        <circle cx="9" cy="14" r="0.75" fill="currentColor" stroke="none" />
+        <circle cx="15" cy="14" r="0.75" fill="currentColor" stroke="none" />
+      </svg>
+    </div>
+  )
+}
+
+function UserIcon() {
+  return (
+    <div className={ICON_CLASS} aria-hidden>
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <circle cx="12" cy="9" r="3.5" />
+        <path d="M5 20c0-3.5 3.1-6 7-6s7 2.5 7 6" />
+      </svg>
+    </div>
+  )
+}
+
 function citationChip(idx: number, sources: Chunk[], key: string | number): ReactNode {
   const src = sources[idx - 1]
   if (!src) return `[${idx}]`
@@ -206,7 +247,12 @@ export function ChatMessage({ message }: { message: Message }) {
     .filter(({ i }) => !cited.has(i))
 
   return (
-    <div className={isUser ? 'flex justify-end' : 'flex justify-start'}>
+    <div
+      className={
+        'flex items-start gap-2 ' + (isUser ? 'justify-end' : 'justify-start')
+      }
+    >
+      {!isUser && <BotIcon />}
       <div
         className={
           'rounded-lg px-3 py-2 max-w-[85%] text-sm leading-relaxed ' +
@@ -285,6 +331,7 @@ export function ChatMessage({ message }: { message: Message }) {
           </details>
         )}
       </div>
+      {isUser && <UserIcon />}
     </div>
   )
 }

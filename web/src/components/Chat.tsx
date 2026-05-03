@@ -71,54 +71,56 @@ export function Chat() {
   }
 
   return (
-    <div className="flex flex-col h-screen flex-1 py-4 px-16 gap-4">
-      <header className="flex items-baseline justify-between border-b border-zinc-800 pb-2">
-        <h1 className="text-lg font-semibold">Advisor</h1>
-        <span className="text-xs text-zinc-500">
-          UBC Vancouver · runs in your browser
-        </span>
-      </header>
+    <div className="flex flex-col h-screen flex-1 py-4 min-h-0">
+      <div className="mx-auto w-full max-w-[800px] flex flex-col flex-1 min-h-0 gap-4 px-4">
+        <header className="flex items-baseline justify-between border-b border-zinc-800 pb-2">
+          <h1 className="text-lg font-semibold">Advisor</h1>
+          <span className="text-xs text-zinc-500">
+            UBC Vancouver · runs in your browser
+          </span>
+        </header>
 
-      <div ref={scrollerRef} className="flex-1 overflow-y-auto space-y-3 pr-1">
-        {messages.length === 0 && (
-          <div className="text-center text-zinc-500 mt-12 text-sm">
-            Ask about a UBC Vancouver course or program. Try:
-            <ul className="mt-2 space-y-1">
-              <li>"What are the prerequisites for CPSC 110?"</li>
-              <li>"How many credits is MATH 200?"</li>
-              <li>"Which courses count as Arts electives?"</li>
-            </ul>
-          </div>
-        )}
-        {messages.map((m) => (
-          <ChatMessage key={m.id} message={m} />
-        ))}
-      </div>
+        <div ref={scrollerRef} className="flex-1 overflow-y-auto space-y-3 pr-1">
+          {messages.length === 0 && (
+            <div className="text-center text-zinc-500 mt-12 text-sm">
+              Ask about a UBC Vancouver course or program. Try:
+              <ul className="mt-2 space-y-1">
+                <li>"What are the prerequisites for CPSC 110?"</li>
+                <li>"How many credits is MATH 200?"</li>
+                <li>"Which courses count as Arts electives?"</li>
+              </ul>
+            </div>
+          )}
+          {messages.map((m) => (
+            <ChatMessage key={m.id} message={m} />
+          ))}
+        </div>
 
-      <form
-        onSubmit={(e) => {
-          e.preventDefault()
-          void send()
-        }}
-        className="flex gap-2"
-      >
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          disabled={streaming}
-          className="flex-1 rounded bg-zinc-900 border border-zinc-700 px-3 py-2 text-sm focus:outline-none focus:border-zinc-500 disabled:opacity-60"
-          placeholder={
-            streaming ? 'Generating…' : 'Ask about a UBC course or program'
-          }
-        />
-        <button
-          type="submit"
-          disabled={streaming || !input.trim()}
-          className="rounded bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:hover:bg-blue-600 px-4 py-2 text-sm font-medium"
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            void send()
+          }}
+          className="flex gap-2"
         >
-          Send
-        </button>
-      </form>
+          <input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            disabled={streaming}
+            className="flex-1 rounded bg-zinc-900 border border-zinc-700 px-3 py-2 text-sm focus:outline-none focus:border-zinc-500 disabled:opacity-60"
+            placeholder={
+              streaming ? 'Generating…' : 'Ask about a UBC course or program'
+            }
+          />
+          <button
+            type="submit"
+            disabled={streaming || !input.trim()}
+            className="rounded bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:hover:bg-blue-600 px-4 py-2 text-sm font-medium"
+          >
+            Send
+          </button>
+        </form>
+      </div>
     </div>
   )
 }

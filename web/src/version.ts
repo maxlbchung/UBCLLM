@@ -3,4 +3,4 @@
 //   MAJOR — only on explicit user instruction
 //   MINOR — feature changes
 //   PATCH — bug fixes / tweaks
-export const APP_VERSION = '0.7.2'
+export const APP_VERSION = '0.8.0'

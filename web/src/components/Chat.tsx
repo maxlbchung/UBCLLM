@@ -22,14 +22,28 @@ export function Chat() {
   const appendToLast = useChat((s) => s.appendToLast)
   const setSourcesOnLast = useChat((s) => s.setSourcesOnLast)
   const setStreaming = useChat((s) => s.setStreaming)
+  const view = useConversations((s) => s.view)
 
   const [input, setInput] = useState('')
   const scrollerRef = useRef<HTMLDivElement | null>(null)
+  const inputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
     const el = scrollerRef.current
     if (el) el.scrollTop = el.scrollHeight
   }, [messages])
+
+  // Auto-focus the composer so the user never has to click into it: on first
+  // mount (streaming starts false → fires once), each time streaming flips
+  // back to false (input becomes enabled again after a reply), and whenever
+  // the user navigates back to the chat view from a tool. The Shell keeps
+  // all panels mounted via `display: none`, so a useEffect on `view` is the
+  // only way to retrigger focus on view-switch — and `display: none` makes
+  // the intermediate focus calls no-ops, so there's no risk of stealing
+  // focus from CourseLookup / PrereqTree while they're active.
+  useEffect(() => {
+    if (!streaming && view === 'chat') inputRef.current?.focus()
+  }, [streaming, view])
 
   async function send() {
     const q = input.trim()
@@ -125,6 +139,7 @@ export function Chat() {
           className="flex gap-2"
         >
           <input
+            ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             disabled={streaming}

@@ -15,13 +15,22 @@ export default function App() {
 
 function Shell() {
   const view = useConversations((s) => s.view)
+  // Keep every panel mounted and toggle visibility instead of conditionally
+  // rendering — this preserves each tool's local input + result state when
+  // the user switches views (e.g. course lookup query stays put).
   return (
     <div className="flex h-screen w-screen overflow-hidden">
       <Sidebar />
       <main className="flex-1 min-w-0 flex flex-col">
-        {view === 'chat' && <Chat />}
-        {view === 'lookup' && <CourseLookup />}
-        {view === 'prereq' && <PrereqTree />}
+        <div className={view === 'chat' ? 'flex-1 min-h-0 flex flex-col' : 'hidden'}>
+          <Chat />
+        </div>
+        <div className={view === 'lookup' ? 'flex-1 min-h-0 flex flex-col' : 'hidden'}>
+          <CourseLookup />
+        </div>
+        <div className={view === 'prereq' ? 'flex-1 min-h-0 flex flex-col' : 'hidden'}>
+          <PrereqTree />
+        </div>
       </main>
     </div>
   )

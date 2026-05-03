@@ -130,7 +130,11 @@ export async function* streamChat(
         const stream = await engine.chat.completions.create({
           messages,
           stream: true,
-          temperature: opts.temperature ?? 0.4,
+          // Greedy decoding for the RAG advisor task: at any meaningful
+          // temperature, a 2B model will sometimes prefer a fluent
+          // parametric answer over the verbatim grounded one. 0 keeps
+          // it on the chunk-supported path and makes refusals reliable.
+          temperature: opts.temperature ?? 0,
         })
         for await (const chunk of stream) {
           const delta = chunk.choices[0]?.delta?.content

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ChatCompletionMessageParam } from '@mlc-ai/web-llm'
-import { topK } from '../lib/retrieve'
+import { extractCourseCodes, getCourseIndex, topK } from '../lib/retrieve'
 import { streamChat } from '../lib/llm'
 import { SYSTEM_PROMPT, userPromptWithContext } from '../lib/prompts'
 import { makeMessage, useChat, type Message } from '../store/chat'
@@ -44,8 +44,18 @@ export function Chat() {
     useConversations.getState().saveCurrent()
 
     try {
-      const sources = await topK(q, 8)
+      const [sources, courseIndex] = await Promise.all([
+        topK(q, 8),
+        getCourseIndex(),
+      ])
       setSourcesOnLast(sources)
+
+      // Course codes the user mentioned but which aren't in the calendar.
+      // Surface as a hard signal so the model takes the refusal path
+      // instead of confabulating from neighbouring CPSC chunks.
+      const missingCodes = extractCourseCodes(q).filter(
+        (code) => !courseIndex.has(code),
+      )
 
       const prior = useChat
         .getState()
@@ -55,7 +65,10 @@ export function Chat() {
       const llmMessages: ChatCompletionMessageParam[] = [
         { role: 'system', content: SYSTEM_PROMPT },
         ...toLLMHistory(recent),
-        { role: 'user', content: userPromptWithContext(q, sources) },
+        {
+          role: 'user',
+          content: userPromptWithContext(q, sources, missingCodes),
+        },
       ]
 
       for await (const delta of streamChat(llmMessages)) {

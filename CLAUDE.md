@@ -38,7 +38,7 @@ UBCLLM/
 └── .github/workflows/deploy.yml   pipeline → npm install → vite build → Pages
 ```
 
-## Current state (as of v0.4.0)
+## Current state (as of v0.6.0)
 
 The full v1 stack from the original plan is shipped and live. Highlights:
 
@@ -52,9 +52,10 @@ The full v1 stack from the original plan is shipped and live. Highlights:
 - **Chat** with streaming Gemma 4 E2B output, last 6 turns of history, RAG context from top-8 chunks per turn.
 - **Course Lookup** — one-shot detail card by code (case-insensitive: `CPSC 110` / `cpsc110` / `CPSC_V 110` all work).
 - **Prereq Tree** — full transitive BFS expansion, depth-capped at 12, cycle-safe; direct coreqs on the right (not transitively expanded). ReactFlow column layout, root on the right.
-- **Sidebar** — conversation list (auto-titled from first user message), tool tabs, version badge bottom-left.
+- **Sidebar** — conversation list (auto-titled from first user message), tool tabs, version badge bottom-left. Collapsible: toggle in the top-right shrinks it to a `w-12` strip; collapsed state is persisted via `useConversations.sidebarCollapsed`.
 - **Conversation persistence** — `localStorage` key `ubcllm-conversations` via `zustand/middleware/persist`; on reload the active conversation rehydrates into `useChat`.
 - **Citation surfacing** — `SYSTEM_PROMPT` requires `[N]` citations matching the bracketed numbering in `buildContext`; `ChatMessage` parses them, renders inline superscript chips linking to the chunk's UBC URL, and splits the sources panel into "Sources used" vs "Other retrieved context."
+- **Model-load error recovery** — `ModelLoader` distinguishes network/cache errors from WebGPU/capability errors. Network failures (the usual "corrupted cached shard from an interrupted download" case) get a "Clear cache and try again" button that wipes `webllm/*` Cache Storage entries + IndexedDB databases and re-runs the load, plus a plain "Try again" fallback. Capability errors keep the original "needs WebGPU + ~2 GB" message.
 
 **Important runtime contracts (don't break these silently):**
 - **Course-code boost in `topK`** (`web/src/lib/retrieve.ts`): if the query mentions a course code, that course's chunk gets `+2` to its cosine score. Without this, MiniLM's poor distinction between "CPSC 110" and "CPSC 121" causes literal-course queries to miss the exact match. Cosine scores are bounded in [-1, 1] post-normalization; +2 guarantees the boosted chunk wins.
@@ -67,8 +68,8 @@ The full v1 stack from the original plan is shipped and live. Highlights:
 **Open opportunities** (none of these block daily use):
 - Programs crawl was capped at 800 — depth-4 leaves never reached. Bumping `--max-pages` would fill in deeper degree-requirement detail.
 - Boolean prereq parsing ("one of CPSC 107, CPSC 110") is shown as raw text in chat, not modeled in the prereq tree.
-- No mobile/responsive sidebar drawer — fixed 16rem column on every viewport.
-- No "clear cache" UI affordance; users have to use DevTools.
+- Sidebar can collapse, but there's no proper mobile drawer / hamburger pattern yet — small viewports still get the desktop layout, just narrower.
+- "Clear cache" affordance is only surfaced on the model-load error screen. No general-purpose cache reset button in the running app.
 
 ## Versioning
 
@@ -90,6 +91,7 @@ Single source of truth: `web/src/version.ts` (`APP_VERSION`). Mirror it in `web/
 - **Bash tool cwd persists across calls in this session.** Don't `cd web && npm install` in parallel with other directory-scoped commands — use `npm install --prefix <abs-path>` and `uv add --directory <abs-path>` instead. (Discovered the hard way during setup.)
 - **Smoke test was confirmed working** on the user's hardware on 2026-05-02. Don't make them re-run it unless something materially changes (WebLLM version bump, switching browsers, etc.).
 - **Citation contract in `SYSTEM_PROMPT`** — `web/src/lib/prompts.ts` instructs the model to cite context entries as `[N]`, and `ChatMessage.tsx` parses those markers to highlight which retrieved chunks the LLM actually used. Don't strip those instructions thinking they're filler — the UI's "Sources used" panel goes silent if you do, since it has no other signal.
+- **Density is rem-based, not pixel-based.** `html { font-size: 20px }` in `web/src/index.css` makes Tailwind's rem-scaled classes render at 1.25× their nominal size for a more readable default. **Do not use arbitrary pixel sizes** like `text-[10px]` or `text-[11px]` — they bypass the scaling and look tiny. Prefer Tailwind's named scale (`text-xs`, `text-sm`, …) or rem-equivalent arbitrary values like `text-[0.625rem]` (≈10 px nominal → 12.5 px rendered) and `text-[0.6875rem]` (≈11 px → 13.75 px). Borders / dividers / 1 px lines stay in pixels on purpose so they don't get fuzzy.
 
 ## Running things
 

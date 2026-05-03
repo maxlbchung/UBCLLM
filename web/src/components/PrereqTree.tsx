@@ -12,6 +12,7 @@ import {
   getCourseIndex,
   parseCourseChunk,
   type Chunk,
+  type ParsedCourse,
 } from '../lib/retrieve'
 
 function normalize(query: string): string {
@@ -23,83 +24,132 @@ function normalize(query: string): string {
 interface Graph {
   nodes: Node[]
   edges: Edge[]
+  depthCount: number
 }
+
+interface Info {
+  code: string
+  parsed: ParsedCourse | null
+  depth: number
+  kind: 'root' | 'prereq' | 'coreq'
+}
+
+const MAX_DEPTH = 12 // safety cap; UBC chains rarely exceed 4–5
+
+const X_STEP = 280
+const Y_STEP = 90
 
 function buildGraph(rootCode: string, index: Map<string, Chunk>): Graph {
   const rootChunk = index.get(rootCode)
-  if (!rootChunk) return { nodes: [], edges: [] }
+  if (!rootChunk) return { nodes: [], edges: [], depthCount: 0 }
   const root = parseCourseChunk(rootChunk)
-  const prereqCodes = extractCourseCodes(root.prerequisites).filter(
-    (c) => c !== rootCode,
-  )
-  const coreqCodes = extractCourseCodes(root.corequisites).filter(
-    (c) => c !== rootCode,
-  )
+
+  // BFS over prereq edges, deduping nodes and keeping every node at its first
+  // (shortest) discovered depth. Edges still get added every time we see them
+  // so a course required by multiple ancestors connects to all of them.
+  const infoByCode = new Map<string, Info>()
+  infoByCode.set(rootCode, { code: rootCode, parsed: root, depth: 0, kind: 'root' })
+  const edges: Edge[] = []
+  const enqueued = new Set<string>([rootCode])
+
+  type QItem = { code: string; parsed: ParsedCourse; depth: number }
+  const queue: QItem[] = [{ code: rootCode, parsed: root, depth: 0 }]
+
+  while (queue.length > 0) {
+    const cur = queue.shift()!
+    if (cur.depth >= MAX_DEPTH) continue
+    const prereqCodes = extractCourseCodes(cur.parsed.prerequisites)
+    for (const code of prereqCodes) {
+      if (code === cur.code) continue
+      edges.push({
+        id: `prereq:${code}->${cur.code}`,
+        source: code,
+        target: cur.code,
+        style: { stroke: '#52525b', strokeWidth: 1.5 },
+      })
+      if (enqueued.has(code)) continue
+      enqueued.add(code)
+      const chunk = index.get(code)
+      const parsed = chunk ? parseCourseChunk(chunk) : null
+      const childDepth = cur.depth + 1
+      infoByCode.set(code, { code, parsed, depth: childDepth, kind: 'prereq' })
+      if (parsed) queue.push({ code, parsed, depth: childDepth })
+    }
+  }
+
+  // Direct corequisites of the root only (not transitively expanded — coreqs
+  // are taken alongside, not "before", so adding their prereq trees is noisy).
+  for (const code of extractCourseCodes(root.corequisites)) {
+    if (code === rootCode || infoByCode.has(code)) continue
+    const chunk = index.get(code)
+    const parsed = chunk ? parseCourseChunk(chunk) : null
+    infoByCode.set(code, { code, parsed, depth: 0, kind: 'coreq' })
+    edges.push({
+      id: `coreq:${code}->${rootCode}`,
+      source: code,
+      target: rootCode,
+      label: 'co-req',
+      style: { stroke: '#f59e0b', strokeWidth: 1.5 },
+      labelStyle: { fill: '#f59e0b', fontSize: 10 },
+    })
+  }
+
+  // Column layout: root at x=0, transitive prereqs in columns to the left
+  // (one column per depth), direct coreqs in a column to the right.
+  const byColumn = new Map<string, Info[]>()
+  let depthCount = 0
+  for (const info of infoByCode.values()) {
+    const key = info.kind === 'coreq' ? 'coreq' : `d${info.depth}`
+    if (!byColumn.has(key)) byColumn.set(key, [])
+    byColumn.get(key)!.push(info)
+    if (info.kind !== 'coreq') depthCount = Math.max(depthCount, info.depth)
+  }
 
   const nodes: Node[] = []
-  const edges: Edge[] = []
+  for (const [key, infos] of byColumn) {
+    const isCoreq = key === 'coreq'
+    const depth = isCoreq ? 0 : Number(key.slice(1))
+    const x = isCoreq ? X_STEP : -depth * X_STEP
+    infos.sort((a, b) => a.code.localeCompare(b.code))
+    const total = infos.length
+    infos.forEach((info, i) => {
+      const y = (i - (total - 1) / 2) * Y_STEP
+      const known = info.parsed !== null
+      const isRoot = info.kind === 'root'
+      const title = info.parsed?.title ?? '(not in calendar)'
 
-  nodes.push({
-    id: rootCode,
-    position: { x: 0, y: 0 },
-    data: { label: `${rootCode}\n${root.title}` },
-    sourcePosition: Position.Right,
-    targetPosition: Position.Left,
-    style: {
-      background: '#1d4ed8',
-      color: '#fff',
-      border: '1px solid #1e40af',
-      fontSize: 12,
-      whiteSpace: 'pre-line',
-      padding: 8,
-      borderRadius: 6,
-      width: 200,
-    },
-  })
+      const bg = isRoot
+        ? '#1d4ed8'
+        : known
+          ? '#27272a'
+          : '#3f1d1d'
+      const border = isRoot
+        ? '#1e40af'
+        : known
+          ? '#3f3f46'
+          : '#7f1d1d'
 
-  const place = (codes: string[], xOffset: number, kind: 'prereq' | 'coreq') => {
-    const total = codes.length
-    codes.forEach((code, i) => {
-      const known = index.has(code)
-      const chunk = known ? index.get(code)! : null
-      const title = chunk ? parseCourseChunk(chunk).title : '(not in calendar)'
-      const y = (i - (total - 1) / 2) * 90
       nodes.push({
-        id: `${kind}:${code}`,
-        position: { x: xOffset, y },
-        data: { label: `${code}\n${title}` },
+        id: info.code,
+        position: { x, y },
+        data: { label: `${info.code}\n${title}` },
         sourcePosition: Position.Right,
         targetPosition: Position.Left,
         style: {
-          background: known ? '#27272a' : '#3f1d1d',
-          color: '#e5e7eb',
-          border: `1px solid ${known ? '#3f3f46' : '#7f1d1d'}`,
-          fontSize: 11,
+          background: bg,
+          color: isRoot ? '#fff' : '#e5e7eb',
+          border: `1px solid ${border}`,
+          fontSize: isRoot ? 12 : 11,
           whiteSpace: 'pre-line',
-          padding: 6,
+          padding: isRoot ? 8 : 6,
           borderRadius: 6,
           width: 200,
         },
       })
-      edges.push({
-        id: `${kind}:${code}->${rootCode}`,
-        source: `${kind}:${code}`,
-        target: rootCode,
-        animated: false,
-        label: kind === 'coreq' ? 'co-req' : undefined,
-        style: {
-          stroke: kind === 'coreq' ? '#f59e0b' : '#52525b',
-          strokeWidth: 1.5,
-        },
-        labelStyle: { fill: '#f59e0b', fontSize: 10 },
-      })
     })
   }
 
-  place(prereqCodes, -340, 'prereq')
-  place(coreqCodes, 340, 'coreq')
-
-  return { nodes, edges }
+  return { nodes, edges, depthCount }
 }
 
 export function PrereqTree() {
@@ -112,7 +162,7 @@ export function PrereqTree() {
   }, [])
 
   const graph = useMemo(() => {
-    if (!index || !activeCode) return { nodes: [], edges: [] }
+    if (!index || !activeCode) return { nodes: [], edges: [], depthCount: 0 }
     return buildGraph(activeCode, index)
   }, [index, activeCode])
 
@@ -135,7 +185,7 @@ export function PrereqTree() {
       <header className="flex items-center gap-3">
         <h2 className="text-xl font-semibold">Prerequisite Tree</h2>
         <span className="text-xs text-zinc-500">
-          v1: one level, regex-extracted course codes
+          full transitive chain · regex-extracted course codes
         </span>
       </header>
 
@@ -164,10 +214,17 @@ export function PrereqTree() {
 
       {root && (
         <p className="text-xs text-zinc-400">
-          Showing direct prerequisites and corequisites for{' '}
-          <span className="text-zinc-200">{root.code}</span>. Boolean structure
-          (e.g. "all of", "one of", grade thresholds) is preserved as text in
-          the chat view, not in this graph.
+          Showing every transitive prerequisite of{' '}
+          <span className="text-zinc-200">{root.code}</span>
+          {graph.nodes.length > 0 && (
+            <>
+              {' '}— {graph.nodes.length - 1} courses across {graph.depthCount}{' '}
+              {graph.depthCount === 1 ? 'level' : 'levels'}
+            </>
+          )}
+          . Direct corequisites appear on the right (not transitively expanded).
+          Boolean structure ("all of", "one of", grade thresholds) is preserved
+          as text in the chat view, not in this graph.
         </p>
       )}
 

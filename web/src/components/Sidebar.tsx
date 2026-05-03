@@ -1,4 +1,5 @@
 import { useConversations, type View } from '../store/conversations'
+import { APP_VERSION } from '../version'
 
 const TOOLS: { view: View; label: string; icon: string }[] = [
   { view: 'chat', label: 'Chat', icon: '💬' },
@@ -90,6 +91,7 @@ export function Sidebar() {
       <div className="text-[10px] text-zinc-600 leading-tight">
         Gemma 4 E2B · WebGPU · MiniLM embeddings · UBC Vancouver calendar 2026/27.
       </div>
+      <div className="text-[10px] text-zinc-500 font-mono">v{APP_VERSION}</div>
     </aside>
   )
 }

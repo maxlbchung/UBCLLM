@@ -73,6 +73,18 @@ UBCLLM/
 - "What are the prerequisites for FAKE 999?" → says "I don't have that information" (hallucination guard).
 - Reload page → conversations persist, model loads from IndexedDB cache without re-downloading.
 
+## Versioning
+
+The app version is shown in the bottom-left of the screen on the main page (Sidebar) and on the model-loading screen (ModelLoader badge). Format: `MAJOR.MINOR.PATCH`.
+
+- **MAJOR** — only bump when the user explicitly tells you to.
+- **MINOR** — feature changes (new component, new behavior, UX additions).
+- **PATCH** — bug fixes, tweaks, deploy-fix-only commits.
+
+Single source of truth: `web/src/version.ts` (`APP_VERSION`). Mirror it in `web/package.json` so npm tooling stays in sync.
+
+**Workflow:** every time you push or land a change, bump the appropriate digit, edit both files, build, commit, push, then tell the user the new version number in your reply (e.g. "Pushed v0.2.1 — fixes …").
+
 ## Gotchas worth knowing
 
 - **Python 3.14 is the machine default** but the pipeline venv is pinned to 3.12. If you ever recreate the pipeline venv, do `uv python pin 3.12` first or it'll try 3.14 and fail on torch.

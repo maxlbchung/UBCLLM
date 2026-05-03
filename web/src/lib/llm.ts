@@ -53,18 +53,40 @@ export function getLLM(onProgress?: LoadProgress): Promise<MLCEngineInterface> {
   return enginePromise
 }
 
+// Serialize calls to the engine: WebLLM's chat completion stream holds GPU
+// buffer mappings that are torn down when the stream resolves, but a second
+// call can race with that teardown and crash with
+// "Failed to execute 'mapAsync' on 'GPUBuffer': Buffer was unmapped before
+// mapping was resolved". Awaiting the previous call before starting the next
+// avoids the race; resetChat() clears any KV cache state left from the
+// previous turn (we re-send the full message history each call anyway).
+let chainTail: Promise<void> = Promise.resolve()
+
 export async function* streamChat(
   messages: ChatCompletionMessageParam[],
   opts: { temperature?: number } = {},
 ): AsyncGenerator<string, void, void> {
   const engine = await getLLM()
-  const stream = await engine.chat.completions.create({
-    messages,
-    stream: true,
-    temperature: opts.temperature ?? 0.4,
+  const previous = chainTail
+  let release!: () => void
+  chainTail = new Promise<void>((r) => {
+    release = r
   })
-  for await (const chunk of stream) {
-    const delta = chunk.choices[0]?.delta?.content
-    if (delta) yield delta
+
+  try {
+    await previous
+    await engine.resetChat()
+
+    const stream = await engine.chat.completions.create({
+      messages,
+      stream: true,
+      temperature: opts.temperature ?? 0.4,
+    })
+    for await (const chunk of stream) {
+      const delta = chunk.choices[0]?.delta?.content
+      if (delta) yield delta
+    }
+  } finally {
+    release()
   }
 }

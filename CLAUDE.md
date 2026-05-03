@@ -2,76 +2,73 @@
 
 Browser-native UBC academic-advisor chatbot. Gemma 4 E2B runs in the user's browser via WebGPU, answering academic questions grounded in a RAG corpus scraped from UBC's official course calendar. No backend inference, no API keys.
 
+- **Live:** https://maxlbchung.github.io/UBCLLM/
+- **Repo:** https://github.com/maxlbchung/UBCLLM (deploys on push to `master`)
+- **Latest version:** see `web/src/version.ts` (`APP_VERSION`); shown bottom-left in the running app.
+
+Original setup plan (kept for reference; some details now stale):
+**`C:\Users\max\.claude\plans\set-up-the-environment-nested-wigderson.md`**
+
 ## Architecture (one-liner per piece)
 
-- **Build time** (offline, Python via `uv`): `scraper/` crawls `vancouver.calendar.ubc.ca` → JSON. `pipeline/` chunks + embeds with `sentence-transformers` (MiniLM-L6-v2, 384-dim) → ships `chunks.json` + `embeddings.bin` as static assets.
-- **Runtime** (browser only): Vite + React + TS + Tailwind v4. `@xenova/transformers` embeds the user query with the *same* MiniLM. Cosine similarity vs `embeddings.bin` (in-memory Float32Array, ~10k rows, brute-force is fine). Top-k chunks + system prompt + last 6 chat turns → `@mlc-ai/web-llm` streams Gemma 4 E2B output.
-
-Full plan with rationale, file-by-file layout, and verification steps:
-**`C:\Users\max\.claude\plans\set-up-the-environment-nested-wigderson.md`**
+- **Build time** (offline, Python via `uv`): `scraper/` crawls `vancouver.calendar.ubc.ca` → JSON. `pipeline/` chunks + embeds with `sentence-transformers` (MiniLM-L6-v2, 384-dim) → ships `chunks.json` + `embeddings.bin` as static assets to `web/public/data/`.
+- **Runtime** (browser only): Vite + React 19 + TS + Tailwind v4. `@xenova/transformers` embeds the user query with the *same* MiniLM (`Xenova/all-MiniLM-L6-v2`). Cosine similarity vs `embeddings.bin` (in-memory Float32Array, ~10.9k rows, brute-force, ~10 ms). Top-K chunks + system prompt + last 6 chat turns → `@mlc-ai/web-llm` streams Gemma 4 E2B output. Cited context entries are surfaced in the UI via `[N]` markers parsed out of the response.
+- **Deploy:** GitHub Actions workflow re-runs the embedding pipeline on every push (Hugging Face cache speeds it up to ~1–2 min after the first run), then `npm install && npm run build`, then publishes `web/dist/` via `actions/deploy-pages@v4`.
 
 ## Project layout
 
 ```
 UBCLLM/
-├── web/             Vite + React + TS app — only thing deployed
-│   ├── src/{components,lib,store}/    empty, ready for implementation
-│   └── public/data/                   chunks.json + embeddings.bin land here
-├── scraper/         Python 3.14 — crawls UBC calendar
-├── pipeline/        Python 3.12 (pinned) — chunks + embeds
-└── smoke-test/      Standalone HTML — WebGPU + Gemma 4 E2B verification
+├── web/                Vite + React 19 + TS app (the only thing deployed)
+│   ├── src/
+│   │   ├── lib/        embed.ts · retrieve.ts · llm.ts · prompts.ts
+│   │   ├── store/      chat.ts (Zustand) · conversations.ts (localStorage-persisted)
+│   │   ├── components/ Sidebar · Chat · ChatMessage · ModelLoader
+│   │   │               · CourseLookup · PrereqTree
+│   │   ├── App.tsx     view switcher: chat / lookup / prereq
+│   │   └── version.ts  APP_VERSION (mirrored in package.json)
+│   └── public/data/    chunks.json + embeddings.bin (regenerated in CI)
+├── scraper/            Python 3.14 — crawls UBC calendar (output committed)
+│   ├── common.py       rate-limited httpx + tenacity + on-disk HTML cache
+│   ├── scrape_courses.py / scrape_programs.py
+│   └── output/         courses.json (5.7 MB) + programs.json (2.9 MB)
+├── pipeline/           Python 3.12 (pinned) — chunks + embeds (output regen in CI)
+│   └── chunk_and_embed.py
+├── smoke-test/         Standalone HTML — WebGPU + Gemma 4 E2B verification
+└── .github/workflows/deploy.yml   pipeline → npm install → vite build → Pages
 ```
 
-## Progress (2026-05-02)
+## Current state (as of v0.4.0)
 
-**Done — environment fully set up:**
-- Git repo initialized, `.gitignore` + `README.md` committed (single commit `cfe0696`).
-- `web/` scaffolded with Vite + React + TS. Tailwind v4 configured via `@tailwindcss/vite` plugin (no `tailwind.config.js` needed in v4). Boilerplate stripped, placeholder `App.tsx` in place. `npm run build` clean (191 KB JS / 7.6 KB CSS).
-- npm deps installed: `@mlc-ai/web-llm`, `@xenova/transformers`, `zustand`, `reactflow`, `tailwindcss`, `@tailwindcss/vite`.
-- `scraper/` Python project initialized with `uv`. Deps: `httpx`, `selectolax`, `tenacity`. Uses system Python 3.14.
-- `pipeline/` Python project pinned to **3.12** (`.python-version`, `requires-python = ">=3.12,<3.13"`). Deps: `sentence-transformers`, `numpy` (which pulled `torch` 2.11). 3.14 is avoided here because torch wheels lag on bleeding-edge CPython.
-- `smoke-test/index.html` built and **verified on user's hardware**: WebGPU available, Gemma 4 E2B loaded via WebLLM, generation streamed. Stack is validated end-to-end — no need to re-prove the hardware story.
-- All scaffold work after the initial commit is **uncommitted** — user wants to review before committing.
+The full v1 stack from the original plan is shipped and live. Highlights:
 
-**Done — full v1 stack (uncommitted at time of writing):**
+**Data corpus** — committed at `scraper/output/`:
+- 9,450 courses across 263 UBC Vancouver subject codes (full calendar crawl).
+- 800 program/faculty pages (BFS depth 4, capped at 800 — depth 3 wasn't fully drained, depth 4 not crawled; raise `--max-pages` if you want fuller coverage).
+- The pipeline turns this into **10,910 chunks** (9,450 course + 1,460 program slices @ ~1,600 chars each) → 6.1 MB `chunks.json` + 16 MB `embeddings.bin`.
+- Median chunk text size: ~246 chars (course) vs ~1,430 chars (program). Programs dominate the LLM context budget when retrieved.
 
-- `pipeline/chunk_and_embed.py` — loads `scraper/output/{courses,programs}.json`, builds one chunk per course + one chunk per ~1.6 KB slice of program text, embeds with `sentence-transformers/all-MiniLM-L6-v2` (L2-normalized so cosine == dot product), writes `web/public/data/chunks.json` + `embeddings.bin`. Last run: **10,910 chunks → 6.1 MB JSON + 16 MB embeddings**.
-- `web/` app:
-  - `src/lib/embed.ts` — transformers.js MiniLM singleton (Xenova/all-MiniLM-L6-v2, quantized).
-  - `src/lib/retrieve.ts` — fetches `data/chunks.json` + `data/embeddings.bin` once, runs cosine top-K. Also exposes `getCourseIndex()`, `parseCourseChunk()`, and `extractCourseCodes()` for the lookup + prereq-tree views.
-  - `src/lib/llm.ts` — WebLLM wrapper that auto-discovers the Gemma 4 E2B model id (preferring q4f16 quant). Streams chat completions.
-  - `src/lib/prompts.ts` — system prompt that hard-bans hallucinated course numbers + a RAG context template.
-  - `src/store/chat.ts` — current conversation messages + streaming flag (Zustand).
-  - `src/store/conversations.ts` — saved conversation list, active id, view state, `localStorage`-persisted via `zustand/middleware`. Auto-titles chats from the first user message.
-  - `src/components/`: `Sidebar` (history + tool buttons), `Chat` + `ChatMessage`, `ModelLoader` (WebGPU pre-flight + first-load progress bar), `CourseLookup` (one-shot course detail card), `PrereqTree` (reactflow graph showing direct prereqs/coreqs as a fan).
-  - `App.tsx` switches between Chat / Course Lookup / Prereq Tree based on `useConversations.view`.
-- `web/vite.config.ts` reads `VITE_BASE_PATH` (defaults `/UBCLLM/`) so GitHub Pages serves the bundle from the right sub-path.
-- `.github/workflows/deploy.yml` — runs the embedding pipeline + Vite build on every push to `master`/`main` and publishes via `actions/deploy-pages@v4`.
-- `.gitignore` — `scraper/output/*.json` is **committed** so CI doesn't have to re-scrape UBC; `pipeline/output/`, `web/public/data/*.bin`, and `web/public/data/chunks.json` stay regenerable in CI.
+**App features shipped:**
+- **Chat** with streaming Gemma 4 E2B output, last 6 turns of history, RAG context from top-8 chunks per turn.
+- **Course Lookup** — one-shot detail card by code (case-insensitive: `CPSC 110` / `cpsc110` / `CPSC_V 110` all work).
+- **Prereq Tree** — full transitive BFS expansion, depth-capped at 12, cycle-safe; direct coreqs on the right (not transitively expanded). ReactFlow column layout, root on the right.
+- **Sidebar** — conversation list (auto-titled from first user message), tool tabs, version badge bottom-left.
+- **Conversation persistence** — `localStorage` key `ubcllm-conversations` via `zustand/middleware/persist`; on reload the active conversation rehydrates into `useChat`.
+- **Citation surfacing** — `SYSTEM_PROMPT` requires `[N]` citations matching the bracketed numbering in `buildContext`; `ChatMessage` parses them, renders inline superscript chips linking to the chunk's UBC URL, and splits the sources panel into "Sources used" vs "Other retrieved context."
 
-**Done earlier — scrapers:**
-- `scraper/common.py` — shared `RateLimitedClient` (1 req/s gate, tenacity retry/backoff) + on-disk HTML cache keyed by URL hash. Real User-Agent string with contact email. `OUTPUT_DIR = scraper/output/` (gitignored).
-- `scraper/scrape_courses.py` — async crawler for `/course-descriptions/courses-subject`. Discovers ~263 subject pages from the index, parses each `<h3>SUBJ_V NUM (credits) <strong>Title</strong></h3>` + following `<p>` description. Splits `Prerequisite/Corequisite/Equivalency/Recommended` labels out of the description. Stores both `code` ("CPSC 110") and `raw_code` ("CPSC_V 110"); credits as both raw string and parsed int (None for ranges like "1-6"). Flags: `--subject CPSC`, `--limit N`, `--refresh`, `--rate`. Verified on CPSC 2026-05-02: 112 courses, 50 with prereqs, 1 with coreq, 15 variable-credit.
-- `scraper/scrape_programs.py` — BFS crawler under `/faculties-colleges-and-schools`. Follows internal `/node/N` links by letting httpx follow the 301 to the canonical path; uses `<link rel="canonical">` to dedupe. Strips nav/header/footer/breadcrumb chrome before extracting text. Output: `{url, title, breadcrumbs, headings, text, depth, discovered_from, children}`. Defaults: `--depth 4 --max-pages 800`. Smoke-tested at depth=1, max=5.
+**Important runtime contracts (don't break these silently):**
+- **Course-code boost in `topK`** (`web/src/lib/retrieve.ts`): if the query mentions a course code, that course's chunk gets `+2` to its cosine score. Without this, MiniLM's poor distinction between "CPSC 110" and "CPSC 121" causes literal-course queries to miss the exact match. Cosine scores are bounded in [-1, 1] post-normalization; +2 guarantees the boosted chunk wins.
+- **GPU buffer serialization in `streamChat`** (`web/src/lib/llm.ts`): a shared promise tail makes each new completion await the previous one's GPU teardown, plus `engine.resetChat()` before each call. Without this, sending a second message crashes with "Buffer was unmapped before mapping was resolved."
+- **Same MiniLM both sides**: `pipeline/chunk_and_embed.py` uses `sentence-transformers/all-MiniLM-L6-v2`; `web/src/lib/embed.ts` uses `Xenova/all-MiniLM-L6-v2`. Same weights, different distributions — both must be normalized so dot product == cosine.
+- **CI uses `npm install`, not `npm ci`**: the lockfile is generated on Windows and skips Linux-only platform-optional packages (e.g. `@tailwindcss/oxide-linux-x64-gnu` and its `@emnapi/*` transitives), so `npm ci` on the Ubuntu runner fails. `npm install` resolves them on the runner.
+- **`scraper/output/*.json` is committed.** Re-running the scraper hits UBC servers; the corpus snapshot in git is the source of truth that CI feeds to the pipeline.
+- **`web/public/data/{chunks.json, embeddings.bin}` are regenerated in CI**, not committed. Locally, run `cd pipeline && uv run chunk_and_embed.py` once after pulling, then `npm run dev`.
 
-**Not done — implementation has not started:**
-- No pipeline code written. `pipeline/` contains only `pyproject.toml` + venv.
-- No app code beyond a placeholder `App.tsx`. The `components/`, `lib/`, `store/` directories are empty (`.gitkeep` only).
-- No data files. `web/public/data/` is empty.
-- Full courses + programs crawls have not been run yet (only smoke tests).
-
-## What to do next (in order)
-
-1. **Run the full crawls** once the user is ready: `uv run scrape_courses.py` (≈263 pages, ~5 min at 1 req/s) and `uv run scrape_programs.py` (depth 4 BFS, capped at 800 pages, ~13 min). Outputs land in `scraper/output/{courses,programs}.json`.
-2. **`pipeline/chunk_and_embed.py`** — load both JSON files, build self-contained chunks (one course or one program section per chunk), embed with `sentence-transformers/all-MiniLM-L6-v2`, write `web/public/data/chunks.json` (`[{id, kind, code, title, text, url}]`) + `web/public/data/embeddings.bin` (raw `Float32Array`, row-major, `N × 384`). The embedding model **must match** what the browser uses (`Xenova/all-MiniLM-L6-v2`) so vectors stay compatible.
-3. **`web/src/lib/`** — `embed.ts` (transformers.js singleton, lazy-loads MiniLM), `retrieve.ts` (`loadEmbeddings()` once, `topK(query, k=8)` via cosine similarity), `llm.ts` (WebLLM wrapper around the Gemma 4 E2B model id discovered in the smoke test, exposes `streamChat(messages)`), `prompts.ts` (system prompt + RAG template).
-4. **`web/src/components/`** — `Chat.tsx`, `ChatMessage.tsx`, `ModelLoader.tsx` (full-screen progress bar for first-visit Gemma 4 download), `Sidebar.tsx`, `CourseLookup.tsx`, `PrereqTree.tsx` (reactflow graph; v1 only regex-extracts course codes from the raw prereq string and renders one level — full boolean parsing is out of scope for v1).
-5. **`web/src/store/`** — `chat.ts` (Zustand: messages, streaming flag), `conversations.ts` (localStorage persistence: `{id, title, messages, createdAt, updatedAt}`).
-
-**Verification once it all works:**
-- "What are the prerequisites for CPSC 110?" → cites the actual prereq from retrieved context.
-- "What are the prerequisites for FAKE 999?" → says "I don't have that information" (hallucination guard).
-- Reload page → conversations persist, model loads from IndexedDB cache without re-downloading.
+**Open opportunities** (none of these block daily use):
+- Programs crawl was capped at 800 — depth-4 leaves never reached. Bumping `--max-pages` would fill in deeper degree-requirement detail.
+- Boolean prereq parsing ("one of CPSC 107, CPSC 110") is shown as raw text in chat, not modeled in the prereq tree.
+- No mobile/responsive sidebar drawer — fixed 16rem column on every viewport.
+- No "clear cache" UI affordance; users have to use DevTools.
 
 ## Versioning
 
@@ -97,10 +94,26 @@ Single source of truth: `web/src/version.ts` (`APP_VERSION`). Mirror it in `web/
 ## Running things
 
 ```
-cd web      && npm run dev              # local dev server
-cd web      && npm run build            # static build → web/dist/
-cd scraper  && uv run scrape_courses.py # once written
-cd pipeline && uv run chunk_and_embed.py
+# First-time setup after a fresh clone (pipeline output is .gitignored):
+cd pipeline && uv run chunk_and_embed.py     # generates web/public/data/{chunks.json, embeddings.bin}
 
-python -m http.server 8000 --directory smoke-test   # smoke-test page, http://localhost:8000
+# Day-to-day:
+cd web      && npm run dev                    # local dev server (http://localhost:5173/UBCLLM/)
+cd web      && npm run build                  # static build → web/dist/
+cd scraper  && uv run scrape_courses.py       # full crawl, ~10 min at 1 req/s
+cd scraper  && uv run scrape_programs.py      # full crawl, ~13 min (depth 4, max 800)
+cd scraper  && uv run scrape_courses.py --subject CPSC --limit 1   # debug
+
+python -m http.server 8000 --directory smoke-test   # WebGPU smoke test page
+
+# Deploy: just push to master. The Action regenerates data + builds + publishes.
+git push
 ```
+
+## Verification recipes (post-deploy)
+
+- "What are the prerequisites for CPSC 110?" → grounded answer, `[N]` citation, CPSC 110 highlighted in "Sources used".
+- "What are the prerequisites for FAKE 999?" → "I don't have that information in the UBC calendar." No citations, all 8 sources fall under "Other retrieved context" un-highlighted.
+- Reload page → conversation list survives, active conversation rehydrates, model loads from IndexedDB cache (instant).
+- Course Lookup: type `cpsc110` (no space, lowercase) → CPSC 110 detail card.
+- Prereq Tree: type `CPSC 320` → multi-level fan with MATH/CPSC chain reaching back several depths.

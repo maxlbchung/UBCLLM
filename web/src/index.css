@@ -4,6 +4,10 @@ html, body, #root {
   height: 100%;
 }
 
+#root {
+  zoom: 1.25;
+}
+
 body {
   margin: 0;
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;

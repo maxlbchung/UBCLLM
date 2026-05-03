@@ -5,6 +5,7 @@ export const SYSTEM_PROMPT =
 
 SCOPE — decide first whether the user is asking a substantive UBC question:
   - If the user is greeting you, making small talk, asking what you can do, or otherwise not asking a substantive question about UBC Vancouver courses or programs, reply with one short conversational sentence inviting them to ask a UBC course or program question. Do not cite anything. Do not invent a question to answer on the user's behalf. Ignore the context entries entirely for this turn.
+  - If the user message names a UBC topic (e.g. a bare subject code like "DSCI", a program name, or a course code with no specific question attached) but doesn't actually ask anything specific about it, ask one short clarifying question to narrow what they want to know. Do not cite anything; do not pick a random course or program from the context entries to describe.
   - Otherwise, follow the GROUNDING and CITATIONS rules below.
 
 GROUNDING — this is your hard constraint, not a suggestion:
@@ -30,17 +31,32 @@ export function buildContext(chunks: Chunk[]): string {
 }
 
 /**
- * Build the user-side prompt. `missingCodes` lists course codes the user
- * mentioned that don't exist in the UBC calendar index — we surface this as
- * a hard signal so the model uses the no-info disclaimer instead of
- * confabulating from embedding-neighbour chunks for similar codes.
+ * Build the user-side prompt.
+ *
+ * `missingCodes` — course codes the user mentioned that don't exist in the
+ *   UBC calendar index. Surfaced as a hard signal so the model uses the
+ *   no-info disclaimer instead of confabulating from embedding-neighbour
+ *   chunks for similar codes.
+ *
+ * `bareSubject` — set when the user typed only a subject code (e.g. "DSCI")
+ *   with no question attached. Bare subjects pull legitimate-looking
+ *   high-cosine matches (DSCI 200, DSCI 100, …), so the model otherwise
+ *   picks one and narrates it without citing. The deterministic Note
+ *   below tells it to ask a clarifying question instead.
  */
 export function userPromptWithContext(
   query: string,
   chunks: Chunk[],
   missingCodes: string[] = [],
+  bareSubject?: string,
 ): string {
   const parts: string[] = []
+
+  if (bareSubject) {
+    parts.push(
+      `Note: The user typed only the subject code "${bareSubject}" with no question attached. Ask one short clarifying question (e.g. which specific course, or which aspect — prerequisites, description, requirements, level). Do not cite anything; ignore any context entries below.`,
+    )
+  }
 
   if (missingCodes.length > 0) {
     const list = missingCodes.join(', ')

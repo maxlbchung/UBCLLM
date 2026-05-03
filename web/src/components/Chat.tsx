@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ChatCompletionMessageParam } from '@mlc-ai/web-llm'
-import { extractCourseCodes, getCourseIndex, topK } from '../lib/retrieve'
+import {
+  extractCourseCodes,
+  getCourseIndex,
+  topK,
+  type Chunk,
+} from '../lib/retrieve'
 import { streamChat } from '../lib/llm'
 import { SYSTEM_PROMPT, userPromptWithContext } from '../lib/prompts'
 import { makeMessage, useChat, type Message } from '../store/chat'
@@ -8,6 +13,13 @@ import { useConversations } from '../store/conversations'
 import { ChatMessage } from './ChatMessage'
 
 const HISTORY_TURNS = 6 // last N (user, assistant) pairs sent to the LLM
+
+// Bare subject codes ("DSCI", "CPSC", "MATH_V") embed close to their own
+// course chunks (cosine 0.5–0.65), so the threshold floor can't filter
+// them — they're "relevant" but the user hasn't actually asked anything.
+// We detect them here, skip RAG entirely, and signal the model to ask a
+// clarifying question via userPromptWithContext's bareSubject parameter.
+const BARE_SUBJECT_RE = /^[A-Z]{3,5}(?:_V)?$/i
 
 function toLLMHistory(history: Message[]): ChatCompletionMessageParam[] {
   return history
@@ -58,18 +70,26 @@ export function Chat() {
     useConversations.getState().saveCurrent()
 
     try {
-      const [sources, courseIndex] = await Promise.all([
-        topK(q, 8),
-        getCourseIndex(),
-      ])
-      setSourcesOnLast(sources)
+      const bareSubject = BARE_SUBJECT_RE.test(q)
+        ? q.toUpperCase().replace(/_V$/, '')
+        : undefined
 
-      // Course codes the user mentioned but which aren't in the calendar.
-      // Surface as a hard signal so the model takes the refusal path
-      // instead of confabulating from neighbouring CPSC chunks.
-      const missingCodes = extractCourseCodes(q).filter(
-        (code) => !courseIndex.has(code),
-      )
+      let sources: Chunk[] = []
+      let missingCodes: string[] = []
+      if (!bareSubject) {
+        const [topKResult, courseIndex] = await Promise.all([
+          topK(q, 8),
+          getCourseIndex(),
+        ])
+        sources = topKResult
+        // Course codes the user mentioned but which aren't in the calendar.
+        // Surface as a hard signal so the model takes the refusal path
+        // instead of confabulating from neighbouring CPSC chunks.
+        missingCodes = extractCourseCodes(q).filter(
+          (code) => !courseIndex.has(code),
+        )
+      }
+      setSourcesOnLast(sources)
 
       const prior = useChat
         .getState()
@@ -81,7 +101,7 @@ export function Chat() {
         ...toLLMHistory(recent),
         {
           role: 'user',
-          content: userPromptWithContext(q, sources, missingCodes),
+          content: userPromptWithContext(q, sources, missingCodes, bareSubject),
         },
       ]
 

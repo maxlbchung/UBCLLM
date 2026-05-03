@@ -35,7 +35,7 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="w-80 shrink-0 flex flex-col bg-zinc-950 border-r border-zinc-800 p-3 gap-3 h-screen">
+    <aside className="w-72 shrink-0 flex flex-col bg-zinc-950 border-r border-zinc-800 p-3 gap-3 h-screen">
       <div className="flex items-center justify-between">
         <div className="flex items-baseline gap-2 min-w-0">
           <h1 className="text-sm font-semibold tracking-wide">UBCLLM</h1>

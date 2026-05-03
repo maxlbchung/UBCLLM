@@ -71,16 +71,22 @@ export function Chat() {
   }
 
   return (
-    <div className="flex flex-col h-screen flex-1 py-4 min-h-0">
-      <div className="mx-auto w-full max-w-[1200px] flex flex-col flex-1 min-h-0 gap-4 px-4">
+    // The scroller is full-width on purpose so the cursor over the side
+    // gutters still scrolls the chat. We center each row's content via an
+    // inner `mx-auto max-w-[1200px]` wrapper instead of constraining the
+    // scroller itself.
+    <div className="flex flex-col h-screen flex-1 py-4 min-h-0 gap-4">
+      <div className="mx-auto w-full max-w-[1200px] px-4">
         <header className="flex items-baseline justify-between border-b border-zinc-800 pb-2">
           <h1 className="text-lg font-semibold">Advisor</h1>
           <span className="text-xs text-zinc-500">
             UBC Vancouver · runs in your browser
           </span>
         </header>
+      </div>
 
-        <div ref={scrollerRef} className="flex-1 overflow-y-auto space-y-3 pr-1">
+      <div ref={scrollerRef} className="flex-1 overflow-y-auto min-h-0">
+        <div className="mx-auto w-full max-w-[1200px] px-4 space-y-3">
           {messages.length === 0 && (
             <div className="text-center text-zinc-500 mt-12 text-sm">
               Ask about a UBC Vancouver course or program. Try:
@@ -95,7 +101,9 @@ export function Chat() {
             <ChatMessage key={m.id} message={m} />
           ))}
         </div>
+      </div>
 
+      <div className="mx-auto w-full max-w-[1200px] px-4">
         <form
           onSubmit={(e) => {
             e.preventDefault()

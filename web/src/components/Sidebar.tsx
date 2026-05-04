@@ -57,10 +57,11 @@ export function Sidebar() {
       // The prev ref is initialized to discoveredCount at first mount, so
       // this branch only fires on subsequent increments.
       const burstId = Date.now()
-      const particles = Array.from({ length: 12 }, (_, i) => {
-        const baseAngle = (Math.PI * 2 * i) / 12
-        const angle = baseAngle + (Math.random() - 0.5) * 0.4
-        const distance = 22 + Math.random() * 14
+      const PARTICLE_COUNT = 28
+      const particles = Array.from({ length: PARTICLE_COUNT }, (_, i) => {
+        const baseAngle = (Math.PI * 2 * i) / PARTICLE_COUNT
+        const angle = baseAngle + (Math.random() - 0.5) * 0.5
+        const distance = 70 + Math.random() * 50
         return {
           id: burstId + i,
           dx: Math.cos(angle) * distance,
@@ -69,11 +70,11 @@ export function Sidebar() {
       })
       setPopKey((k) => k + 1)
       setSparkBursts((b) => [...b, { id: burstId, particles }])
-      // Animation duration in egg-spark keyframe is 900ms — clean up shortly
-      // after so detached burst nodes don't accumulate.
+      // egg-spark keyframe runs 2500ms; give it a small buffer before
+      // dropping the detached nodes from React state.
       const t = window.setTimeout(() => {
         setSparkBursts((b) => b.filter((x) => x.id !== burstId))
-      }, 1000)
+      }, 2700)
       prevCountRef.current = discoveredCount
       return () => window.clearTimeout(t)
     }
@@ -284,13 +285,13 @@ export function Sidebar() {
                 {burst.particles.map((p) => (
                   <span
                     key={p.id}
-                    className="absolute left-1/2 top-1/2 h-1 w-1 rounded-full bg-amber-300 shadow-[0_0_4px_1px_rgba(252,211,77,0.7)]"
+                    className="absolute left-1/2 top-1/2 h-2 w-2 rounded-full bg-amber-300 shadow-[0_0_8px_2px_rgba(252,211,77,0.8)]"
                     style={
                       {
                         '--dx': `${p.dx}px`,
                         '--dy': `${p.dy}px`,
                         animation:
-                          'egg-spark 900ms cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                          'egg-spark 2500ms cubic-bezier(0.16, 1, 0.3, 1) forwards',
                       } as React.CSSProperties
                     }
                   />

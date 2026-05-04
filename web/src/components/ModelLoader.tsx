@@ -1,6 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { getLLM } from '../lib/llm'
+import type { ChatError } from '../store/chat'
 import { APP_VERSION } from '../version'
+import { ErrorDetails } from './ErrorDetails'
 
 function VersionBadge() {
   return (
@@ -14,7 +16,16 @@ interface State {
   progress: number
   text: string
   ready: boolean
-  error: string | null
+  error: ChatError | null
+}
+
+function toChatError(err: unknown): ChatError {
+  const isErrInstance = err instanceof Error
+  return {
+    message: isErrInstance ? err.message : String(err),
+    name: isErrInstance ? err.name : undefined,
+    stack: isErrInstance ? err.stack : undefined,
+  }
 }
 
 async function clearWebLLMStorage() {
@@ -55,8 +66,11 @@ export function ModelLoader({ children }: { children: ReactNode }) {
     if (typeof navigator !== 'undefined' && !('gpu' in navigator)) {
       setS((prev) => ({
         ...prev,
-        error:
-          'WebGPU is not available in this browser. Use Chrome or Edge 113+ on a desktop.',
+        error: {
+          name: 'WebGPUUnavailable',
+          message:
+            'WebGPU is not available in this browser. Use Chrome or Edge 113+ on a desktop.',
+        },
       }))
       return
     }
@@ -74,7 +88,8 @@ export function ModelLoader({ children }: { children: ReactNode }) {
         if (!cancelled) setS((prev) => ({ ...prev, ready: true, progress: 1 }))
       } catch (err) {
         if (!cancelled) {
-          setS((prev) => ({ ...prev, error: (err as Error).message }))
+          console.error('model load failed', err)
+          setS((prev) => ({ ...prev, error: toChatError(err) }))
         }
       }
     })()
@@ -96,14 +111,14 @@ export function ModelLoader({ children }: { children: ReactNode }) {
   }
 
   if (s.error) {
-    const isNetworkError = /cache|network|fetch/i.test(s.error)
+    const isNetworkError = /cache|network|fetch/i.test(s.error.message)
     return (
       <>
         <div className="flex flex-col items-center justify-center h-screen p-8 gap-3 text-center">
           <h2 className="text-xl font-semibold text-red-400">Couldn't load the model</h2>
-          <code className="text-xs text-zinc-300 bg-zinc-900 border border-zinc-800 rounded px-3 py-2 max-w-xl whitespace-pre-wrap break-words font-mono text-left">
-            {s.error}
-          </code>
+          <div className="max-w-xl w-full text-left">
+            <ErrorDetails error={s.error} />
+          </div>
           {isNetworkError ? (
             <>
               <div className="flex flex-col items-center gap-2 mt-2">

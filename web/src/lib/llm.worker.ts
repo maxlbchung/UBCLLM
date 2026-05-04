@@ -12,3 +12,17 @@ const handler = new WebWorkerMLCEngineHandler()
 self.onmessage = (event: MessageEvent) => {
   handler.onmessage(event)
 }
+
+// Catch failures that don't go through the handler's promise plumbing —
+// e.g. import-time throws, postMessage of a non-cloneable value, or any
+// rejected promise the handler forgot to attach a .catch to. Without this
+// they'd silently land in the worker's devtools console (which the user
+// has to open the *worker* inspector to see). Logging from here at least
+// surfaces them in the main-thread console too via the worker.onerror
+// hook in llm.ts.
+self.onerror = (event) => {
+  console.error('[llm.worker] uncaught', event)
+}
+self.onunhandledrejection = (event) => {
+  console.error('[llm.worker] unhandled rejection', event.reason)
+}

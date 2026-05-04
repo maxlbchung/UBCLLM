@@ -8,7 +8,12 @@ import {
 } from '../lib/retrieve'
 import { streamChat } from '../lib/llm'
 import { SYSTEM_PROMPT, userPromptWithContext } from '../lib/prompts'
-import { makeMessage, useChat, type Message } from '../store/chat'
+import {
+  makeMessage,
+  useChat,
+  type ChatError,
+  type Message,
+} from '../store/chat'
 import { useConversations } from '../store/conversations'
 import { ChatMessage } from './ChatMessage'
 
@@ -33,6 +38,7 @@ export function Chat() {
   const addMessage = useChat((s) => s.addMessage)
   const appendToLast = useChat((s) => s.appendToLast)
   const setSourcesOnLast = useChat((s) => s.setSourcesOnLast)
+  const setErrorOnLast = useChat((s) => s.setErrorOnLast)
   const setStreaming = useChat((s) => s.setStreaming)
   const view = useConversations((s) => s.view)
 
@@ -69,12 +75,17 @@ export function Chat() {
     setStreaming(true)
     useConversations.getState().saveCurrent()
 
+    // Hoisted so the catch block can attach a request snapshot to the
+    // ChatError. They start empty/undefined and get filled inside the try.
+    let sources: Chunk[] = []
+    let recent: Message[] = []
+    let llmMessages: ChatCompletionMessageParam[] = []
+
     try {
       const bareSubject = BARE_SUBJECT_RE.test(q)
         ? q.toUpperCase().replace(/_V$/, '')
         : undefined
 
-      let sources: Chunk[] = []
       let missingCodes: string[] = []
       if (!bareSubject) {
         const [topKResult, courseIndex] = await Promise.all([
@@ -94,9 +105,9 @@ export function Chat() {
       const prior = useChat
         .getState()
         .messages.slice(0, -2) // drop the just-added user + empty assistant
-      const recent = prior.slice(-HISTORY_TURNS * 2)
+      recent = prior.slice(-HISTORY_TURNS * 2)
 
-      const llmMessages: ChatCompletionMessageParam[] = [
+      llmMessages = [
         { role: 'system', content: SYSTEM_PROMPT },
         ...toLLMHistory(recent),
         {
@@ -105,12 +116,46 @@ export function Chat() {
         },
       ]
 
-      for await (const delta of streamChat(llmMessages)) {
-        appendToLast(delta)
+      // Manual .next() loop instead of for-await so we can read the
+      // generator's return value (the recovery flag from streamChat).
+      const it = streamChat(llmMessages)
+      let result = await it.next()
+      while (!result.done) {
+        appendToLast(result.value)
+        result = await it.next()
       }
+      // result.value is { recovered }; we don't surface a UI hint when
+      // recovery happened transparently, only when an error is thrown.
     } catch (err) {
-      console.error(err)
-      appendToLast(`\n\n_Error: ${(err as Error).message}_`)
+      const requestSnapshot = {
+        historyTurns: Math.floor(recent.length / 2),
+        sourceCount: sources.length,
+        query: q,
+      }
+      const isErrInstance = err instanceof Error
+      // String rejections sneak in from the WebLLM worker proxy
+      // (see web_worker.d.ts → proxy reject(msg.content)). Normalize to
+      // a structured ChatError instead of stringifying with .message,
+      // which would yield 'undefined' for those.
+      const chatError: ChatError = {
+        message: isErrInstance ? err.message : String(err),
+        name: isErrInstance ? err.name : undefined,
+        stack: isErrInstance ? err.stack : undefined,
+        recovered: Boolean((err as { recovered?: boolean })?.recovered),
+        request: requestSnapshot,
+      }
+      // console.error of a string shows no expand arrow. Group the raw
+      // error, type-introspection facts, and the structured copy so any
+      // shape (Error, string, plain object) is inspectable in devtools.
+      console.group('chat error')
+      console.error('raw:', err)
+      console.error('typeof:', typeof err)
+      console.error('instanceof Error:', isErrInstance)
+      console.error('String(err):', String(err))
+      console.error('chatError:', chatError)
+      console.error('llmMessages:', llmMessages)
+      console.groupEnd()
+      setErrorOnLast(chatError)
     } finally {
       setStreaming(false)
       useConversations.getState().saveCurrent()

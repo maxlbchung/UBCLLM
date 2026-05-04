@@ -49,28 +49,6 @@ function quantScore(id: string): number {
 
 export type LoadProgress = (r: InitProgressReport) => void
 
-function spawnWorker(): Worker {
-  return new Worker(new URL('./llm.worker.ts', import.meta.url), {
-    type: 'module',
-  })
-}
-
-export function getLLM(onProgress?: LoadProgress): Promise<MLCEngineInterface> {
-  if (!enginePromise) {
-    const worker = spawnWorker()
-    activeWorker = worker
-    enginePromise = CreateWebWorkerMLCEngine(worker, pickModelId(), {
-      initProgressCallback: (r) => onProgress?.(r),
-    }).catch((err) => {
-      enginePromise = null
-      worker.terminate()
-      if (activeWorker === worker) activeWorker = null
-      throw err
-    })
-  }
-  return enginePromise
-}
-
 // After the tab idles for a while, the WebGPU device can quietly drop the
 // model's pipeline. The first send after wakeup then surfaces as
 // "Buffer was unmapped before mapping was resolved" (a GPU buffer the streamer
@@ -100,6 +78,47 @@ function discardEngine() {
   }
 }
 
+function spawnWorker(): Worker {
+  const worker = new Worker(new URL('./llm.worker.ts', import.meta.url), {
+    type: 'module',
+  })
+  // The worker doesn't go through any chat-completion promise we'd catch in
+  // streamChat. Wire onerror/onmessageerror so a crash in the worker (e.g.
+  // worker-side init throwing, postMessage of an unstructured-cloneable
+  // value) at least logs loudly and tears the engine down so the next call
+  // rebuilds instead of silently re-attaching to a corpse.
+  worker.onerror = (e) => {
+    console.error('[llm.worker] error', {
+      message: e.message,
+      filename: e.filename,
+      lineno: e.lineno,
+      raw: e,
+    })
+    if (activeWorker === worker) discardEngine()
+  }
+  worker.onmessageerror = (e) => {
+    console.error('[llm.worker] messageerror', e)
+    if (activeWorker === worker) discardEngine()
+  }
+  return worker
+}
+
+export function getLLM(onProgress?: LoadProgress): Promise<MLCEngineInterface> {
+  if (!enginePromise) {
+    const worker = spawnWorker()
+    activeWorker = worker
+    enginePromise = CreateWebWorkerMLCEngine(worker, pickModelId(), {
+      initProgressCallback: (r) => onProgress?.(r),
+    }).catch((err) => {
+      enginePromise = null
+      worker.terminate()
+      if (activeWorker === worker) activeWorker = null
+      throw err
+    })
+  }
+  return enginePromise
+}
+
 // Serialize calls to the engine: WebLLM's chat completion stream holds GPU
 // buffer mappings that are torn down when the stream resolves, but a second
 // call can race with that teardown and crash with
@@ -109,16 +128,30 @@ function discardEngine() {
 // previous turn (we re-send the full message history each call anyway).
 let chainTail: Promise<void> = Promise.resolve()
 
+/**
+ * Stream chat completion deltas. The generator's *return value* (read via
+ * the iterator protocol, not the for-await loop) signals whether the
+ * discard-engine recovery path was hit on this turn — the caller can use
+ * it to tell the user "the engine was rebuilt; your next message should
+ * work" without inferring it from the error string.
+ *
+ * On a mid-stream stale-engine failure we still throw, but the thrown
+ * error gets a `recovered = true` property attached (cast required since
+ * Error doesn't widen) so the catch can read it.
+ */
+export type StreamChatResult = { recovered: boolean }
+
 export async function* streamChat(
   messages: ChatCompletionMessageParam[],
   opts: { temperature?: number } = {},
-): AsyncGenerator<string, void, void> {
+): AsyncGenerator<string, StreamChatResult, void> {
   const previous = chainTail
   let release!: () => void
   chainTail = new Promise<void>((r) => {
     release = r
   })
 
+  let recovered = false
   try {
     await previous
 
@@ -143,7 +176,7 @@ export async function* streamChat(
             yield delta
           }
         }
-        return
+        return { recovered }
       } catch (err) {
         if (isStaleEngineError(err)) {
           // Force the next getLLM() to rebuild the engine from cached
@@ -151,11 +184,18 @@ export async function* streamChat(
           // otherwise rethrow so the user sees what happened on this turn,
           // and their next send picks up the fresh engine.
           discardEngine()
+          recovered = true
           if (!yielded && attempt === 0) continue
         }
+        // Tag the recovery flag onto the error for the mid-stream stale case
+        // (and as a no-op false otherwise) so Chat.tsx's catch can read it
+        // without re-running isStaleEngineError.
+        ;(err as { recovered?: boolean }).recovered = recovered
         throw err
       }
     }
+    // Unreachable: the loop either returns or throws on every iteration.
+    return { recovered }
   } finally {
     release()
   }

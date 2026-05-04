@@ -4,6 +4,7 @@ import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { Message } from '../store/chat'
 import type { Chunk } from '../lib/retrieve'
+import { ErrorDetails } from './ErrorDetails'
 
 const CITATION_RE = /\[(\d+)\]/g
 
@@ -346,6 +347,8 @@ export function ChatMessage({ message }: { message: Message }) {
             )}
           </details>
         )}
+
+        {!isUser && message.error && <ErrorDetails error={message.error} />}
       </div>
       {isUser && <UserIcon />}
     </div>

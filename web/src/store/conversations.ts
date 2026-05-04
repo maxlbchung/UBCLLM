@@ -111,7 +111,17 @@ export const useConversations = create<State>()(
         if (!activeId) return
         const conv = conversations[activeId]
         if (!conv) return
-        const messages = useChat.getState().messages
+        const liveMessages = useChat.getState().messages
+        // Drop error.stack before persisting. Stacks are only useful in the
+        // live session and would balloon localStorage + leak internal paths
+        // into stored state. The rest of the ChatError (message, name,
+        // recovered, request) stays so reloaded conversations still show
+        // the structured error block.
+        const messages = liveMessages.map((m) =>
+          m.error?.stack
+            ? { ...m, error: { ...m.error, stack: undefined } }
+            : m,
+        )
         const title =
           conv.title === 'New chat'
             ? deriveTitle(messages) ?? conv.title

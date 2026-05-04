@@ -337,7 +337,7 @@ export function ChatMessage({ message }: { message: Message }) {
                       {s.score != null && (
                         <span
                           className="ml-auto text-[0.625rem] font-mono text-zinc-500"
-                          title="Retrieval score (cosine similarity; +2 if the query named this course code)"
+                          title="Retrieval score (cosine similarity, plus optional title-match and course-keyword boosts; pure cosine is in [-1, 1])"
                         >
                           {s.score.toFixed(3)}
                         </span>
@@ -383,7 +383,7 @@ export function ChatMessage({ message }: { message: Message }) {
                         {s.score != null && (
                           <span
                             className="ml-auto text-[0.625rem] font-mono text-zinc-600"
-                            title="Retrieval score (cosine similarity; +2 if the query named this course code)"
+                            title="Retrieval score (cosine similarity, plus optional title-match and course-keyword boosts; pure cosine is in [-1, 1])"
                           >
                             {s.score.toFixed(3)}
                           </span>

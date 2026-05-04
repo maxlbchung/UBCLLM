@@ -111,18 +111,24 @@ export interface Chunk {
   id: string
   // 'easter' chunks are hand-curated Q&A entries from
   // pipeline/easter-eggs.json. They share the corpus and the cosine top-K
-  // with everything else, but get NO score boost — they have to win on pure
-  // semantic similarity. Every existing boost in topK is gated explicitly
-  // ('course'-code +2, course-keyword +1, 'program' title-match +1), so
-  // easter chunks are already on a level playing field. Keep that contract:
-  // any future kind-specific bonus must be opt-in by kind, not opt-out.
+  // with everything else, and ride along on whichever score boosts apply
+  // by signal: a query token substring-matching the chunk's title gets
+  // them the +1 program-title boost, and a "course"/"class" query gets
+  // them the +0.5 course-keyword boost. The intent is "level playing
+  // field" — easter chunks shouldn't be artificially preferred OR
+  // structurally disadvantaged relative to programs/courses they could
+  // plausibly answer. Boosts that are kind-specific by intent (none
+  // currently exist; the +2 course-code boost was removed in v0.9.30
+  // because Mode A's structural inclusion made it redundant) should
+  // stay kind-specific.
   kind: 'course' | 'program' | 'easter'
   code: string | null
   title: string
   text: string
   url: string
-  // Set by topK on returned chunks (post-boost ranking score; cosine in
-  // [-1, 1] for pure-semantic hits, ~+2 higher for course-code matches).
+  // Set by topK on returned chunks (post-boost ranking score). Pure cosine
+  // is in [-1, 1]; a chunk can pick up at most +1 program-title and +0.5
+  // course-keyword on top, so the realistic envelope is roughly [-1, 2.5].
   // Undefined for chunks read straight from the corpus or rehydrated from
   // older persisted conversations that pre-date this field.
   score?: number
@@ -175,40 +181,31 @@ export async function topK(
     scores[i] = dot(matrix, qVec, i * EMBED_DIM)
   }
 
-  // Hybrid boost: course numbers are dense, low-frequency tokens that MiniLM
-  // doesn't distinguish well — embed("CPSC 110") sits very close to "CPSC 121"
-  // and "CPSC 320", so pure semantic top-K can miss the literal course the
-  // user asked about. If the query mentions explicit course codes, push their
-  // chunks above any cosine-only match. Cosine scores live in [-1, 1] after
-  // normalization; +2 guarantees the boosted chunk lands in the top slice
-  // (and trivially passes the minScore floor below).
-  //
-  // The `requested.has(c.code)` check requires an EXACT canonical code
-  // ("CPSC 110") match against the chunk's code, so partial subject typos
-  // can't hijack the boost: extractCourseCodes("CPS 110") yields
-  // "CPS 110", which is not a real chunk code, so no chunk gets boosted.
-  // Likewise "hi" extracts to nothing (regex needs both letters and
-  // digits) and triggers no boost at all.
+  // Course-code recognition. Used by Mode A below to structurally include
+  // the asked course (Pass 1) and any chunk whose text mentions the asked
+  // code (Pass 2) — both regardless of cosine score. Previously this also
+  // applied a +2 score boost to the Pass 1 chunks, but that boost only
+  // affected the displayed score: Pass 1 already includes asked courses
+  // unconditionally and Pass 2 doesn't see the boost, so removing it makes
+  // the displayed score honestly reflect cosine similarity. The
+  // `requested.has(c.code)` check stays canonical-only — extractCourseCodes
+  // ("CPS 110") yields "CPS 110" which isn't a real chunk code, so partial
+  // subject typos can't hijack inclusion. "hi" extracts nothing (regex
+  // needs both letters and digits).
   const requested = new Set(extractCourseCodes(query))
-  if (requested.size > 0) {
-    for (let i = 0; i < chunks.length; i++) {
-      const c = chunks[i]
-      if (c.kind === 'course' && c.code && requested.has(c.code)) {
-        scores[i] += 2
-      }
-    }
-  }
 
-  // Program boost: pure-semantic ranking buries the umbrella program /
-  // faculty / school overview chunk under individual courses (more chunks,
-  // denser titles), so a query like "tell me about astronomy", "what is
-  // CPSC", or "tell me about Sauder" shows individual course chunks before
-  // the actual program/faculty page. Add +1 to any program-kind chunk
-  // whose title (lowercased) contains a query token of length ≥ 4. The
-  // 4-char floor avoids prepositions/articles; ALIASES handles cases where
-  // the query term doesn't appear in the title (CPSC → computer, Sauder →
-  // commerce and business). Magnitude is +1, deliberately under the +2
-  // course-code boost so "CPSC 110 prereqs" still ranks CPSC 110 first.
+  // Program / easter boost: pure-semantic ranking buries the umbrella
+  // program / faculty / school overview chunk under individual courses
+  // (more chunks, denser titles), so a query like "tell me about astronomy",
+  // "what is CPSC", or "tell me about Sauder" shows individual course chunks
+  // before the actual program/faculty page. Add +1 to any program OR easter
+  // chunk whose title (lowercased) contains a query token of length ≥ 4.
+  // Easter chunks share this boost so the hand-curated Q&A entries can
+  // compete on equal terms when their title aligns with the query — they're
+  // not boosted as a kind, they're boosted on the same title-match signal
+  // that lifts program pages. The 4-char floor avoids prepositions /
+  // articles; ALIASES handles cases where the query term doesn't appear in
+  // the title (CPSC → computer, Sauder → commerce and business).
   const queryLower = query.toLowerCase()
   const tokens = queryLower
     .split(/[^a-z0-9]+/)
@@ -226,7 +223,7 @@ export async function topK(
   if (programNeedles.length > 0) {
     for (let i = 0; i < chunks.length; i++) {
       const c = chunks[i]
-      if (c.kind !== 'program') continue
+      if (c.kind !== 'program' && c.kind !== 'easter') continue
       const title = c.title.toLowerCase()
       if (programNeedles.some((n) => title.includes(n))) {
         scores[i] += 1
@@ -239,14 +236,17 @@ export async function topK(
   // above lifts programs whose title shares generic tokens like "course"
   // or "learning" with the query (e.g. "what course should I take to
   // learn linear algebra" → "Professional and Diploma Courses",
-  // "Adult Learning and Education" all jump to ~1.28). This +1 on every
-  // course-kind chunk pushes the actually-relevant courses (MATH 221,
-  // MATH 223, …) past those boosted programs. Stacks additively with
-  // the +2 course-code boost — "what course is CPSC 110?" gives
-  // CPSC 110 +3 (still wins) and other courses +1, programs nothing.
+  // "Adult Learning and Education" all jump to ~1.28). This +0.5 on every
+  // course or easter chunk nudges those past the boosted programs.
+  // Easter chunks ride along so a hand-curated course Q&A doesn't get
+  // outranked just because it shares a kind with programs in the boost
+  // table. Magnitude is +0.5 (down from +1 prior) — enough to overtake
+  // the program +1 boost in combination with cosine, without dominating
+  // the ranking on its own.
   if (COURSE_KEYWORD_RE.test(query)) {
     for (let i = 0; i < chunks.length; i++) {
-      if (chunks[i].kind === 'course') scores[i] += 1
+      const k = chunks[i].kind
+      if (k === 'course' || k === 'easter') scores[i] += 0.5
     }
   }
 
@@ -264,7 +264,8 @@ export async function topK(
   // 2 catches follow-on courses ("what's after CPSC 110" → CPSC 121, 213)
   // that list the asked code as a prereq. This sidesteps MiniLM's
   // course-code clustering blindspot — string-contains is a deterministic
-  // structural signal, the way the +2 boost is for direct matches.
+  // structural signal that doesn't need a score boost to land in the
+  // result, since both passes ignore the minScore floor.
   if (requested.size > 0) {
     const codes = [...requested]
     const out: Chunk[] = []

@@ -16,6 +16,13 @@ const EMBED_DIM = 384
 // return empty.
 const MIN_SCORE = 0.4
 
+// When the user explicitly says "course"/"class" (incl. plurals), they
+// want a course chunk, not a program/faculty page. Independent of the
+// course-code +2 boost (which fires on a literal CPSC 110 in the query)
+// and the program +1 boost (which lifts opposite-kind chunks), so all
+// three stack additively without conflict. See the boost block in topK.
+const COURSE_KEYWORD_RE = /\b(course|courses|class|classes)\b/i
+
 // Aliases for query terms that don't share a substring with the program /
 // faculty / school title they refer to, so the "title.includes(query-token)"
 // boost below wouldn't otherwise fire. Maps each alias to keyword(s) that
@@ -161,6 +168,22 @@ export async function topK(
       if (programNeedles.some((n) => title.includes(n))) {
         scores[i] += 1
       }
+    }
+  }
+
+  // Course-keyword boost: when the user says "course"/"class" (incl.
+  // plurals), they want course chunks, not programs. The program boost
+  // above lifts programs whose title shares generic tokens like "course"
+  // or "learning" with the query (e.g. "what course should I take to
+  // learn linear algebra" → "Professional and Diploma Courses",
+  // "Adult Learning and Education" all jump to ~1.28). This +1 on every
+  // course-kind chunk pushes the actually-relevant courses (MATH 221,
+  // MATH 223, …) past those boosted programs. Stacks additively with
+  // the +2 course-code boost — "what course is CPSC 110?" gives
+  // CPSC 110 +3 (still wins) and other courses +1, programs nothing.
+  if (COURSE_KEYWORD_RE.test(query)) {
+    for (let i = 0; i < chunks.length; i++) {
+      if (chunks[i].kind === 'course') scores[i] += 1
     }
   }
 

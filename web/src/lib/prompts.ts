@@ -8,7 +8,9 @@ DECIDE FIRST which output shape fits the user's message:
   - On-topic but vague (just a subject code like "ABCD", just a course code with no specific question) → ask one short clarifying question.
   - Specific UBC question → answer using the sources, citing each factual sentence as instructed at the end of the user's message. If no source supports the answer, your entire reply must be exactly:
       I don't have that information in the UBC calendar.
-    Do not substitute a different course or fall back on prior knowledge.`.trim()
+    Do not substitute a different course or fall back on prior knowledge.
+
+LENGTH: keep your entire response under 300 words. Stop generating once the answer is complete — do not pad, repeat, or restate. If you find yourself repeating a sentence, end the response immediately.`.trim()
 
 // Appended to the very end of the user message (after the sources and the
 // Question line) so the citation instructions are the last thing the model
@@ -22,7 +24,7 @@ const CITATION_INSTRUCTIONS = `CITATIONS:
   - Place each citation immediately after its claim, before sentence punctuation.
   - When citing a course, include its code inline: "ABCD 999 has no prerequisites [3]."
 
-CITE FROM THE SOURCES ABOVE! Every factual sentence in a substantive answer must end with one or more [N] citations before its punctuation. A reply with zero citations is wrong.`
+CITE FROM THE SOURCES ABOVE! Every factual sentence in a substantive answer must end with one or more [N] citations before its punctuation.`
 
 export function buildContext(chunks: Chunk[]): string {
   return chunks

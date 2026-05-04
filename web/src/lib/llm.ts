@@ -128,6 +128,18 @@ export function getLLM(onProgress?: LoadProgress): Promise<MLCEngineInterface> {
 // previous turn (we re-send the full message history each call anyway).
 let chainTail: Promise<void> = Promise.resolve()
 
+// Hard cutoff for the streamed response, used as a backstop against the
+// model entering a degenerate repeat loop on adversarial / off-topic
+// queries (e.g. "why do asteroids always land in craters?" hit a
+// never-ending repeating answer). The SYSTEM_PROMPT also asks the model
+// to stay under SOFT_WORD_CAP words; HARD_WORD_CAP is 10% over that and
+// triggers a JS-side interruptGenerate() so a runaway generation can't
+// keep the GPU pinned forever. Both caps measured in whitespace-separated
+// tokens — close enough to "words" for a length backstop, and cheap to
+// recompute on every delta without pulling in a real tokenizer.
+const SOFT_WORD_CAP = 300
+const HARD_WORD_CAP = Math.ceil(SOFT_WORD_CAP * 1.1)
+
 /**
  * Stream chat completion deltas. The generator's *return value* (read via
  * the iterator protocol, not the for-await loop) signals whether the
@@ -169,11 +181,33 @@ export async function* streamChat(
           // it on the chunk-supported path and makes refusals reliable.
           temperature: opts.temperature ?? 0,
         })
+        let accumulated = ''
         for await (const chunk of stream) {
           const delta = chunk.choices[0]?.delta?.content
           if (delta) {
             yielded = true
             yield delta
+            accumulated += delta
+            // Whitespace-token count is approximate during streaming
+            // (a partial word like "wor" reads as one token until the
+            // closing delta arrives) but converges to the real count
+            // by stream end. Slight over-count here makes us cut a
+            // few tokens early — fine for a length backstop.
+            const wordCount = accumulated.match(/\S+/g)?.length ?? 0
+            if (wordCount >= HARD_WORD_CAP) {
+              try {
+                // Best-effort: tells the engine to stop generating so
+                // the GPU loop terminates cleanly. If it throws or is
+                // missing, breaking the for-await still ends our yield
+                // — the iterator's return() call propagates to the
+                // worker, and resetChat() at the next call's start
+                // clears any leftover state anyway.
+                engine.interruptGenerate()
+              } catch {
+                /* fall through to the break below */
+              }
+              break
+            }
           }
         }
         return { recovered }

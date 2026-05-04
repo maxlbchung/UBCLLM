@@ -3,4 +3,4 @@
 //   MAJOR — only on explicit user instruction
 //   MINOR — big changes only (new top-level capability, architectural shift)
 //   PATCH — everything else (default: small features, polish, fixes, docs)
-export const APP_VERSION = '0.9.30'
+export const APP_VERSION = '0.9.31'

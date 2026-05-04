@@ -350,7 +350,7 @@ export async function topK(
   // the alias signal, so we fall through to Mode C and let course chunks
   // (with their +0.25 boost) compete on equal footing.
   if (aliasKeywords.length > 0 && !wantsCourses) {
-    const PROGRAM_K = 3
+    const PROGRAM_K = 5
     const out: Chunk[] = []
     for (const i of allIndicesByScore) {
       if (out.length >= PROGRAM_K) break

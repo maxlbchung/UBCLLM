@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -32,7 +33,15 @@ EMBEDDINGS_BIN = OUTPUT_DIR / "embeddings.bin"
 
 MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 EMBED_DIM = 384
-TARGET_CHARS = 1600  # ~400 tokens; MiniLM ceiling is 512 tokens
+# ~200 tokens of body. Course chunks already sit around this; programs used to
+# blow past it (median 1.4k chars, max 6.4k) because the binner here would
+# treat any single oversized paragraph as its own un-split bin. That made the
+# K=8 prompt for "general program" queries (astronomy, science) hit ~13 kB
+# and trigger Windows TDR mid-prefill on the WebGPU backend. Capping here
+# keeps the worst-case browser prompt bounded by construction and improves
+# retrieval granularity (a long program page now becomes several chunks the
+# embedder can match against more specifically).
+TARGET_CHARS = 800
 
 log = logging.getLogger("ubcllm.pipeline")
 
@@ -73,11 +82,52 @@ def course_chunk(c: dict) -> Chunk:
     )
 
 
+_SENTENCE_BOUNDARY_RE = re.compile(r"(?<=[.!?])\s+")
+
+
+def _split_long(text: str, max_chars: int) -> list[str]:
+    """Split a paragraph that's longer than max_chars into pieces ≤ max_chars.
+
+    Tries sentence boundaries first; if a single sentence is still too long
+    (rare — long bullet lists with no terminal punctuation), falls back to a
+    hard char-window split so we never emit an oversized piece.
+    """
+    if len(text) <= max_chars:
+        return [text]
+    sentences = _SENTENCE_BOUNDARY_RE.split(text)
+    out: list[str] = []
+    cur = ""
+    for s in sentences:
+        if len(s) > max_chars:
+            if cur:
+                out.append(cur)
+                cur = ""
+            for i in range(0, len(s), max_chars):
+                out.append(s[i:i + max_chars])
+            continue
+        candidate = f"{cur} {s}".strip() if cur else s
+        if len(candidate) > max_chars:
+            out.append(cur)
+            cur = s
+        else:
+            cur = candidate
+    if cur:
+        out.append(cur)
+    return out
+
+
 def program_chunks(p: dict) -> list[Chunk]:
     text = (p.get("text") or "").strip()
     if not text:
         return []
-    paragraphs = [pg for pg in text.split("\n") if pg.strip()]
+    # Split first, then bin. Without the per-paragraph split, a single
+    # oversized paragraph becomes its own un-split bin (the old bug — a 6.4k-
+    # char paragraph would ride straight into chunks.json untouched).
+    paragraphs: list[str] = []
+    for pg in text.split("\n"):
+        pg = pg.strip()
+        if pg:
+            paragraphs.extend(_split_long(pg, TARGET_CHARS))
 
     bins: list[list[str]] = []
     cur: list[str] = []

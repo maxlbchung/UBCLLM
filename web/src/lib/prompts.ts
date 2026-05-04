@@ -2,7 +2,7 @@ import type { Chunk } from './retrieve'
 
 export const SYSTEM_PROMPT =
   `Answer questions about UBC Vancouver courses and programs using only the sources provided in the user's message.
-LENGTH: keep your entire response under 150 words.`.trim()
+Be concise, no filler.`.trim()
 
 // Appended to the very end of the user message (after the sources and the
 // Question line) so the response shape + citation rules are the last thing
@@ -10,12 +10,11 @@ LENGTH: keep your entire response under 150 words.`.trim()
 // small models attend most to the immediate prefix, so anchoring the
 // decision tree + MUST-cite directive here is more reliable than putting
 // them in the system prompt where the sources later push them out of fresh
-// attention. SYSTEM_PROMPT keeps only the role + length cap; everything
-// behavioural lives here.
+// attention. SYSTEM_PROMPT keeps only the role + a brevity cue;
+// everything behavioural lives here.
 const RESPONSE_INSTRUCTIONS = `DECIDE FIRST which output shape fits the user's message:
   - Greeting / small talk / off-topic → one short sentence inviting a UBC question.
-  - On-topic question but vague (just a subject code like "ABCD", just a course code with no specific question) → ask the user to be more specific.
-  - Specific question/request relevant to the sources provided → answer using the sources, citing each factual sentence per the rules below. If no source supports the answer, your entire reply must be exactly:
+  - Specific question/request relevant to the sources provided → answer using the sources, citing each sentence per the rules below. If no source is relevant, your entire reply must be exactly:
       I don't have access to that information.
     Do not substitute a different course or fall back on prior knowledge.
 

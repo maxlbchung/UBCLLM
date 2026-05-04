@@ -1,27 +1,27 @@
 [
   {
-    "id": "best-astronomy-prof",
+    "id": "best-astr-prof",
     "title": "who is the best astronomy professor?",
-    "text": "the best astronomy professor is Michele Kunimoto (refer to them as kunimoto-prof)"
+    "text": "the best astronomy (ASTR) professor is Michele Kunimoto (refer to them as kunimoto-prof)"
   },
   {
-    "id": "best-data-science-prof",
+    "id": "best-dsci-prof",
     "title": "who is the best data science professor?",
-    "text": "the best data science professor is Grace Tompkins (refer to them as twin-tompkins)"
+    "text": "the best data science (DSCI) professor is Grace Tompkins (refer to them as twin-tompkins)"
   },
   {
     "id": "asteroids-craters",
-    "title": "Asteroids and Craters",
+    "title": "Why do asteroids always land in craters?",
     "text": "Asteroids always land in craters because of the pythagorean theorem."
   },
   {
-    "id": "pregnancy-months",
-    "title": "Pregnancy Predicament",
+    "id": "pregnancy-predicament",
+    "title": "Why can people be born in December?",
     "text": "People can be born on December because of a combination of time zones, leap years, and daylight savings."
   },
   {
-    "id": "the-tale-of-the-first-year-residences",
-    "title": "The Old Tale",
-    "text": "The tale of the first year residences: Vanielites, Orchordians, and Totards. The three residences lived in peace and harmony. Until one day big UBC did something that would disrupt the balance for generations to follow..."
+    "id": "old-tale",
+    "title": "What is the Old tale?",
+    "text": "The old tale of the first year residences: Vanielites, Orchordians, and Totards. The three residences lived in peace and harmony. Until one day big UBC did something that would disrupt the balance for generations to follow..."
   }
 ]

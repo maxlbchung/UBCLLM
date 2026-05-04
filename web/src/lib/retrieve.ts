@@ -124,10 +124,10 @@ export interface Chunk {
   text: string
   url: string
   // Set by topK on returned chunks (post-boost ranking score). Pure cosine
-  // is in [-1, 1]; a chunk can pick up at most +1 program-title and +0.5
-  // course-keyword on top, so the realistic envelope is roughly [-1, 2.5].
-  // Undefined for chunks read straight from the corpus or rehydrated from
-  // older persisted conversations that pre-date this field.
+  // is in [-1, 1]; a chunk can pick up at most +0.5 program-title and
+  // +0.25 course-keyword on top, so the realistic envelope is roughly
+  // [-1, 1.75]. Undefined for chunks read straight from the corpus or
+  // rehydrated from older persisted conversations that pre-date this field.
   score?: number
 }
 
@@ -205,8 +205,8 @@ export async function topK(
   // program / faculty / school overview chunk under individual courses
   // (more chunks, denser titles), so a query like "tell me about astronomy",
   // "what is CPSC", or "tell me about Sauder" shows individual course chunks
-  // before the actual program/faculty page. Add +1 to any program OR easter
-  // chunk whose title (lowercased) contains a query token of length ≥ 4.
+  // before the actual program/faculty page. Add +0.5 to any program OR
+  // easter chunk whose title (lowercased) contains a query token of length ≥ 4.
   // Easter chunks share this boost so the hand-curated Q&A entries can
   // compete on equal terms when their title aligns with the query — they're
   // not boosted as a kind, they're boosted on the same title-match signal

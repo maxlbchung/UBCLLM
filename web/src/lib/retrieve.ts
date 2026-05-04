@@ -170,6 +170,16 @@ function dot(a: Float32Array, b: Float32Array, offset: number): number {
   return s
 }
 
+// If the top-ranked chunk in `out` is an easter-egg entry, drop everything
+// after it. Easter chunks are hand-curated Q&A pairs — when one wins the
+// top slot it IS the canonical answer, and surfacing additional sources
+// alongside it just gives the LLM material to confabulate from or cite
+// over the curated answer. Mode A doesn't return easter chunks at all,
+// so this only matters for Mode B and Mode C.
+function easterCollapse(out: Chunk[]): Chunk[] {
+  return out.length > 0 && out[0].kind === 'easter' ? [out[0]] : out
+}
+
 export async function topK(
   query: string,
   k = 8,
@@ -226,7 +236,7 @@ export async function topK(
       if (c.kind !== 'program' && c.kind !== 'easter') continue
       const title = c.title.toLowerCase()
       if (programNeedles.some((n) => title.includes(n))) {
-        scores[i] += 1
+        scores[i] += 0.5
       }
     }
   }
@@ -246,7 +256,7 @@ export async function topK(
   if (COURSE_KEYWORD_RE.test(query)) {
     for (let i = 0; i < chunks.length; i++) {
       const k = chunks[i].kind
-      if (k === 'course' || k === 'easter') scores[i] += 0.5
+      if (k === 'course' || k === 'easter') scores[i] += 0.25
     }
   }
 
@@ -324,17 +334,18 @@ export async function topK(
       if (scores[i] < minScore) continue
       out.push({ ...c, score: scores[i] })
     }
-    return out
+    return easterCollapse(out)
   }
 
   // ---- Mode C: default semantic mode ----
   // Top-K by score with the minScore floor. For greetings and off-topic
   // queries every chunk's cosine sits near zero, so this returns [];
   // userPromptWithContext + the SCOPE rule then handle the empty case.
-  return allIndicesByScore
+  const modeC = allIndicesByScore
     .filter((i) => scores[i] >= minScore)
     .slice(0, k)
     .map((i) => ({ ...chunks[i], score: scores[i] }))
+  return easterCollapse(modeC)
 }
 
 // ---------- Course-only helpers (used by CourseLookup + PrereqTree) ----------

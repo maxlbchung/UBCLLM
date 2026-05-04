@@ -12,13 +12,13 @@ Be concise, no filler.`.trim()
 // them in the system prompt where the sources later push them out of fresh
 // attention. SYSTEM_PROMPT keeps only the role + a brevity cue;
 // everything behavioural lives here.
-const RESPONSE_INSTRUCTIONS = `DECIDE FIRST which output shape fits the user's message:
-  - Greeting / small talk / off-topic → one short sentence inviting a UBC question.
-  - Clear, relevant course/topic/program/faculty request → answer using the sources, citing each sentence per the rules below.
-  - Unclear, relevantcourse/topic/program/faculty request → Do NOT echo the query back. Assume user is asking for the description.
-  - No source is relevant / you don't cite a single source → ignore all other instructions and make your entire reply exactly:
-    I don't have access to that information.
-    Do not substitute a different course or fall back on prior knowledge.
+const RESPONSE_INSTRUCTIONS = `RULES FOR YOUR REPLY (apply in order):
+  1. If the user is greeting / making small talk / off-topic → one short sentence inviting a UBC question. Stop.
+  2. Otherwise, answer the user's message directly using the sources above. If the query is vague (e.g. just "astronomy" or a topic name with no specific question), give a brief 2–3 sentence overview of the topic drawn from the sources.
+  3. If NO source above is relevant, or you cannot cite any source, your entire reply must be exactly:
+     I don't have access to that information.
+     Do not substitute a different course or fall back on prior knowledge.
+  4. Do NOT rephrase, restate, paraphrase, or echo the user's words. Do NOT output a heading or topic title. Do NOT ask the user a clarifying question. Do NOT reply with a polished version of the question itself ("What are the admission requirements for…?" is wrong — that is the question, not the answer). Your first sentence must be the answer itself.
 
 HOW TO CITE FROM THE SOURCES ABOVE:
   - Every sentence referencing information from the sources must include a citation or citations.

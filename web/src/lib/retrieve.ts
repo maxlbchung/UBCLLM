@@ -16,6 +16,23 @@ const EMBED_DIM = 384
 // return empty.
 const MIN_SCORE = 0.4
 
+// Subject codes whose 4-letter prefix doesn't share a substring with the
+// program's title, so the "title.includes(query-token)" boost below
+// wouldn't otherwise fire. Maps each odd code to keyword(s) that DO appear
+// in matching program titles. Multi-word values (e.g. "data science") use
+// plain substring match against the title.
+//
+// Keep this list small and explicit. Most subject codes (ASTR, MATH, BIOL,
+// PHYS, ECON, HIST, ENGL, …) don't need an entry because their code is a
+// prefix of the program name and substring-on-title already matches.
+const SUBJECT_OVERRIDES: Record<string, string[]> = {
+  CPSC: ['computer'],
+  DSCI: ['data science'],
+  COGS: ['cognitive'],
+  LFS: ['land and food'],
+  KIN: ['kinesiology'],
+}
+
 export interface Chunk {
   id: string
   kind: 'course' | 'program'
@@ -97,6 +114,40 @@ export async function topK(
       const c = chunks[i]
       if (c.kind === 'course' && c.code && requested.has(c.code)) {
         scores[i] += 2
+      }
+    }
+  }
+
+  // Program boost: pure-semantic ranking buries the umbrella program-overview
+  // chunk under individual courses (more chunks, denser titles), so a query
+  // like "tell me about astronomy" or "what is CPSC" shows CPSC 110 / 121 /…
+  // before the actual CS or Astronomy program page. Add +1 to any program
+  // chunk whose title (lowercased) contains a query token of length ≥ 4.
+  // The 4-char floor avoids prepositions/articles; SUBJECT_OVERRIDES handles
+  // codes whose prefix doesn't appear in the program title (CPSC → computer).
+  // Magnitude is +1, deliberately under the +2 course-code boost so
+  // "CPSC 110 prereqs" still ranks the CPSC 110 course first.
+  const queryLower = query.toLowerCase()
+  const tokens = queryLower
+    .split(/[^a-z0-9]+/)
+    .filter((t) => t.length >= 4)
+  const overrideKeywords: string[] = []
+  for (const [code, keywords] of Object.entries(SUBJECT_OVERRIDES)) {
+    // Word-boundary match against the original query (case-insensitive)
+    // so "CPSC110" still triggers (regex \b allows letter→digit boundary)
+    // but "concepts" or "specifics" don't false-trigger on substring.
+    if (new RegExp(`\\b${code}\\b`, 'i').test(query)) {
+      overrideKeywords.push(...keywords.map((k) => k.toLowerCase()))
+    }
+  }
+  const programNeedles = [...tokens, ...overrideKeywords]
+  if (programNeedles.length > 0) {
+    for (let i = 0; i < chunks.length; i++) {
+      const c = chunks[i]
+      if (c.kind !== 'program') continue
+      const title = c.title.toLowerCase()
+      if (programNeedles.some((n) => title.includes(n))) {
+        scores[i] += 1
       }
     }
   }

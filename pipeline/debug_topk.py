@@ -127,10 +127,9 @@ def main() -> None:
     if requested:
         print("Mode A would fire (course-code match)")
     elif alias_keywords and not wants_courses:
-        print("Mode B fires (alias hit, !wantsCourses) — program/easter only, top 5 distinct URLs above minScore")
+        print("Mode B fires (alias hit, !wantsCourses) — program/easter only, top 5 with alias-keyword filter")
         program_k = 5
         out = []
-        seen_urls = set()
         for i in order:
             if len(out) >= program_k:
                 break
@@ -139,9 +138,9 @@ def main() -> None:
                 continue
             if scores[i] < MIN_SCORE:
                 continue
-            if c["url"] in seen_urls:
+            haystack = f"{c['title']}\n{c['text']}".lower()
+            if not any(kw in haystack for kw in alias_keywords):
                 continue
-            seen_urls.add(c["url"])
             out.append((i, c))
         print()
         for i, c in out:

@@ -352,20 +352,24 @@ export async function topK(
   if (aliasKeywords.length > 0 && !wantsCourses) {
     const PROGRAM_K = 5
     const out: Chunk[] = []
-    const seenUrls = new Set<string>()
     for (const i of allIndicesByScore) {
       if (out.length >= PROGRAM_K) break
       const c = chunks[i]
       if (c.kind !== 'program' && c.kind !== 'easter') continue
       if (scores[i] < minScore) continue
-      // Dedup by source URL: program pages get split into multiple slices
-      // (program:astronomy:1..N) and otherwise the top of the score list
-      // is dominated by 4–5 near-duplicate slices of the same page. Keep
-      // only the highest-scoring slice per URL so PROGRAM_K covers
-      // PROGRAM_K *distinct* pages, giving the LLM a wider topical
-      // surface to draw from.
-      if (seenUrls.has(c.url)) continue
-      seenUrls.add(c.url)
+      // Alias-keyword filter (mirrors Mode A's string-contains "Pass 2"):
+      // only return chunks whose title or text actually mentions one of
+      // the keywords that triggered Mode B — "astronomy" for the ASTR
+      // alias, "computer" for CPSC, etc. Without this, a chunk titled
+      // "Admission" could ride the generic "admission" needle into Mode
+      // B's slots even when it's the engineering-admission page; the
+      // filter keeps the result topically locked to the asked program.
+      // Multiple slices of the same source page (program:astronomy:1..N)
+      // are kept on purpose — they're different sub-sections of the same
+      // canonical page (admission rules, degree requirements, contact),
+      // so each adds information rather than duplicating it.
+      const haystack = `${c.title}\n${c.text}`.toLowerCase()
+      if (!aliasKeywords.some((kw) => haystack.includes(kw))) continue
       out.push({ ...c, score: scores[i] })
     }
     return easterCollapse(out)

@@ -52,6 +52,27 @@ function UserIcon() {
 function citationChip(idx: number, sources: Chunk[], key: string | number): ReactNode {
   const src = sources[idx - 1]
   if (!src) return `[${idx}]`
+  // Hand-curated easter-egg chunks (pipeline/easter-eggs.json) get gold
+  // styling so they're visually distinct from scraped course/program chunks.
+  const isEaster = src.kind === 'easter'
+  const chipClasses = isEaster
+    ? 'bg-amber-400/30 text-amber-200 hover:bg-amber-400/60 hover:text-white'
+    : 'bg-blue-500/30 text-blue-200 hover:bg-blue-500/60 hover:text-white'
+  const baseClasses =
+    'inline-block align-super text-[0.625rem] font-mono px-1 mx-0.5 rounded no-underline'
+  // Easter chunks usually have no source URL — render as a plain span so an
+  // empty href doesn't navigate the user to the current page on click.
+  if (!src.url) {
+    return (
+      <span
+        key={key}
+        title={src.code ?? src.title}
+        className={`${baseClasses} ${chipClasses}`}
+      >
+        {idx}
+      </span>
+    )
+  }
   return (
     <a
       key={key}
@@ -59,7 +80,7 @@ function citationChip(idx: number, sources: Chunk[], key: string | number): Reac
       target="_blank"
       rel="noopener noreferrer"
       title={src.code ?? src.title}
-      className="inline-block align-super text-[0.625rem] font-mono px-1 mx-0.5 rounded bg-blue-500/30 text-blue-200 hover:bg-blue-500/60 hover:text-white no-underline"
+      className={`${baseClasses} ${chipClasses}`}
     >
       {idx}
     </a>
@@ -287,29 +308,43 @@ export function ChatMessage({ message }: { message: Message }) {
 
             {cited1Indexed.length > 0 && (
               <ul className="mt-1 space-y-1">
-                {cited1Indexed.map(({ s, i }) => (
-                  <li key={s.id} className="flex items-baseline gap-1.5">
-                    <span className="text-[0.625rem] font-mono text-blue-300/90 w-4 text-right">
-                      [{i}]
-                    </span>
-                    <a
-                      href={s.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="underline hover:text-zinc-200 text-zinc-200"
-                    >
-                      {s.code ?? s.title}
-                    </a>
-                    {s.score != null && (
-                      <span
-                        className="ml-auto text-[0.625rem] font-mono text-zinc-500"
-                        title="Retrieval score (cosine similarity; +2 if the query named this course code)"
-                      >
-                        {s.score.toFixed(3)}
-                      </span>
-                    )}
-                  </li>
-                ))}
+                {cited1Indexed.map(({ s, i }) => {
+                  const isEaster = s.kind === 'easter'
+                  const indexClass = isEaster
+                    ? 'text-[0.625rem] font-mono text-amber-300 w-4 text-right'
+                    : 'text-[0.625rem] font-mono text-blue-300/90 w-4 text-right'
+                  const labelClass = isEaster
+                    ? 'underline text-amber-300 hover:text-amber-200'
+                    : 'underline hover:text-zinc-200 text-zinc-200'
+                  const label = s.code ?? s.title
+                  return (
+                    <li key={s.id} className="flex items-baseline gap-1.5">
+                      <span className={indexClass}>[{i}]</span>
+                      {s.url ? (
+                        <a
+                          href={s.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={labelClass}
+                        >
+                          {label}
+                        </a>
+                      ) : (
+                        <span className={labelClass.replace('underline ', '')}>
+                          {label}
+                        </span>
+                      )}
+                      {s.score != null && (
+                        <span
+                          className="ml-auto text-[0.625rem] font-mono text-zinc-500"
+                          title="Retrieval score (cosine similarity; +2 if the query named this course code)"
+                        >
+                          {s.score.toFixed(3)}
+                        </span>
+                      )}
+                    </li>
+                  )
+                })}
               </ul>
             )}
 
@@ -319,29 +354,43 @@ export function ChatMessage({ message }: { message: Message }) {
                   Other retrieved context
                 </p>
                 <ul className="mt-1 space-y-1 opacity-60">
-                  {uncited.map(({ s, i }) => (
-                    <li key={s.id} className="flex items-baseline gap-1.5">
-                      <span className="text-[0.625rem] font-mono text-zinc-600 w-4 text-right">
-                        [{i}]
-                      </span>
-                      <a
-                        href={s.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="underline hover:text-zinc-300"
-                      >
-                        {s.code ?? s.title}
-                      </a>
-                      {s.score != null && (
-                        <span
-                          className="ml-auto text-[0.625rem] font-mono text-zinc-600"
-                          title="Retrieval score (cosine similarity; +2 if the query named this course code)"
-                        >
-                          {s.score.toFixed(3)}
-                        </span>
-                      )}
-                    </li>
-                  ))}
+                  {uncited.map(({ s, i }) => {
+                    const isEaster = s.kind === 'easter'
+                    const indexClass = isEaster
+                      ? 'text-[0.625rem] font-mono text-amber-400/70 w-4 text-right'
+                      : 'text-[0.625rem] font-mono text-zinc-600 w-4 text-right'
+                    const labelClass = isEaster
+                      ? 'underline text-amber-300/80 hover:text-amber-200'
+                      : 'underline hover:text-zinc-300'
+                    const label = s.code ?? s.title
+                    return (
+                      <li key={s.id} className="flex items-baseline gap-1.5">
+                        <span className={indexClass}>[{i}]</span>
+                        {s.url ? (
+                          <a
+                            href={s.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={labelClass}
+                          >
+                            {label}
+                          </a>
+                        ) : (
+                          <span className={labelClass.replace('underline ', '')}>
+                            {label}
+                          </span>
+                        )}
+                        {s.score != null && (
+                          <span
+                            className="ml-auto text-[0.625rem] font-mono text-zinc-600"
+                            title="Retrieval score (cosine similarity; +2 if the query named this course code)"
+                          >
+                            {s.score.toFixed(3)}
+                          </span>
+                        )}
+                      </li>
+                    )
+                  })}
                 </ul>
               </>
             )}

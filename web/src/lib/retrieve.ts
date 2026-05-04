@@ -164,12 +164,75 @@ export async function topK(
     }
   }
 
-  // Drop chunks below the relevance floor before sorting. For greetings and
-  // off-topic queries every chunk's cosine sits near zero, so this returns
-  // []; userPromptWithContext + the SCOPE rule then handle the empty case.
-  const indices = Array.from(scores.keys()).filter((i) => scores[i] >= minScore)
-  indices.sort((a, b) => scores[b] - scores[a])
-  return indices.slice(0, k).map((i) => ({ ...chunks[i], score: scores[i] }))
+  // Sort once by post-boost score; each retrieval mode below picks from
+  // this in its own way. We don't pre-filter by minScore here because mode
+  // A wants the asked courses included even if their cosine is low.
+  const allIndicesByScore = Array.from(scores.keys()).sort(
+    (a, b) => scores[b] - scores[a],
+  )
+
+  // ---- Mode A: course-code mode ----
+  // Triggered when the query names specific course codes (CPSC 110,
+  // ASTR 201, …). Two passes: (1) the asked courses themselves, then (2)
+  // other course chunks whose text literally contains an asked code. Pass
+  // 2 catches follow-on courses ("what's after CPSC 110" → CPSC 121, 213)
+  // that list the asked code as a prereq. This sidesteps MiniLM's
+  // course-code clustering blindspot — string-contains is a deterministic
+  // structural signal, the way the +2 boost is for direct matches.
+  if (requested.size > 0) {
+    const codes = [...requested]
+    const out: Chunk[] = []
+    const seen = new Set<number>()
+    // Pass 1: directly-asked courses (always included, even if below
+    // minScore — the user named them explicitly).
+    for (const i of allIndicesByScore) {
+      const c = chunks[i]
+      if (c.kind === 'course' && c.code && requested.has(c.code)) {
+        out.push({ ...c, score: scores[i] })
+        seen.add(i)
+      }
+    }
+    // Pass 2: other courses whose chunk text mentions an asked code.
+    for (const i of allIndicesByScore) {
+      if (out.length >= k) break
+      if (seen.has(i)) continue
+      const c = chunks[i]
+      if (c.kind !== 'course') continue
+      if (codes.some((code) => c.text.includes(code))) {
+        out.push({ ...c, score: scores[i] })
+        seen.add(i)
+      }
+    }
+    return out
+  }
+
+  // ---- Mode B: program mode ----
+  // Triggered when the query mentions a major / faculty / school name (or
+  // alias) but no specific course code. Returns the top PROGRAM_K program
+  // chunks across all matching programs by score. Multi-program comparison
+  // stays workable. No course chunks — the user wants to know what the
+  // major IS, not get distracted by random course descriptions.
+  if (programNeedles.length > 0) {
+    const PROGRAM_K = 3
+    const out: Chunk[] = []
+    for (const i of allIndicesByScore) {
+      if (out.length >= PROGRAM_K) break
+      const c = chunks[i]
+      if (c.kind !== 'program') continue
+      if (scores[i] < minScore) continue
+      out.push({ ...c, score: scores[i] })
+    }
+    return out
+  }
+
+  // ---- Mode C: default semantic mode ----
+  // Top-K by score with the minScore floor. For greetings and off-topic
+  // queries every chunk's cosine sits near zero, so this returns [];
+  // userPromptWithContext + the SCOPE rule then handle the empty case.
+  return allIndicesByScore
+    .filter((i) => scores[i] >= minScore)
+    .slice(0, k)
+    .map((i) => ({ ...chunks[i], score: scores[i] }))
 }
 
 // ---------- Course-only helpers (used by CourseLookup + PrereqTree) ----------

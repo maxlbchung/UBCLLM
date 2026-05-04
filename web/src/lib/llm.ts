@@ -187,11 +187,14 @@ export async function* streamChat(
           recovered = true
           if (!yielded && attempt === 0) continue
         }
-        // Tag the recovery flag onto the error for the mid-stream stale case
-        // (and as a no-op false otherwise) so Chat.tsx's catch can read it
-        // without re-running isStaleEngineError.
-        ;(err as { recovered?: boolean }).recovered = recovered
-        throw err
+        // Worker proxy rejections often arrive as bare strings (web-llm
+        // does reject(msg.content) without re-Error-ifying). Strings can't
+        // carry properties — assigning `recovered` to one throws TypeError
+        // that masks the real GPU error in the user's debug surface.
+        // Promote to a real Error first so the original message survives.
+        const wrapped = err instanceof Error ? err : new Error(String(err))
+        ;(wrapped as { recovered?: boolean }).recovered = recovered
+        throw wrapped
       }
     }
     // Unreachable: the loop either returns or throws on every iteration.

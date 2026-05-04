@@ -339,24 +339,26 @@ export function Sidebar() {
               >
                 {displayedCount}/{eggTotal || '–'}
               </span>
-              {/* Anticipation rings — concentric circles that fade in around
-                  the number, hold, then zoom inward and vanish. Sized in rem
-                  so they scale with the rem-base setting in index.css. */}
+              {/* Anticipation rings — three same-size circles staggered by
+                  100ms / 150ms so they pulse out one after another rather
+                  than animating concentrically. Sized in rem so they scale
+                  with the rem-base setting in index.css. */}
               {ringBursts.map((burst) => (
                 <span
                   key={burst.id}
                   aria-hidden
                   className="pointer-events-none absolute left-1/2 top-1/2"
                 >
-                  {[2.6, 3.4, 4.2].map((sizeRem, i) => (
+                  {[0, 100, 150].map((delayMs, i) => (
                     <span
                       key={i}
                       className="absolute left-0 top-0 rounded-full border-2 border-amber-300"
                       style={{
-                        width: `${sizeRem}rem`,
-                        height: `${sizeRem}rem`,
+                        width: '4.2rem',
+                        height: '4.2rem',
                         boxShadow: '0 0 6px 1px rgba(252, 211, 77, 0.5)',
                         animation: 'egg-ring 1150ms linear forwards',
+                        animationDelay: `${delayMs}ms`,
                       }}
                     />
                   ))}

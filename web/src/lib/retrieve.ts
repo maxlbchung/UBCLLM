@@ -23,29 +23,85 @@ const MIN_SCORE = 0.4
 // three stack additively without conflict. See the boost block in topK.
 const COURSE_KEYWORD_RE = /\b(course|courses|class|classes)\b/i
 
-// Aliases for query terms that don't share a substring with the program /
-// faculty / school title they refer to, so the "title.includes(query-token)"
-// boost below wouldn't otherwise fire. Maps each alias to keyword(s) that
-// DO appear in matching program titles. Multi-word values (e.g. "data
-// science") use plain substring match against the title.
+// Allowlist of query terms that identify a UBC program. Doubles as both
+// (a) the gate for Mode B (program-only retrieval) and (b) a fallback
+// title-match source for the +1 program boost when the alias key itself
+// doesn't appear in the program title.
 //
-// Two flavours of entry:
+// Each entry maps a query-side token (matched word-boundary, case-
+// insensitive against the original query) to keyword(s) that DO appear
+// in matching program titles. Multi-word values like "data science"
+// substring-match titles directly.
+//
+// Four flavours of entry:
 //   - Subject codes whose 4-letter prefix isn't in the program title
 //     (CPSC → computer, DSCI → data science, COGS → cognitive, KIN, LFS).
-//     Most subject codes (ASTR, MATH, BIOL, PHYS, ECON, HIST, ENGL, …)
-//     don't need an entry because the code prefix already substring-matches
-//     "Astronomy", "Mathematics", "Biology", etc.
-//   - Colloquial school names that aren't in the official title (Sauder is
-//     "The Faculty of Commerce and Business Administration", etc.).
+//   - Subject codes whose prefix DOES substring-match the program title
+//     (ASTR, BIOL, MATH, PHYS, …). They'd already fire the +1 boost via
+//     the generic ≥4-char token match below, but the alias-only Mode B
+//     gate needs an explicit ALIASES entry to fire — listing them here
+//     opts them into Mode B.
+//   - Natural-name aliases (astronomy, biology, mathematics, …). Required
+//     because the alias key is matched verbatim against the query, so a
+//     user typing "tell me about astronomy" needs "astronomy" as a key
+//     for Mode B to trigger; the bare subject code "ASTR" wouldn't match.
+//   - Colloquial school / faculty names not in the official title
+//     (Sauder = "Faculty of Commerce and Business Administration", etc.).
 //
 // Word-boundary regex on the original-case query, so "CPSC110", "Sauder",
 // and "sauder" all trigger but a substring inside another word doesn't.
+//
+// Curation notes:
+//   - Skipped ENGL / english, HIST / history, STAT / statistics — they're
+//     extremely common as non-program words ("English language", "browser
+//     history", "statistical analysis"); flipping into program-only Mode B
+//     for those would surface program chunks for unrelated queries.
+//   - Skipped KIN's natural-name "kinesiology" because the existing KIN
+//     entry already maps to "kinesiology" as a keyword — adding a separate
+//     `kinesiology: [...]` entry would just duplicate. Same logic for the
+//     other already-natural aliases that read as English words.
 const ALIASES: Record<string, string[]> = {
+  // Subject codes whose 4-letter prefix isn't in the program title.
   CPSC: ['computer'],
   DSCI: ['data science'],
   COGS: ['cognitive'],
   LFS: ['land and food'],
   KIN: ['kinesiology'],
+
+  // Subject codes whose prefix already substring-matches the program
+  // title — listed so the alias-only Mode B gate fires when the user
+  // types the code instead of the natural name.
+  ASTR: ['astronomy'],
+  BIOL: ['biology'],
+  BIOC: ['biochemistry'],
+  CHEM: ['chemistry'],
+  ECON: ['economics'],
+  GEOG: ['geography'],
+  MATH: ['mathematics'],
+  PHIL: ['philosophy'],
+  PHYS: ['physics'],
+  POLI: ['political science'],
+  PSYC: ['psychology'],
+  SOCI: ['sociology'],
+
+  // Natural-name aliases — the query words a user is likely to type
+  // when asking about a UBC program. Required so "tell me about
+  // astronomy" / "what is biology" fire Mode B without forcing the
+  // user to know the subject code.
+  astronomy: ['astronomy'],
+  biology: ['biology'],
+  biochemistry: ['biochemistry'],
+  chemistry: ['chemistry'],
+  economics: ['economics'],
+  geography: ['geography'],
+  mathematics: ['mathematics'],
+  math: ['mathematics'],
+  philosophy: ['philosophy'],
+  physics: ['physics'],
+  psychology: ['psychology'],
+  sociology: ['sociology'],
+
+  // Colloquial school / faculty names not in the official title.
   Sauder: ['commerce and business'],
   VSE: ['vancouver school of economics'],
   iSchool: ['school of information'],
@@ -237,11 +293,13 @@ export async function topK(
   }
 
   // ---- Mode B: program mode ----
-  // Triggered when the query names a UBC program/faculty/school via an
-  // ALIASES hit (CPSC, Sauder, KIN, COGS, DSCI, LFS, VSE, iSchool). Returns
-  // the top PROGRAM_K program chunks across all matching programs by score —
-  // no course chunks, no easter chunks: when the user named a program by its
-  // canonical alias, they want to know what that program IS.
+  // Triggered when the query names a UBC program/faculty/school via any
+  // ALIASES entry — subject codes (CPSC, ASTR, BIOL, MATH, …), natural
+  // names (astronomy, biology, mathematics, …), or colloquial school
+  // names (Sauder, VSE, iSchool). Returns the top PROGRAM_K program
+  // chunks across all matching programs by score — no course chunks, no
+  // easter chunks: when the user named a program by its canonical alias,
+  // they want to know what that program IS.
   //
   // The previous gate (`programNeedles.length > 0`) flipped this on for any
   // query containing a ≥4-char English token (first, year, tell, about, …),

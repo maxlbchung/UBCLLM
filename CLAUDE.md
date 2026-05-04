@@ -76,7 +76,7 @@ The full v1 stack from the original plan is shipped and live. Highlights:
 The app version is shown in the bottom-left of the screen on the main page (Sidebar) and on the model-loading screen (ModelLoader badge). Format: `MAJOR.MINOR.PATCH`.
 
 - **MAJOR** — only bump when the user explicitly tells you to.
-- **SIGNIFICANT** — *big* changes only. A genuinely new top-level capability (e.g. a whole new tool view in the sidebar), a significant architectural shift (e.g. swapping the LLM runtime, replacing the retrieval index, restructuring the build pipeline), or a breaking change to a persisted data format. The rule of thumb: if you'd want to call it out in release notes as a headline, it's SIGNIFICANT. Otherwise it isn't.
+- **SIGNIFICANT** — *big* changes only. A genuinely new top-level capability (e.g. a whole new tool view in the sidebar), a significant architectural shift.
 - **PATCH** — everything else, and this is what you should default to. New components inside an existing feature, UX polish, prompt tweaks, layout refinements, error-handling improvements, bug fixes, dependency bumps, deploy/CI fixes, doc updates, small new affordances. When in doubt, PATCH.
 
 Single source of truth: `web/src/version.ts` (`APP_VERSION`). Mirror it in `web/package.json` so npm tooling stays in sync.
@@ -115,7 +115,7 @@ git push
 ## Verification recipes (post-deploy)
 
 - "What are the prerequisites for CPSC 110?" → grounded answer, `[N]` citation, CPSC 110 highlighted in "Sources used".
-- "What are the prerequisites for FAKE 999?" → "I don't have that information in the UBC calendar." No citations, all 8 sources fall under "Other retrieved context" un-highlighted.
+- "What are the prerequisites for FAKE 999?" → "I don't have access to that information." No citations, all 8 sources fall under "Other retrieved context" un-highlighted.
 - Reload page → conversation list survives, active conversation rehydrates, model loads from IndexedDB cache (instant).
 - Course Lookup: type `cpsc110` (no space, lowercase) → CPSC 110 detail card.
 - Prereq Tree: type `CPSC 320` → multi-level fan with MATH/CPSC chain reaching back several depths.

@@ -267,6 +267,20 @@ export async function topK(
     }
   }
 
+  // Easter floor: an easter chunk only earns a slot when its post-boost
+  // score clears 1.0. Pure cosine maxes at 1.0, so this requires the
+  // +0.5 program-title boost to have fired AND raw cosine > 0.5 — i.e.,
+  // both signals (title match + semantic alignment) have to agree before
+  // we surface a hand-curated Q&A. Without this gate, weakly-aligned
+  // easters can drift into Mode C on cosine alone and hijack the
+  // easterCollapse path with off-topic curated answers. Setting score to
+  // -Infinity drops them below minScore in every downstream mode.
+  for (let i = 0; i < chunks.length; i++) {
+    if (chunks[i].kind === 'easter' && scores[i] <= 1) {
+      scores[i] = -Infinity
+    }
+  }
+
   // Sort once by post-boost score; each retrieval mode below picks from
   // this in its own way. We don't pre-filter by minScore here because mode
   // A wants the asked courses included even if their cosine is low.

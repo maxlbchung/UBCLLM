@@ -131,14 +131,14 @@ let chainTail: Promise<void> = Promise.resolve()
 // Hard cutoff for the streamed response, used as a backstop against the
 // model entering a degenerate repeat loop on adversarial / off-topic
 // queries (e.g. "why do asteroids always land in craters?" hit a
-// never-ending repeating answer). The SYSTEM_PROMPT also asks the model
-// to stay under SOFT_WORD_CAP words; HARD_WORD_CAP is 10% over that and
-// triggers a JS-side interruptGenerate() so a runaway generation can't
-// keep the GPU pinned forever. Both caps measured in whitespace-separated
-// tokens — close enough to "words" for a length backstop, and cheap to
-// recompute on every delta without pulling in a real tokenizer.
-const SOFT_WORD_CAP = 300
-const HARD_WORD_CAP = Math.ceil(SOFT_WORD_CAP * 1.1)
+// never-ending repeating answer). SYSTEM_PROMPT asks for under 150
+// words (the soft cap); HARD_WORD_CAP at 200 is the JS-side backstop
+// that triggers interruptGenerate() so a runaway generation can't
+// keep the GPU pinned forever. Measured in whitespace-separated
+// tokens — close enough to "words" for a length backstop, and cheap
+// to recompute on every delta without a real tokenizer. Keep this in
+// sync with the number in SYSTEM_PROMPT (prompts.ts).
+const HARD_WORD_CAP = 200
 
 /**
  * Stream chat completion deltas. The generator's *return value* (read via

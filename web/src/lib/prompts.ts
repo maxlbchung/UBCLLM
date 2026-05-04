@@ -10,7 +10,7 @@ DECIDE FIRST which output shape fits the user's message:
       I don't have that information in the UBC calendar.
     Do not substitute a different course or fall back on prior knowledge.
 
-LENGTH: keep your entire response under 300 words. Stop generating once the answer is complete — do not pad, repeat, or restate. If you find yourself repeating a sentence, end the response immediately.`.trim()
+LENGTH: keep your entire response under 150 words.`.trim()
 
 // Appended to the very end of the user message (after the sources and the
 // Question line) so the citation instructions are the last thing the model

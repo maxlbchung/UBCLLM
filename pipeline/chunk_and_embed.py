@@ -56,14 +56,8 @@ class Chunk:
     kind: str            # "course" | "program" | "easter"
     code: str | None     # e.g. "CPSC 110" for course chunks; None for programs
     title: str
-    text: str            # shipped to the browser → fed to the LLM as context
+    text: str
     url: str
-    # If set, used in place of `text` when computing this chunk's embedding.
-    # Decouples "what the LLM sees" from "what we match queries against" —
-    # easter eggs embed on just the title (so a paraphrase of the question
-    # scores high) while still giving the LLM the body as the answer.
-    # Pipeline-internal: stripped from chunks.json before write.
-    embed_text: str | None = None
 
 
 # ---------- chunk builders ----------
@@ -127,16 +121,10 @@ def _split_long(text: str, max_chars: int) -> list[str]:
 
 
 def easter_chunk(e: dict) -> Chunk:
-    """Hand-curated Q&A entry.
-
-    Embedded on the title alone (`embed_text=title`) so a paraphrase of the
-    question lands close in MiniLM space without dragging the body's tokens
-    into the embedding (which would dilute the question's semantic signal —
-    "cogs" embeds far from "what is the best major?", and averaging the two
-    pulls the chunk's vector toward neither). The body still ships in
-    chunk.text so the LLM has the answer when the chunk is retrieved.
-    Retrieval relies purely on the semantic match — there is no score boost
-    for this kind in retrieve.ts.
+    """Hand-curated Q&A entry. Embedded text is "title\\n\\nbody" so a query
+    that paraphrases the title lands close in MiniLM space and the chunk gets
+    retrieved on its own merits — there is *no* score boost for this kind in
+    retrieve.ts, only the semantic match.
     """
     title = e["title"]
     body = e.get("text") or ""
@@ -149,7 +137,6 @@ def easter_chunk(e: dict) -> Chunk:
         title=title,
         text=f"{title}\n\n{body}" if body else title,
         url=e.get("url", ""),
-        embed_text=title,
     )
 
 
@@ -270,10 +257,7 @@ def main() -> None:
     log.info("Loading embedding model %s", MODEL_NAME)
     model = SentenceTransformer(MODEL_NAME)
 
-    # Embed `embed_text` when set (easter eggs use title-only), else `text`.
-    # Pipeline-internal — chunks.json gets `text` only; see the asdict()
-    # call below where we drop the `embed_text` field before serializing.
-    texts = [c.embed_text if c.embed_text is not None else c.text for c in chunks]
+    texts = [c.text for c in chunks]
     log.info("Embedding %d chunks (batch=%d)…", len(texts), args.batch_size)
     embeddings = model.encode(
         texts,
@@ -292,14 +276,8 @@ def main() -> None:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     # chunks.json: pretty-print disabled to keep payload small. The browser
-    # parses this once at load time. `embed_text` is a pipeline-internal
-    # field (see Chunk dataclass) — drop it from the JSON so the runtime
-    # schema in retrieve.ts doesn't have to mention it.
-    payload = []
-    for c in chunks:
-        d = asdict(c)
-        d.pop("embed_text", None)
-        payload.append(d)
+    # parses this once at load time.
+    payload = [asdict(c) for c in chunks]
     CHUNKS_JSON.write_text(
         json.dumps(payload, ensure_ascii=False, separators=(",", ":")),
         encoding="utf-8",

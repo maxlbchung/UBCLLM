@@ -59,22 +59,36 @@ export function Sidebar() {
     { id: number; particles: { id: number; dx: number; dy: number }[] }[]
   >([])
   const prevCountRef = useRef(discoveredCount)
-  // Discovery animation effect. Depends ONLY on discoveredCount so that the
-  // Phase 1 setRingBursts inside the body doesn't cause a re-render → effect
-  // cleanup → clearTimeout cascade that nukes the impact/ring/spark timers
-  // before they get to fire. (Listing ringBursts.length here was the bug:
-  // the rings would appear and shrink on their own CSS animation, but the
-  // number flip and spark burst at t=850 never landed because their timers
-  // had already been cleared.) The "keep displayed in sync at rest" branch
-  // moved to a separate effect below — it has no cleanup, so it can't tear
-  // this one's timers down.
+  // `initializedRef` gates the animation against the page-open false-positive.
+  // validIds is not persisted (loadFromCorpus repopulates it on every mount),
+  // so on every page open discoveredCount goes 0 (pre-load filter against
+  // empty validIds) → N (post-load filter sees the persisted IDs). Without
+  // this gate, that 0 → N transition reads as a new discovery and the
+  // animation fires on load. We treat the first effect run with a populated
+  // validIds as the baseline-snap: align prevCountRef + displayedCount, no
+  // animation. Only subsequent increments animate.
+  const initializedRef = useRef(false)
+  // Discovery animation effect. Depends on discoveredCount and the loaded
+  // state of validIds. Listing ringBursts.length here was the bug fixed in
+  // v1.0.14: the Phase 1 setRingBursts caused a re-render → effect cleanup →
+  // clearTimeout cascade that nuked the impact/ring/spark timers before they
+  // fired. The "keep displayed in sync at rest" branch lives in a separate
+  // effect below — it has no cleanup, so it can't tear this one's timers down.
   useEffect(() => {
+    if (!initializedRef.current) {
+      // Wait for loadFromCorpus to populate validIds before establishing
+      // the baseline; until then discoveredCount is artificially 0.
+      if (validIds.length > 0) {
+        initializedRef.current = true
+        prevCountRef.current = discoveredCount
+        setDisplayedCount(discoveredCount)
+      }
+      return
+    }
     if (discoveredCount <= prevCountRef.current) {
       prevCountRef.current = discoveredCount
       return
     }
-    // The prev ref is initialized to discoveredCount at first mount, so
-    // this branch only fires on subsequent in-session increments.
     const burstId = Date.now()
     const targetCount = discoveredCount
 
@@ -115,7 +129,7 @@ export function Sidebar() {
       window.clearTimeout(ringTimer)
       window.clearTimeout(sparkTimer)
     }
-  }, [discoveredCount])
+  }, [discoveredCount, validIds.length])
 
   // Keep the displayed count in sync when no animation is running (e.g.
   // initial hydration from localStorage, or a count that decreased because

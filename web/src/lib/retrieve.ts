@@ -292,20 +292,24 @@ export async function topK(
     return out
   }
 
-  // ---- Mode B: program mode ----
+  // ---- Mode B: program / hand-curated mode ----
   // Triggered when the query names a UBC program/faculty/school via any
   // ALIASES entry — subject codes (CPSC, ASTR, BIOL, MATH, …), natural
   // names (astronomy, biology, mathematics, …), or colloquial school
-  // names (Sauder, VSE, iSchool). Returns the top PROGRAM_K program
-  // chunks across all matching programs by score — no course chunks, no
-  // easter chunks: when the user named a program by its canonical alias,
-  // they want to know what that program IS.
+  // names (Sauder, VSE, iSchool). Returns up to PROGRAM_K program OR
+  // easter chunks across all matching scores — course chunks are
+  // excluded because the user named a program, not a specific course.
+  //
+  // Easter chunks ride alongside programs here so a query like "who is
+  // the best astronomy professor?" — which alias-fires on "astronomy"
+  // and would otherwise return only astronomy-program chunks — can still
+  // surface the hand-curated easter answer when its score wins.
   //
   // The previous gate (`programNeedles.length > 0`) flipped this on for any
   // query containing a ≥4-char English token (first, year, tell, about, …),
   // which dragged unrelated queries — including easter-egg lookups — into
   // program-only mode and silently filtered out their best matches. Pure-
-  // semantic program queries like "tell me about astronomy" still surface
+  // semantic program queries like "tell me about science" still surface
   // programs at the top of Mode C via the +1 title-match boost above; they
   // just no longer hide course or easter chunks. Add to ALIASES when a new
   // canonical program name should opt back into Mode B's program-only slice.
@@ -315,7 +319,7 @@ export async function topK(
     for (const i of allIndicesByScore) {
       if (out.length >= PROGRAM_K) break
       const c = chunks[i]
-      if (c.kind !== 'program') continue
+      if (c.kind !== 'program' && c.kind !== 'easter') continue
       if (scores[i] < minScore) continue
       out.push({ ...c, score: scores[i] })
     }

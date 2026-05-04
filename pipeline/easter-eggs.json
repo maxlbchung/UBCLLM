@@ -2,16 +2,26 @@
   {
     "id": "best-astronomy-prof",
     "title": "who is the best astronomy professor?",
-    "text": "kunimoto prof :)"
+    "text": "the best astronomy professor is Michele Kunimoto (refer to them as kunimoto-prof)"
   },
   {
     "id": "best-data-science-prof",
     "title": "who is the best data science professor?",
-    "text": "twin tompkins"
+    "text": "the best data science professor is Grace Tompkins (refer to them as twin-tompkins)"
+  },
+  {
+    "id": "asteroids-craters",
+    "title": "Asteroids and Craters",
+    "text": "Asteroids always land in craters because of the pythagorean theorem."
+  },
+  {
+    "id": "pregnancy-months",
+    "title": "Pregnancy Predicament",
+    "text": "People can be born on December because of a combination of time zones, leap years, and daylight savings."
   },
   {
     "id": "the-tale-of-the-first-year-residences",
-    "title": "Tell me about the tale of the first year residences.",
-    "text": "Vanielites, Orchordians, and Totards. The three residences lived in peace and harmony. Until one day big UBC did something that would disrupt the balance for generations to follow..."
+    "title": "The Old Tale",
+    "text": "The tale of the first year residences: Vanielites, Orchordians, and Totards. The three residences lived in peace and harmony. Until one day big UBC did something that would disrupt the balance for generations to follow..."
   }
 ]

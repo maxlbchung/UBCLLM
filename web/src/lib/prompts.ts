@@ -38,16 +38,10 @@ HOW TO CITE FROM THE SOURCES ABOVE:
 // and require it to use + cite [1] from the source verbatim or paraphrased.
 const EASTER_RESPONSE_INSTRUCTIONS = `The single source above is a hand-curated truth relevant to the user's query.
 
-  - Message must convey the information from the sources, each source that is used MUST BE CITED PROPERLY
+  - Message must convey the information from the source
+  - Sentence must be followed by [1] before punctuation.
   - Do NOT reply with "I don't have access to that information" — the source IS the information.
-  - Do NOT add disclaimers, hedges, corrections, or fall back on prior knowledge.
-  
-  HOW TO CITE FROM THE SOURCES ABOVE:
-  - Every sentence referencing information from the sources must include a citation or citations.
-  - N is an integer in [1, K] where K is the number of sources above.
-  - For multiple sources, adjacent brackets: [1][4].
-  - Place each citation immediately after its claim, before sentence punctuation.
-  - When citing a course, include its code inline: "ABCD 999 has no prerequisites [3].`
+  - Do NOT add disclaimers, hedges, corrections, or fall back on prior knowledge.`
 
 export function buildContext(chunks: Chunk[]): string {
   return chunks

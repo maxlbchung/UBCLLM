@@ -40,12 +40,12 @@ export function Sidebar() {
   const eggTotal = validIds.length
 
   // Discovery animation sequence:
-  //   t=0    rings fade in around the number (anticipation)
-  //   t≈300  rings hold at full size, drawing attention
-  //   t≈540  rings start zooming inward toward the number
-  //   t=850  IMPACT — number flips to new value + pops, sparks burst out
-  //   t=900  rings hit zero scale and vanish
-  //   t≈3350 sparks finish (egg-spark = 2500ms)
+  //   t=0     rings fade in around the number (anticipation)
+  //   t≈160   rings hold at full size, drawing attention
+  //   t≈790   rings start zooming inward toward the number
+  //   t=1100  IMPACT — number flips to new value + pops, sparks burst out
+  //   t=1150  rings hit zero scale and vanish
+  //   t≈3600  sparks finish (egg-spark = 2500ms)
   //
   // `displayedCount` is the value rendered in the counter — it lags
   // `discoveredCount` by 850ms so the visible flip lands on the impact
@@ -59,55 +59,69 @@ export function Sidebar() {
     { id: number; particles: { id: number; dx: number; dy: number }[] }[]
   >([])
   const prevCountRef = useRef(discoveredCount)
+  // Discovery animation effect. Depends ONLY on discoveredCount so that the
+  // Phase 1 setRingBursts inside the body doesn't cause a re-render → effect
+  // cleanup → clearTimeout cascade that nukes the impact/ring/spark timers
+  // before they get to fire. (Listing ringBursts.length here was the bug:
+  // the rings would appear and shrink on their own CSS animation, but the
+  // number flip and spark burst at t=850 never landed because their timers
+  // had already been cleared.) The "keep displayed in sync at rest" branch
+  // moved to a separate effect below — it has no cleanup, so it can't tear
+  // this one's timers down.
   useEffect(() => {
-    if (discoveredCount > prevCountRef.current && prevCountRef.current >= 0) {
-      // The prev ref is initialized to discoveredCount at first mount, so
-      // this branch only fires on subsequent in-session increments.
-      const burstId = Date.now()
-      const targetCount = discoveredCount
-
-      // Phase 1: rings appear
-      setRingBursts((b) => [...b, { id: burstId }])
-
-      // Phase 2: impact. Snap the number, pop, fire sparks.
-      const PARTICLE_COUNT = 28
-      const particles = Array.from({ length: PARTICLE_COUNT }, (_, i) => {
-        const baseAngle = (Math.PI * 2 * i) / PARTICLE_COUNT
-        const angle = baseAngle + (Math.random() - 0.5) * 0.5
-        const distance = 70 + Math.random() * 50
-        return {
-          id: burstId + i,
-          dx: Math.cos(angle) * distance,
-          dy: Math.sin(angle) * distance,
-        }
-      })
-      const impactTimer = window.setTimeout(() => {
-        setDisplayedCount(targetCount)
-        setPopKey((k) => k + 1)
-        setSparkBursts((b) => [...b, { id: burstId, particles }])
-      }, 850)
-
-      // Phase 3: ring cleanup just after they vanish.
-      const ringTimer = window.setTimeout(() => {
-        setRingBursts((b) => b.filter((x) => x.id !== burstId))
-      }, 950)
-
-      // Phase 4: spark cleanup after they finish (impact + 2500ms run + buffer).
-      const sparkTimer = window.setTimeout(() => {
-        setSparkBursts((b) => b.filter((x) => x.id !== burstId))
-      }, 850 + 2700)
-
+    if (discoveredCount <= prevCountRef.current) {
       prevCountRef.current = discoveredCount
-      return () => {
-        window.clearTimeout(impactTimer)
-        window.clearTimeout(ringTimer)
-        window.clearTimeout(sparkTimer)
-      }
+      return
     }
+    // The prev ref is initialized to discoveredCount at first mount, so
+    // this branch only fires on subsequent in-session increments.
+    const burstId = Date.now()
+    const targetCount = discoveredCount
+
+    // Phase 1: rings appear
+    setRingBursts((b) => [...b, { id: burstId }])
+
+    // Phase 2: impact. Snap the number, pop, fire sparks.
+    const PARTICLE_COUNT = 28
+    const particles = Array.from({ length: PARTICLE_COUNT }, (_, i) => {
+      const baseAngle = (Math.PI * 2 * i) / PARTICLE_COUNT
+      const angle = baseAngle + (Math.random() - 0.5) * 0.5
+      const distance = 70 + Math.random() * 50
+      return {
+        id: burstId + i,
+        dx: Math.cos(angle) * distance,
+        dy: Math.sin(angle) * distance,
+      }
+    })
+    const impactTimer = window.setTimeout(() => {
+      setDisplayedCount(targetCount)
+      setPopKey((k) => k + 1)
+      setSparkBursts((b) => [...b, { id: burstId, particles }])
+    }, 1100)
+
+    // Phase 3: ring cleanup just after they vanish.
+    const ringTimer = window.setTimeout(() => {
+      setRingBursts((b) => b.filter((x) => x.id !== burstId))
+    }, 1200)
+
+    // Phase 4: spark cleanup after they finish (impact + 2500ms run + buffer).
+    const sparkTimer = window.setTimeout(() => {
+      setSparkBursts((b) => b.filter((x) => x.id !== burstId))
+    }, 1100 + 2700)
+
     prevCountRef.current = discoveredCount
-    // Keep the displayed count in sync when no animation is running (e.g.
-    // initial hydration from localStorage, or a count that decreased
-    // because validIds shrank between deploys).
+    return () => {
+      window.clearTimeout(impactTimer)
+      window.clearTimeout(ringTimer)
+      window.clearTimeout(sparkTimer)
+    }
+  }, [discoveredCount])
+
+  // Keep the displayed count in sync when no animation is running (e.g.
+  // initial hydration from localStorage, or a count that decreased because
+  // validIds shrank between deploys). No cleanup function so it can't
+  // interfere with the discovery effect's timers.
+  useEffect(() => {
     if (discoveredCount !== displayedCount && ringBursts.length === 0) {
       setDisplayedCount(discoveredCount)
     }
@@ -328,7 +342,7 @@ export function Sidebar() {
                         width: `${sizeRem}rem`,
                         height: `${sizeRem}rem`,
                         boxShadow: '0 0 6px 1px rgba(252, 211, 77, 0.5)',
-                        animation: 'egg-ring 900ms linear forwards',
+                        animation: 'egg-ring 1150ms linear forwards',
                       }}
                     />
                   ))}

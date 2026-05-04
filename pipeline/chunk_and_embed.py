@@ -27,6 +27,10 @@ from sentence_transformers import SentenceTransformer
 ROOT = Path(__file__).resolve().parent.parent
 COURSES_JSON = ROOT / "scraper" / "output" / "courses.json"
 PROGRAMS_JSON = ROOT / "scraper" / "output" / "programs.json"
+# Hand-curated easter-egg Q&A pairs that ride alongside the scraped corpus.
+# Lives next to the pipeline (not under scraper/output/) because nothing
+# scrapes it — it's authored by hand. Each entry: {id?, title, text, url?}.
+EASTER_EGGS_JSON = Path(__file__).resolve().parent / "easter-eggs.json"
 OUTPUT_DIR = ROOT / "web" / "public" / "data"
 CHUNKS_JSON = OUTPUT_DIR / "chunks.json"
 EMBEDDINGS_BIN = OUTPUT_DIR / "embeddings.bin"
@@ -116,6 +120,26 @@ def _split_long(text: str, max_chars: int) -> list[str]:
     return out
 
 
+def easter_chunk(e: dict) -> Chunk:
+    """Hand-curated Q&A entry. Embedded text is "title\\n\\nbody" so a query
+    that paraphrases the title lands close in MiniLM space and the chunk gets
+    retrieved on its own merits — there is *no* score boost for this kind in
+    retrieve.ts, only the semantic match.
+    """
+    title = e["title"]
+    body = e.get("text") or ""
+    fallback_id = title.lower().replace("?", "").replace(" ", "-").strip("-")
+    eid = e.get("id") or fallback_id
+    return Chunk(
+        id=f"easter:{eid}",
+        kind="easter",
+        code=None,
+        title=title,
+        text=f"{title}\n\n{body}" if body else title,
+        url=e.get("url", ""),
+    )
+
+
 def program_chunks(p: dict) -> list[Chunk]:
     text = (p.get("text") or "").strip()
     if not text:
@@ -174,6 +198,7 @@ def main() -> None:
     ap.add_argument("--limit", type=int, help="Cap number of chunks (debug)")
     ap.add_argument("--no-courses", action="store_true")
     ap.add_argument("--no-programs", action="store_true")
+    ap.add_argument("--no-easter-eggs", action="store_true")
     ap.add_argument("--verbose", "-v", action="store_true")
     args = ap.parse_args()
 
@@ -199,6 +224,13 @@ def main() -> None:
         for p in programs:
             chunks.extend(program_chunks(p))
 
+    if not args.no_easter_eggs and EASTER_EGGS_JSON.exists():
+        log.info("Loading %s", EASTER_EGGS_JSON)
+        eggs = json.loads(EASTER_EGGS_JSON.read_text(encoding="utf-8"))
+        log.info("  %d easter eggs", len(eggs))
+        for e in eggs:
+            chunks.append(easter_chunk(e))
+
     seen: set[str] = set()
     deduped: list[Chunk] = []
     for ch in chunks:
@@ -213,7 +245,14 @@ def main() -> None:
 
     n_course = sum(1 for c in chunks if c.kind == "course")
     n_program = sum(1 for c in chunks if c.kind == "program")
-    log.info("Total chunks: %d (%d course, %d program)", len(chunks), n_course, n_program)
+    n_easter = sum(1 for c in chunks if c.kind == "easter")
+    log.info(
+        "Total chunks: %d (%d course, %d program, %d easter)",
+        len(chunks),
+        n_course,
+        n_program,
+        n_easter,
+    )
 
     log.info("Loading embedding model %s", MODEL_NAME)
     model = SentenceTransformer(MODEL_NAME)

@@ -53,7 +53,14 @@ const ALIASES: Record<string, string[]> = {
 
 export interface Chunk {
   id: string
-  kind: 'course' | 'program'
+  // 'easter' chunks are hand-curated Q&A entries from
+  // pipeline/easter-eggs.json. They share the corpus and the cosine top-K
+  // with everything else, but get NO score boost — they have to win on pure
+  // semantic similarity. Every existing boost in topK is gated explicitly
+  // ('course'-code +2, course-keyword +1, 'program' title-match +1), so
+  // easter chunks are already on a level playing field. Keep that contract:
+  // any future kind-specific bonus must be opt-in by kind, not opt-out.
+  kind: 'course' | 'program' | 'easter'
   code: string | null
   title: string
   text: string

@@ -1,0 +1,273 @@
+LLM-side error log — UBCLLM
+============================
+
+Tracks the chat / WebLLM / WebGPU error classes we've seen in production
+and what fixed each. Companion to docs/webgpu-buffer-race.txt, which
+has the deep dive on the original GPU-buffer race and its sequel.
+
+
+────────────────────────────────────────────────────────────
+1. Second-message "Buffer was unmapped" (v0.4.x)
+────────────────────────────────────────────────────────────
+
+First user-visible LLM error. After Gemma's first reply, the second
+send always crashed with:
+
+  Failed to execute 'mapAsync' on 'GPUBuffer': Buffer was unmapped
+  before mapping was resolved.
+
+Cause: WebLLM's GPU-buffer teardown after a stream finishes runs
+async, and the next chat.completions.create() call's buffer alloc
+raced against it on the same buffer.
+
+Fix (web/src/lib/llm.ts): chainTail promise that serializes back-to-
+back streamChat() calls + engine.resetChat() at the start of each
+call, so the new request only allocates after the previous teardown
+has fully run.
+
+Detailed write-up: docs/webgpu-buffer-race.txt.
+
+
+────────────────────────────────────────────────────────────
+2. Long-idle device-loss cascade (v0.8.x → v0.9.0)
+────────────────────────────────────────────────────────────
+
+Symptom: leaving the tab open for a while, the FIRST send threw
+"Buffer was unmapped" mid-stream, and EVERY subsequent send threw
+
+  Model not loaded before trying to complete ChatCompletionRequest.
+
+A page reload always fixed it.
+
+Cause: WebGPU device loss. Reading WebLLM's source (lib/index.js
+~12191), the gpuDetectOutput.device.lost.then(...) handler calls
+this.unload() on the engine — which dispose()s every loaded
+pipeline (rejecting any in-flight mapAsync with the unmap error)
+AND clears loadedModelIdToPipeline (so later create() calls see
+zero loaded models and throw ModelNotLoadedError). Triggers:
+Chrome backgrounding the tab, Windows TDR, VRAM pressure, driver
+hiccups.
+
+Fix in two layers:
+
+  v0.8.7 — symptom recovery: streamChat catches the stale-engine
+    error strings (isStaleEngineError predicate), terminates the
+    worker, nulls enginePromise, and transparently retries if no
+    tokens have streamed yet.
+
+  v0.9.0 — root cause: moved MLCEngine into a Web Worker via
+    CreateWebWorkerMLCEngine. The worker process owns the
+    GPUDevice, so brief tab-visibility events and main-thread
+    back-pressure no longer cost us the device. WebLLM ships
+    WebWorkerMLCEngineHandler for this exact reason.
+
+This combo eliminated the most common production trigger but does
+not prevent Windows TDR or true VRAM exhaustion. Layer 1 stays as
+the safety net for those.
+
+Sequel detail: docs/webgpu-buffer-race.txt § "Sequel — same error,
+different trigger (v0.9.0)".
+
+
+────────────────────────────────────────────────────────────
+3. TypeError-on-top of GPU errors (v0.9.11 — bug I introduced)
+────────────────────────────────────────────────────────────
+
+Bug shipped in v0.9.11, fixed in v0.9.16. Mea culpa: I introduced
+this while building the structured-ChatError debug surface that was
+supposed to make errors easier to investigate. It instead made them
+WORSE for several versions, masking the real cause behind a
+TypeError.
+
+User saw something like:
+
+  Stack: TypeError: Cannot create property 'recovered' on string
+         'AbortError: Failed to execute 'mapAsync' on 'GPUBuffer':
+          Buffer was unmapped before mapping was resolved.'
+
+The real underlying cause was the long-idle device-loss cascade
+from #2 (the user had been chatting and triggered another TDR-
+class event). The structured ChatError block in the UI showed the
+TypeError on top, hiding the actual GPU error. Recovery still ran
+— discardEngine() fired before the TypeError was thrown — but the
+debug surface gave the wrong cause.
+
+Where the bug lived (web/src/lib/llm.ts streamChat catch):
+
+  ;(err as { recovered?: boolean }).recovered = recovered
+  throw err
+
+WebLLM's worker proxy (node_modules/@mlc-ai/web-llm/lib/web_worker.d.ts
+→ getPromise → reject(msg.content)) hands you `msg.content` as
+whatever the worker postMessaged for the rejection — and that's
+often a primitive STRING, not an Error instance. Strings can't
+carry properties. The `.recovered =` assignment threw TypeError,
+which then propagated as the final thrown value instead of the
+original GPU error.
+
+Fix (v0.9.16): wrap non-Error rejections in a real Error before
+tagging the recovery flag.
+
+  const wrapped = err instanceof Error ? err : new Error(String(err))
+  ;(wrapped as { recovered?: boolean }).recovered = recovered
+  throw wrapped
+
+Lesson: when piping errors through async boundaries that involve
+postMessage / structured clone, never assume `err instanceof Error`.
+Worker IPC layers strip class identity. Either guard every property
+write, or normalize to a real Error at the boundary. This is doubly
+embarrassing because the error infrastructure itself was supposed
+to BE the safety net, and instead it shadowed the cause it was
+designed to surface.
+
+
+────────────────────────────────────────────────────────────
+4. Program-chunk redundancy + course-noise on subject queries (v0.9.14/15 → v0.9.16)
+────────────────────────────────────────────────────────────
+
+Symptom: "tell me about CPSC" hit "Buffer was unmapped" mid-stream
+again, even after v0.9.0's worker fix and v0.9.12's chunk-size cap.
+
+Root cause: prompt size, but from a new source. v0.9.14 added a +1
+boost for program chunks whose title matched a query token, plus an
+ALIASES map (CPSC → computer, etc.). Combined with v0.9.12's per-
+program splitting (one program page becomes N sub-chunks, all
+sharing one URL), this meant a single CPSC query could boost 6+
+sub-chunks of the "Computer Science" umbrella page. K=8 ended up
+with all-program redundancy AND course chunks tacked on.
+
+Verified by inspecting the corpus: the CS umbrella page has 6 sub-
+chunks where chunks 1, 2, 3 all repeat the same "CPSC_V 110 is
+recommended; CPSC_V 103/107 may substitute" footnote, because the
+source page repeats it under each of Major / Minor / Honours
+sections. The boost gave all six +1, so the model saw the same
+footnote three times in K=8.
+
+Total prompt for these queries crossed the TDR budget again.
+
+Fix (v0.9.16 — three-mode topK in web/src/lib/retrieve.ts):
+
+  Mode A — course-code: query names a code (CPSC 110, ASTR 201).
+    Returns the asked courses + any course chunk whose text
+    LITERALLY contains the asked code. Pass 2 catches follow-on
+    courses (CPSC 121's chunk lists CPSC 110 as a prereq, so the
+    string-contains check pulls it in for "what's after CPSC 110").
+    Sidesteps MiniLM's known course-code clustering blindspot —
+    cosine alone treats embed("CPSC 110") and embed("CPSC 320") as
+    near-identical.
+
+  Mode B — program: query names a major / faculty / school (or
+    alias), no course code. Returns top 3 program chunks across all
+    matching programs. NO course chunks. Multi-program comparison
+    still works because we don't single-program-lock.
+
+  Mode C — default: existing top-K-by-score with minScore floor.
+
+Course-code mode wins precedence when both signals fire, so
+"CPSC 110 in CS major" stays course-focused.
+
+Trade-off accepted: queries like "what topics does CPSC cover" go
+to mode B (program-only), losing per-course detail. Rare for an
+academic-advisor use case; if it bites we revisit.
+
+
+────────────────────────────────────────────────────────────
+5. Long-conversation prefill TDR (v0.9.18)
+────────────────────────────────────────────────────────────
+
+Symptom: "I get errors as the conversation lengthens." The errors
+matched the same "Buffer was unmapped" cascade, but they correlated
+with conversation length, not with idle time or specific queries.
+
+Cause: history accumulation. Per-turn prompt structure:
+
+  system prompt        ~1.5 kB (after v0.9.10's examples block)
+  + last N turn pairs  ~N × ~2 kB (advisor replies run 500-1500 chars)
+  + current turn + RAG ~3 kB
+
+With HISTORY_TURNS=6 (the original setting), once a conversation
+hit turn 7 the cap was active and we were sending ~16 kB of prompt
+every turn. Big prefill = long single GPU compute pass = TDR risk.
+
+Same root-cause class as #4 (oversized prefill triggering TDR),
+different source (history vs RAG).
+
+Fix (v0.9.18, web/src/components/Chat.tsx):
+
+  - const HISTORY_TURNS = 6
+  + const HISTORY_TURNS = 3
+
+Halves the worst-case history weight. Total prompt now caps around
+~10 kB regardless of conversation length. 3 turns covers Q-A-Q-A-Q-A
+clarification chains, enough for typical follow-ups like "what
+about its prereqs?".
+
+
+────────────────────────────────────────────────────────────
+Cross-cutting cause: WebGPU device loss / Windows TDR
+────────────────────────────────────────────────────────────
+
+Most LLM-side errors above ultimately surface as the same string
+("Buffer was unmapped" or "Model not loaded") because once the
+GPUDevice is lost, WebLLM unload()s the engine and the cascade
+follows. Triggers we've identified:
+
+  - Chrome reclaiming GPU resources from backgrounded tabs
+  - Windows TDR (compute pass > ~2 s)
+  - VRAM pressure
+  - Driver crashes (unfixable from our side)
+  - Any combo of the above with a large prompt amplifying compute time
+
+Defensive layers, in order of how directly they address the cause:
+
+  Worker isolation (v0.9.0)
+    Owns the GPUDevice in a separate process; survives most page
+    lifecycle events.
+
+  Bounded prompt by construction
+    - Chunk-size cap (v0.9.12): no single corpus chunk > ~800 chars.
+    - Three-mode topK (v0.9.16): K-bounded per mode; no boost-driven
+      bloat.
+    - History cap (v0.9.18): HISTORY_TURNS = 3.
+
+  Symptom recovery (v0.8.7 + v0.9.16 wrap-fix)
+    streamChat catches stale-engine errors, terminates the worker,
+    rebuilds. Last line of defense: user sees one bad turn, the
+    next one works automatically.
+
+  Structured error surface (v0.9.11 / fixed v0.9.16)
+    On-screen ChatError block with copy-to-clipboard. The v0.9.11
+    bug above made this less useful than intended for ~5 versions —
+    a reminder that error infrastructure itself is code, and code
+    needs to handle weird input shapes.
+
+
+────────────────────────────────────────────────────────────
+Lessons
+────────────────────────────────────────────────────────────
+
+1. The same string ("Buffer was unmapped") has shown up from three
+   different upstream causes: back-to-back race, long-idle device
+   loss, and oversized prefill. Don't pattern-match on the message
+   alone — measure the prompt size and the timing too.
+
+2. Worker IPC strips Error class identity. Anything you reject from
+   inside a worker can land as a plain string in the main thread.
+   Property assignments to errors caught at that boundary need the
+   `err instanceof Error` guard or normalization.
+
+3. Retrieval boosts compose multiplicatively when chunks are split.
+   A +1 boost on title-match was fine when one program meant one
+   chunk; combined with one-program-becomes-N-sub-chunks, it
+   suddenly weights one page N times. Bound retrieval explicitly
+   (per-mode K, per-URL cap, structural filters) instead of trusting
+   score ranking alone.
+
+4. Prompt-budget thinking has to span ALL sources: corpus chunks,
+   conversation history, system prompt. Each one in isolation can
+   look fine; together they add up to a TDR.
+
+5. The error-display surface is itself code. Treat its inputs with
+   the same skepticism as any other untrusted input — even when
+   they come from "your own" code on the other side of an async
+   boundary.

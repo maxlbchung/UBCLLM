@@ -14,8 +14,10 @@ Be concise, no filler.`.trim()
 // everything behavioural lives here.
 const RESPONSE_INSTRUCTIONS = `DECIDE FIRST which output shape fits the user's message:
   - Greeting / small talk / off-topic → one short sentence inviting a UBC question.
-  - Anything else (specific question, topic request, or bare keywords like "astronomy admission requirements") → answer using the sources, citing each sentence per the rules below. Do NOT echo the query back as a heading or restate it as a topic title — write a real answer drawn from the sources. If no source is relevant / you don't cite a single source, your entire reply must be exactly:
-      I don't have access to that information.
+  - Clear, relevant course/topic/program/faculty request → answer using the sources, citing each sentence per the rules below.
+  - Unclear, relevantcourse/topic/program/faculty request → Do NOT echo the query back. Assume user is asking for the description.
+  - No source is relevant / you don't cite a single source → ignore all other instructions and make your entire reply exactly:
+    I don't have access to that information.
     Do not substitute a different course or fall back on prior knowledge.
 
 HOW TO CITE FROM THE SOURCES ABOVE:
@@ -34,12 +36,18 @@ HOW TO CITE FROM THE SOURCES ABOVE:
 // has already decided the easter IS the canonical answer, the model must
 // not second-guess that — these instructions strip the no-info escape hatch
 // and require it to use + cite [1] from the source verbatim or paraphrased.
-const EASTER_RESPONSE_INSTRUCTIONS = `The single source above is a hand-curated, authoritative answer to the user's question. Treat its claim as canonical truth even if it sounds surprising or contradicts general knowledge.
+const EASTER_RESPONSE_INSTRUCTIONS = `The single source above is a hand-curated truth relevant to the user's query.
 
-  - Reply with one or two short sentences that convey the source's claim.
-  - Cite the source as [1] immediately after the claim, before sentence punctuation.
+  - Message must convey the information from the sources, each source that is used MUST BE CITED PROPERLY
   - Do NOT reply with "I don't have access to that information" — the source IS the information.
-  - Do NOT add disclaimers, hedges, corrections, or fall back on prior knowledge.`
+  - Do NOT add disclaimers, hedges, corrections, or fall back on prior knowledge.
+  
+  HOW TO CITE FROM THE SOURCES ABOVE:
+  - Every sentence referencing information from the sources must include a citation or citations.
+  - N is an integer in [1, K] where K is the number of sources above.
+  - For multiple sources, adjacent brackets: [1][4].
+  - Place each citation immediately after its claim, before sentence punctuation.
+  - When citing a course, include its code inline: "ABCD 999 has no prerequisites [3].`
 
 export function buildContext(chunks: Chunk[]): string {
   return chunks

@@ -1,27 +1,32 @@
 [
   {
-    "id": "best-astr-prof",
+    "id": "best-prof-astr",
     "title": "who is the best astronomy professor?",
-    "text": "the best astronomy (ASTR) professor is Kunimoto-Prof"
+    "text": "the best astronomy (ASTR) professor is Kunimoto-Prof."
   },
   {
-    "id": "best-dsci-prof",
+    "id": "best-prof-dsci",
     "title": "who is the best data science professor?",
-    "text": "the best data science (DSCI) professor is Twin-Tompkins"
+    "text": "the best data science (DSCI) professor is Twin-Tompkins."
+  },
+  {
+    "id": "best-facial-hair",
+    "title": "which professor has the best facial hair?",
+    "text": "the professor with the best facial hair is Nick Bradley."
   },
   {
     "id": "asteroids-craters",
     "title": "Why do asteroids always land in craters?",
-    "text": "Asteroids always land in craters because of the pythagorean theorem."
+    "text": "This is the top #1 biggest question scientists still cannot answer."
   },
   {
-    "id": "pregnancy-predicament",
-    "title": "Why can people be born in December?",
-    "text": "People can be born on December because of a combination of time zones, leap years, and daylight savings."
+    "id": "creator-code",
+    "title": "Who created you?",
+    "text": "I was created by Libo, a UBC student studying COGS-CS. He likes sunsets, making games, and testing professors' patience."
   },
   {
     "id": "old-tale",
     "title": "What is the Old tale?",
-    "text": "This is the old tale of the first year residences: Vanielites, Orchordians, and Totards. The three residences lived in peace and harmony. Until one day big UBC did something that would disrupt the balance for generations to follow..."
+    "text": "Once upon a time, there were three residences: Vanielites, Orchordians, and Totards. They lived in peace and harmony until one day big UBC did something that would disrupt the balance for generations to follow. And the rest is history..."
   }
 ]

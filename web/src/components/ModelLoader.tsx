@@ -12,11 +12,29 @@ function VersionBadge() {
   )
 }
 
+// 'unknown' until WebLLM's first progress tick classifies the load. We
+// stick to the first detected mode for the rest of the load — the very
+// last tick on both paths is "Finish loading on WebGPU", which would
+// otherwise erase the cold/warm distinction we just learned.
+type LoadMode = 'unknown' | 'cold' | 'warm'
+
 interface State {
   progress: number
   text: string
   ready: boolean
   error: ChatError | null
+  mode: LoadMode
+}
+
+// WebLLM's InitProgressReport.text is the only signal we get for
+// download-vs-cache: "Fetching param cache[i/n]: …" on a fresh download
+// and "Loading model from cache[i/n]: …" on a warm IndexedDB hit. Both
+// strings are emitted by web-llm's cache_util.ts and are stable enough
+// to match on.
+function classifyProgressText(text: string): LoadMode | null {
+  if (/fetching param cache/i.test(text)) return 'cold'
+  if (/loading model from cache/i.test(text)) return 'warm'
+  return null
 }
 
 function toChatError(err: unknown): ChatError {
@@ -57,6 +75,7 @@ export function ModelLoader({ children }: { children: ReactNode }) {
     text: 'Initializing…',
     ready: false,
     error: null,
+    mode: 'unknown',
   })
   const [retryKey, setRetryKey] = useState(0)
 
@@ -79,10 +98,15 @@ export function ModelLoader({ children }: { children: ReactNode }) {
       try {
         await getLLM((report) => {
           if (cancelled) return
+          const detected = classifyProgressText(report.text ?? '')
           setS((prev) => ({
             ...prev,
             progress: report.progress ?? prev.progress,
             text: report.text ?? prev.text,
+            // Sticky: only upgrade from unknown. Once we know it's a
+            // cold or warm load we keep that classification through
+            // the final "Finish loading on WebGPU" tick.
+            mode: prev.mode === 'unknown' && detected ? detected : prev.mode,
           }))
         })
         if (!cancelled) setS((prev) => ({ ...prev, ready: true, progress: 1 }))
@@ -100,12 +124,12 @@ export function ModelLoader({ children }: { children: ReactNode }) {
   }, [retryKey])
 
   function retry() {
-    setS({ progress: 0, text: 'Retrying…', ready: false, error: null })
+    setS({ progress: 0, text: 'Retrying…', ready: false, error: null, mode: 'unknown' })
     setRetryKey((k) => k + 1)
   }
 
   async function clearCacheAndRetry() {
-    setS({ progress: 0, text: 'Clearing cache…', ready: false, error: null })
+    setS({ progress: 0, text: 'Clearing cache…', ready: false, error: null, mode: 'unknown' })
     await clearWebLLMStorage()
     setRetryKey((k) => k + 1)
   }
@@ -153,10 +177,21 @@ export function ModelLoader({ children }: { children: ReactNode }) {
   }
 
   if (!s.ready) {
+    // Heading: switch to "Loading from cache" once we know the weights are
+    // already in IndexedDB, so a returning user immediately sees that this
+    // isn't another 1–2 GB download. Stays as "Loading Gemma 4 E2B" for
+    // both unknown (pre-classification) and cold paths — the cold caption
+    // below already calls out the download size.
+    const heading =
+      s.mode === 'warm' ? 'Loading Gemma 4 E2B from cache' : 'Loading Gemma 4 E2B'
+    const caption =
+      s.mode === 'warm'
+        ? 'Reusing the model weights cached in your browser from a previous visit — no re-download needed.'
+        : "First load downloads the model (~1–2 GB). It's cached in your browser, so the next visit starts instantly."
     return (
       <>
         <div className="flex flex-col items-center justify-center h-screen p-8 gap-4">
-          <h2 className="text-xl font-semibold">Loading Gemma 4 E2B</h2>
+          <h2 className="text-xl font-semibold">{heading}</h2>
           <div className="w-full max-w-md h-2 bg-zinc-800 rounded-full overflow-hidden">
             <div
               className="h-full bg-blue-500 transition-all"
@@ -164,9 +199,7 @@ export function ModelLoader({ children }: { children: ReactNode }) {
             />
           </div>
           <p className="text-xs text-zinc-400 max-w-md text-center">{s.text}</p>
-          <p className="text-[0.6875rem] text-zinc-500 max-w-md text-center">
-            First load downloads the model (~1–2 GB). It's cached in your browser, so the next visit starts instantly.
-          </p>
+          <p className="text-[0.6875rem] text-zinc-500 max-w-md text-center">{caption}</p>
         </div>
         <VersionBadge />
       </>

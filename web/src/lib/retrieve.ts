@@ -17,10 +17,12 @@ const EMBED_DIM = 384
 const MIN_SCORE = 0.4
 
 // When the user explicitly says "course"/"class" (incl. plurals), they
-// want a course chunk, not a program/faculty page. Independent of the
-// course-code +2 boost (which fires on a literal CPSC 110 in the query)
-// and the program +1 boost (which lifts opposite-kind chunks), so all
-// three stack additively without conflict. See the boost block in topK.
+// want a course chunk, not a program/faculty page. The matching `wantsCourses`
+// flag in topK does three things: adds +0.25 to every course chunk so they
+// outrank similarly-scored programs, suppresses the +0.5 program-title boost
+// (so the umbrella program page can't dominate via the boost), and skips
+// Mode B entirely (so an alias hit like "ASTR" doesn't restrict the result
+// to programs/easters when the user asked for courses).
 const COURSE_KEYWORD_RE = /\b(course|courses|class|classes)\b/i
 
 // Allowlist of query terms that identify a UBC program. Doubles as both
@@ -188,6 +190,15 @@ export async function topK(
     scores[i] = dot(matrix, qVec, i * EMBED_DIM)
   }
 
+  // Course-keyword cancels program-mode behaviour. When the user explicitly
+  // says "course"/"class" they want individual course chunks, so we suppress
+  // both the program-title +0.5 boost (which would lift the umbrella program
+  // page over the courses) and Mode B (which restricts the result to
+  // program/easter chunks only). A query like "what are some ASTR courses?"
+  // alias-fires on ASTR but the user's intent is course chunks, so the
+  // alias-driven program-mode behaviour gets cancelled out.
+  const wantsCourses = COURSE_KEYWORD_RE.test(query)
+
   // Course-code recognition. Used by Mode A below to structurally include
   // the asked course (Pass 1) and any chunk whose text mentions the asked
   // code (Pass 2) — both regardless of cosine score. Previously this also
@@ -227,7 +238,7 @@ export async function topK(
     }
   }
   const programNeedles = [...tokens, ...aliasKeywords]
-  if (programNeedles.length > 0) {
+  if (programNeedles.length > 0 && !wantsCourses) {
     for (let i = 0; i < chunks.length; i++) {
       const c = chunks[i]
       if (c.kind !== 'program' && c.kind !== 'easter') continue
@@ -250,7 +261,7 @@ export async function topK(
   // boost above when the alignment is real), not get a generic course-
   // word lift that doesn't reflect any signal about whether the easter
   // is actually on-topic for the query.
-  if (COURSE_KEYWORD_RE.test(query)) {
+  if (wantsCourses) {
     for (let i = 0; i < chunks.length; i++) {
       if (chunks[i].kind === 'course') scores[i] += 0.25
     }
@@ -320,7 +331,11 @@ export async function topK(
   // programs at the top of Mode C via the +1 title-match boost above; they
   // just no longer hide course or easter chunks. Add to ALIASES when a new
   // canonical program name should opt back into Mode B's program-only slice.
-  if (aliasKeywords.length > 0) {
+  //
+  // Skipped when wantsCourses: the user's explicit "course"/"class" overrides
+  // the alias signal, so we fall through to Mode C and let course chunks
+  // (with their +0.25 boost) compete on equal footing.
+  if (aliasKeywords.length > 0 && !wantsCourses) {
     const PROGRAM_K = 3
     const out: Chunk[] = []
     for (const i of allIndicesByScore) {

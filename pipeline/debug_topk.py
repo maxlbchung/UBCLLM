@@ -127,9 +127,10 @@ def main() -> None:
     if requested:
         print("Mode A would fire (course-code match)")
     elif alias_keywords and not wants_courses:
-        print("Mode B fires (alias hit, !wantsCourses) — program/easter only, top 3 above minScore")
+        print("Mode B fires (alias hit, !wantsCourses) — program/easter only, top 5 distinct URLs above minScore")
         program_k = 5
         out = []
+        seen_urls = set()
         for i in order:
             if len(out) >= program_k:
                 break
@@ -138,6 +139,9 @@ def main() -> None:
                 continue
             if scores[i] < MIN_SCORE:
                 continue
+            if c["url"] in seen_urls:
+                continue
+            seen_urls.add(c["url"])
             out.append((i, c))
         print()
         for i, c in out:
@@ -146,14 +150,19 @@ def main() -> None:
             print(f"           text:  {c['text'][:200]!r}{'…' if len(c['text']) > 200 else ''}")
             print()
     else:
-        print("Mode C (default semantic, top K above minScore)")
+        print("Mode C (default semantic, top K distinct URLs above minScore)")
         out = []
+        seen_urls = set()
         for i in order:
             if len(out) >= args.k:
                 break
             if scores[i] < MIN_SCORE:
                 continue
-            out.append((i, chunks[i]))
+            c = chunks[i]
+            if c["url"] in seen_urls:
+                continue
+            seen_urls.add(c["url"])
+            out.append((i, c))
         print()
         for i, c in out:
             print(f"  [{scores[i]:+.4f}] (raw {raw_scores[i]:+.4f}) [{c['kind']}] {c['id']}")
@@ -161,7 +170,7 @@ def main() -> None:
             print()
 
     print()
-    print("--- top 15 by post-boost score (any kind) ---")
+    print("--- top 15 by post-boost score (any kind, pre-dedup) ---")
     for i in order[:15]:
         c = chunks[i]
         print(f"  [{scores[i]:+.4f}] (raw {raw_scores[i]:+.4f}) [{c['kind']:7s}] {c['title'][:70]}")

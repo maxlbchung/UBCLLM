@@ -352,11 +352,20 @@ export async function topK(
   if (aliasKeywords.length > 0 && !wantsCourses) {
     const PROGRAM_K = 5
     const out: Chunk[] = []
+    const seenUrls = new Set<string>()
     for (const i of allIndicesByScore) {
       if (out.length >= PROGRAM_K) break
       const c = chunks[i]
       if (c.kind !== 'program' && c.kind !== 'easter') continue
       if (scores[i] < minScore) continue
+      // Dedup by source URL: program pages get split into multiple slices
+      // (program:astronomy:1..N) and otherwise the top of the score list
+      // is dominated by 4–5 near-duplicate slices of the same page. Keep
+      // only the highest-scoring slice per URL so PROGRAM_K covers
+      // PROGRAM_K *distinct* pages, giving the LLM a wider topical
+      // surface to draw from.
+      if (seenUrls.has(c.url)) continue
+      seenUrls.add(c.url)
       out.push({ ...c, score: scores[i] })
     }
     return easterCollapse(out)
@@ -366,10 +375,18 @@ export async function topK(
   // Top-K by score with the minScore floor. For greetings and off-topic
   // queries every chunk's cosine sits near zero, so this returns [];
   // userPromptWithContext + the SCOPE rule then handle the empty case.
-  const modeC = allIndicesByScore
-    .filter((i) => scores[i] >= minScore)
-    .slice(0, k)
-    .map((i) => ({ ...chunks[i], score: scores[i] }))
+  // Same per-URL dedup as Mode B — top-K should be K distinct sources,
+  // not K slices of the same page.
+  const modeC: Chunk[] = []
+  const seenUrlsC = new Set<string>()
+  for (const i of allIndicesByScore) {
+    if (modeC.length >= k) break
+    if (scores[i] < minScore) continue
+    const c = chunks[i]
+    if (seenUrlsC.has(c.url)) continue
+    seenUrlsC.add(c.url)
+    modeC.push({ ...c, score: scores[i] })
+  }
   return easterCollapse(modeC)
 }
 

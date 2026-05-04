@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type MouseEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { useConversations, type View } from '../store/conversations'
+import { useEasterEggs } from '../store/easterEggs'
 import { APP_VERSION } from '../version'
 
 const TOOLS: { view: View; label: string; icon: string }[] = [
@@ -22,6 +23,62 @@ export function Sidebar() {
   const deleteConversation = useConversations((s) => s.deleteConversation)
   const setView = useConversations((s) => s.setView)
   const toggleSidebar = useConversations((s) => s.toggleSidebar)
+
+  // Easter-egg counter (bottom-right). Total comes from the live corpus so
+  // adding/removing eggs in the pipeline reflects on next session without
+  // any migration. The corpus is shared via a cached promise in retrieve.ts,
+  // so this just attaches to whatever load is already in flight (or kicks
+  // one off if the user opened the sidebar before sending a message).
+  const discovered = useEasterEggs((s) => s.discovered)
+  const validIds = useEasterEggs((s) => s.validIds)
+  const loadFromCorpus = useEasterEggs((s) => s.loadFromCorpus)
+  useEffect(() => {
+    void loadFromCorpus()
+  }, [loadFromCorpus])
+  const validIdSet = new Set(validIds)
+  const discoveredCount = discovered.filter((id) => validIdSet.has(id)).length
+  const eggTotal = validIds.length
+
+  // Pop + spark burst when discoveredCount increments. `popKey` is bumped to
+  // remount the counter span so the CSS keyframe restarts; sparkBursts is a
+  // queue of {id, particles[]} so multiple back-to-back discoveries can
+  // overlap without one wiping out the other. Each burst is 12 particles
+  // along an 8-spoke ring with a small per-particle angular jitter and
+  // distance jitter so the spread looks organic, not mechanical.
+  const [popKey, setPopKey] = useState(0)
+  const [sparkBursts, setSparkBursts] = useState<
+    { id: number; particles: { id: number; dx: number; dy: number }[] }[]
+  >([])
+  const prevCountRef = useRef(discoveredCount)
+  useEffect(() => {
+    if (discoveredCount > prevCountRef.current && prevCountRef.current >= 0) {
+      // Skip the initial-load delta from 0→N when persisted state hydrates
+      // and the corpus arrives — we only want to celebrate live discoveries.
+      // The prev ref is initialized to discoveredCount at first mount, so
+      // this branch only fires on subsequent increments.
+      const burstId = Date.now()
+      const particles = Array.from({ length: 12 }, (_, i) => {
+        const baseAngle = (Math.PI * 2 * i) / 12
+        const angle = baseAngle + (Math.random() - 0.5) * 0.4
+        const distance = 22 + Math.random() * 14
+        return {
+          id: burstId + i,
+          dx: Math.cos(angle) * distance,
+          dy: Math.sin(angle) * distance,
+        }
+      })
+      setPopKey((k) => k + 1)
+      setSparkBursts((b) => [...b, { id: burstId, particles }])
+      // Animation duration in egg-spark keyframe is 900ms — clean up shortly
+      // after so detached burst nodes don't accumulate.
+      const t = window.setTimeout(() => {
+        setSparkBursts((b) => b.filter((x) => x.id !== burstId))
+      }, 1000)
+      prevCountRef.current = discoveredCount
+      return () => window.clearTimeout(t)
+    }
+    prevCountRef.current = discoveredCount
+  }, [discoveredCount])
 
   // Inline delete-confirmation popup. Replaces window.confirm() so we get a
   // styled prompt anchored to the row rather than a system dialog. We anchor
@@ -196,7 +253,52 @@ export function Sidebar() {
         <div className="text-[0.625rem] text-zinc-600 leading-tight">
           Gemma 4 E2B · WebGPU · MiniLM embeddings · UBC Vancouver calendar 2026/27.
         </div>
-        <div className="text-[0.625rem] text-zinc-500 font-mono">v{APP_VERSION}</div>
+        <div className="flex items-center justify-between text-[0.625rem] font-mono">
+          <span className="text-zinc-500">v{APP_VERSION}</span>
+          <span
+            className="relative inline-block text-amber-300"
+            title={
+              eggTotal > 0
+                ? `${discoveredCount} of ${eggTotal} easter eggs discovered`
+                : 'Easter eggs (loading…)'
+            }
+          >
+            {/* key={popKey} remounts the span so the egg-pop keyframe restarts
+                each time the count ticks up. Without remount, replaying the
+                same animation on the same element is a no-op. */}
+            <span
+              key={popKey}
+              className="inline-block origin-center"
+              style={{
+                animation: popKey > 0 ? 'egg-pop 450ms ease-out' : undefined,
+              }}
+            >
+              {discoveredCount}/{eggTotal || '–'}
+            </span>
+            {sparkBursts.map((burst) => (
+              <span
+                key={burst.id}
+                aria-hidden
+                className="pointer-events-none absolute inset-0"
+              >
+                {burst.particles.map((p) => (
+                  <span
+                    key={p.id}
+                    className="absolute left-1/2 top-1/2 h-1 w-1 rounded-full bg-amber-300 shadow-[0_0_4px_1px_rgba(252,211,77,0.7)]"
+                    style={
+                      {
+                        '--dx': `${p.dx}px`,
+                        '--dy': `${p.dy}px`,
+                        animation:
+                          'egg-spark 900ms cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                      } as React.CSSProperties
+                    }
+                  />
+                ))}
+              </span>
+            ))}
+          </span>
+        </div>
       </aside>
 
       {pendingConv &&

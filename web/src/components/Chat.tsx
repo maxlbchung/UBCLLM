@@ -15,6 +15,7 @@ import {
   type Message,
 } from '../store/chat'
 import { useConversations } from '../store/conversations'
+import { useEasterEggs } from '../store/easterEggs'
 import { ChatMessage } from './ChatMessage'
 
 // Last N (user, assistant) pairs sent to the LLM each turn. Each pair is
@@ -113,6 +114,14 @@ export function Chat() {
         )
       }
       setSourcesOnLast(sources)
+
+      // Easter-egg discovery: topK collapses to a single chunk when an
+      // easter wins the top slot (see retrieve.ts → easterCollapse), so a
+      // top-source kind === 'easter' is the canonical "egg triggered" signal.
+      const top = sources[0]
+      if (top?.kind === 'easter') {
+        useEasterEggs.getState().markDiscovered(top.id)
+      }
 
       const prior = useChat
         .getState()

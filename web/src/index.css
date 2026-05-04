@@ -46,3 +46,24 @@ body {
 *::-webkit-scrollbar-corner {
   background: transparent;
 }
+
+/* Easter-egg counter pop + spark particles. Triggered when the discovered
+   count increments (see Sidebar.tsx). The pop scales the number briefly;
+   sparks fly outward along per-particle --dx/--dy CSS vars and decelerate
+   via a long-tail cubic-bezier so they "ease out" rather than hit a wall. */
+@keyframes egg-pop {
+  0%   { transform: scale(1); }
+  35%  { transform: scale(1.7); }
+  70%  { transform: scale(0.92); }
+  100% { transform: scale(1); }
+}
+@keyframes egg-spark {
+  0% {
+    transform: translate(-50%, -50%) translate(0, 0) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) translate(var(--dx), var(--dy)) scale(0.4);
+    opacity: 0;
+  }
+}

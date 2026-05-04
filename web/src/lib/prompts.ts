@@ -14,7 +14,8 @@ Be concise, no filler.`.trim()
 // everything behavioural lives here.
 const RESPONSE_INSTRUCTIONS = `DECIDE FIRST which output shape fits the user's message:
   - Greeting / small talk / off-topic → one short sentence inviting a UBC question.
-  - Specific question/request relevant to the sources provided → answer using the sources, citing each sentence per the rules below. If no source is relevant, your entire reply must be exactly:
+  - On-topic but vague (just a subject code like "ABCD" with no specific question) → Default to description.
+  - Specific question/request relevant to the sources provided → answer using the sources, citing each sentence per the rules below. If no source is relevant / you don't cite a single source, your entire reply must be exactly:
       I don't have access to that information.
     Do not substitute a different course or fall back on prior knowledge.
 
@@ -24,6 +25,22 @@ HOW TO CITE FROM THE SOURCES ABOVE:
   - For multiple sources, adjacent brackets: [1][4].
   - Place each citation immediately after its claim, before sentence punctuation.
   - When citing a course, include its code inline: "ABCD 999 has no prerequisites [3]."`
+
+// Used when the retrieval layer collapses the result to a single easter-egg
+// chunk (see easterCollapse in retrieve.ts). The default RESPONSE_INSTRUCTIONS
+// above include a "no source is relevant → reply with the no-info disclaimer"
+// path, and Gemma 4 E2B routinely takes that path on easter chunks because
+// the curated answer sounds absurd or contradicts its priors (e.g. asteroids
+// landing in craters "because of the pythagorean theorem"). When the corpus
+// has already decided the easter IS the canonical answer, the model must
+// not second-guess that — these instructions strip the no-info escape hatch
+// and require it to use + cite [1] from the source verbatim or paraphrased.
+const EASTER_RESPONSE_INSTRUCTIONS = `The single source above is a hand-curated, authoritative answer to the user's question. Treat its claim as canonical truth even if it sounds surprising or contradicts general knowledge.
+
+  - Reply with one or two short sentences that convey the source's claim.
+  - Cite the source as [1] immediately after the claim, before sentence punctuation.
+  - Do NOT reply with "I don't have access to that information" — the source IS the information.
+  - Do NOT add disclaimers, hedges, corrections, or fall back on prior knowledge.`
 
 export function buildContext(chunks: Chunk[]): string {
   return chunks
@@ -81,9 +98,13 @@ export function userPromptWithContext(
   // sit in the freshest attention position before generation. Skip on
   // the bareSubject path — its Note already tells the model to ignore
   // sources, ask a clarifying question, and not cite, which would
-  // contradict the DECIDE FIRST + MUST-cite block here.
+  // contradict the DECIDE FIRST + MUST-cite block here. When retrieval
+  // has collapsed to a single easter chunk (easterCollapse in retrieve.ts),
+  // swap in EASTER_RESPONSE_INSTRUCTIONS so the model uses + cites the
+  // curated answer instead of falling through to the no-info disclaimer.
   if (!bareSubject) {
-    parts.push(RESPONSE_INSTRUCTIONS)
+    const easterOnly = chunks.length === 1 && chunks[0].kind === 'easter'
+    parts.push(easterOnly ? EASTER_RESPONSE_INSTRUCTIONS : RESPONSE_INSTRUCTIONS)
   }
 
   return parts.join('\n\n')

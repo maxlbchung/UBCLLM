@@ -33,6 +33,11 @@ const HISTORY_TURNS = 3
 // clarifying question via userPromptWithContext's bareSubject parameter.
 const BARE_SUBJECT_RE = /^[A-Z]{3,5}(?:_V)?$/i
 
+// Hard cap on composer input. Real questions are well under this; the cap
+// keeps the prefill bounded and prevents pathological pastes from blowing
+// past MiniLM's ~512-token window or eating the LLM's context budget.
+const MAX_INPUT_LENGTH = 500
+
 function toLLMHistory(history: Message[]): ChatCompletionMessageParam[] {
   return history
     .filter((m) => m.content.trim().length > 0)
@@ -213,7 +218,10 @@ export function Chat() {
           <input
             ref={inputRef}
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(e) =>
+              setInput(e.target.value.slice(0, MAX_INPUT_LENGTH))
+            }
+            maxLength={MAX_INPUT_LENGTH}
             disabled={streaming}
             className="flex-1 rounded bg-zinc-900 border border-zinc-700 px-3 py-2 text-sm focus:outline-none focus:border-zinc-500 disabled:opacity-60"
             placeholder={
@@ -228,6 +236,17 @@ export function Chat() {
             Send
           </button>
         </form>
+        {input.length >= MAX_INPUT_LENGTH * 0.8 && (
+          <div
+            className={`mt-1 text-right text-xs ${
+              input.length >= MAX_INPUT_LENGTH
+                ? 'text-amber-400'
+                : 'text-zinc-500'
+            }`}
+          >
+            {input.length} / {MAX_INPUT_LENGTH}
+          </div>
+        )}
       </div>
     </div>
   )

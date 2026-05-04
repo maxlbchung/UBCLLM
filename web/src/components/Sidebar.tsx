@@ -6,8 +6,8 @@ import { APP_VERSION } from '../version'
 
 const TOOLS: { view: View; label: string; icon: string }[] = [
   { view: 'chat', label: 'Chat', icon: '💬' },
-  { view: 'lookup', label: 'Course lookup', icon: '🔎' },
-  { view: 'prereq', label: 'Prereq tree', icon: '🌳' },
+  { view: 'lookup', label: 'Course Lookup', icon: '🔎' },
+  { view: 'prereq', label: 'Prerequisite Tree', icon: '🌳' },
 ]
 
 const POPUP_WIDTH = 224 // px; matches Tailwind's w-56
@@ -39,24 +39,37 @@ export function Sidebar() {
   const discoveredCount = discovered.filter((id) => validIdSet.has(id)).length
   const eggTotal = validIds.length
 
-  // Pop + spark burst when discoveredCount increments. `popKey` is bumped to
-  // remount the counter span so the CSS keyframe restarts; sparkBursts is a
-  // queue of {id, particles[]} so multiple back-to-back discoveries can
-  // overlap without one wiping out the other. Each burst is 12 particles
-  // along an 8-spoke ring with a small per-particle angular jitter and
-  // distance jitter so the spread looks organic, not mechanical.
+  // Discovery animation sequence:
+  //   t=0    rings fade in around the number (anticipation)
+  //   t≈300  rings hold at full size, drawing attention
+  //   t≈540  rings start zooming inward toward the number
+  //   t=850  IMPACT — number flips to new value + pops, sparks burst out
+  //   t=900  rings hit zero scale and vanish
+  //   t≈3350 sparks finish (egg-spark = 2500ms)
+  //
+  // `displayedCount` is the value rendered in the counter — it lags
+  // `discoveredCount` by 850ms so the visible flip lands on the impact
+  // beat rather than the moment the store updates. Each burst gets its own
+  // id so back-to-back discoveries can stack without one cancelling the
+  // other.
+  const [displayedCount, setDisplayedCount] = useState(discoveredCount)
   const [popKey, setPopKey] = useState(0)
+  const [ringBursts, setRingBursts] = useState<{ id: number }[]>([])
   const [sparkBursts, setSparkBursts] = useState<
     { id: number; particles: { id: number; dx: number; dy: number }[] }[]
   >([])
   const prevCountRef = useRef(discoveredCount)
   useEffect(() => {
     if (discoveredCount > prevCountRef.current && prevCountRef.current >= 0) {
-      // Skip the initial-load delta from 0→N when persisted state hydrates
-      // and the corpus arrives — we only want to celebrate live discoveries.
       // The prev ref is initialized to discoveredCount at first mount, so
-      // this branch only fires on subsequent increments.
+      // this branch only fires on subsequent in-session increments.
       const burstId = Date.now()
+      const targetCount = discoveredCount
+
+      // Phase 1: rings appear
+      setRingBursts((b) => [...b, { id: burstId }])
+
+      // Phase 2: impact. Snap the number, pop, fire sparks.
       const PARTICLE_COUNT = 28
       const particles = Array.from({ length: PARTICLE_COUNT }, (_, i) => {
         const baseAngle = (Math.PI * 2 * i) / PARTICLE_COUNT
@@ -68,18 +81,37 @@ export function Sidebar() {
           dy: Math.sin(angle) * distance,
         }
       })
-      setPopKey((k) => k + 1)
-      setSparkBursts((b) => [...b, { id: burstId, particles }])
-      // egg-spark keyframe runs 2500ms; give it a small buffer before
-      // dropping the detached nodes from React state.
-      const t = window.setTimeout(() => {
+      const impactTimer = window.setTimeout(() => {
+        setDisplayedCount(targetCount)
+        setPopKey((k) => k + 1)
+        setSparkBursts((b) => [...b, { id: burstId, particles }])
+      }, 850)
+
+      // Phase 3: ring cleanup just after they vanish.
+      const ringTimer = window.setTimeout(() => {
+        setRingBursts((b) => b.filter((x) => x.id !== burstId))
+      }, 950)
+
+      // Phase 4: spark cleanup after they finish (impact + 2500ms run + buffer).
+      const sparkTimer = window.setTimeout(() => {
         setSparkBursts((b) => b.filter((x) => x.id !== burstId))
-      }, 2700)
+      }, 850 + 2700)
+
       prevCountRef.current = discoveredCount
-      return () => window.clearTimeout(t)
+      return () => {
+        window.clearTimeout(impactTimer)
+        window.clearTimeout(ringTimer)
+        window.clearTimeout(sparkTimer)
+      }
     }
     prevCountRef.current = discoveredCount
-  }, [discoveredCount])
+    // Keep the displayed count in sync when no animation is running (e.g.
+    // initial hydration from localStorage, or a count that decreased
+    // because validIds shrank between deploys).
+    if (discoveredCount !== displayedCount && ringBursts.length === 0) {
+      setDisplayedCount(discoveredCount)
+    }
+  }, [discoveredCount, displayedCount, ringBursts.length])
 
   // Inline delete-confirmation popup. Replaces window.confirm() so we get a
   // styled prompt anchored to the row rather than a system dialog. We anchor
@@ -257,48 +289,75 @@ export function Sidebar() {
         <div className="flex items-center justify-between text-[0.625rem] font-mono">
           <span className="text-zinc-500">v{APP_VERSION}</span>
           <span
-            className="relative inline-block text-amber-300"
+            className="text-amber-300"
             title={
               eggTotal > 0
                 ? `${discoveredCount} of ${eggTotal} easter eggs discovered`
                 : 'Easter eggs (loading…)'
             }
           >
-            {/* key={popKey} remounts the span so the egg-pop keyframe restarts
-                each time the count ticks up. Without remount, replaying the
-                same animation on the same element is a no-op. */}
-            <span
-              key={popKey}
-              className="inline-block origin-center"
-              style={{
-                animation: popKey > 0 ? 'egg-pop 450ms ease-out' : undefined,
-              }}
-            >
-              {discoveredCount}/{eggTotal || '–'}
+            {/* Inner relative wrapper anchors the rings + sparks to just the
+                numbers, not the whole "N/total Easter Eggs Found" line. */}
+            <span className="relative inline-block">
+              {/* key={popKey} remounts the span so the egg-pop keyframe
+                  restarts on each impact. Without remount, replaying the
+                  same animation on the same element is a no-op. */}
+              <span
+                key={popKey}
+                className="inline-block origin-center"
+                style={{
+                  animation: popKey > 0 ? 'egg-pop 450ms ease-out' : undefined,
+                }}
+              >
+                {displayedCount}/{eggTotal || '–'}
+              </span>
+              {/* Anticipation rings — concentric circles that fade in around
+                  the number, hold, then zoom inward and vanish. Sized in rem
+                  so they scale with the rem-base setting in index.css. */}
+              {ringBursts.map((burst) => (
+                <span
+                  key={burst.id}
+                  aria-hidden
+                  className="pointer-events-none absolute left-1/2 top-1/2"
+                >
+                  {[2.6, 3.4, 4.2].map((sizeRem, i) => (
+                    <span
+                      key={i}
+                      className="absolute left-0 top-0 rounded-full border-2 border-amber-300"
+                      style={{
+                        width: `${sizeRem}rem`,
+                        height: `${sizeRem}rem`,
+                        boxShadow: '0 0 6px 1px rgba(252, 211, 77, 0.5)',
+                        animation: 'egg-ring 900ms linear forwards',
+                      }}
+                    />
+                  ))}
+                </span>
+              ))}
+              {sparkBursts.map((burst) => (
+                <span
+                  key={burst.id}
+                  aria-hidden
+                  className="pointer-events-none absolute inset-0"
+                >
+                  {burst.particles.map((p) => (
+                    <span
+                      key={p.id}
+                      className="absolute left-1/2 top-1/2 h-2 w-2 rounded-full bg-amber-300 shadow-[0_0_8px_2px_rgba(252,211,77,0.8)]"
+                      style={
+                        {
+                          '--dx': `${p.dx}px`,
+                          '--dy': `${p.dy}px`,
+                          animation:
+                            'egg-spark 2500ms cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                        } as React.CSSProperties
+                      }
+                    />
+                  ))}
+                </span>
+              ))}
             </span>
             <span> Easter Eggs Found</span>
-            {sparkBursts.map((burst) => (
-              <span
-                key={burst.id}
-                aria-hidden
-                className="pointer-events-none absolute inset-0"
-              >
-                {burst.particles.map((p) => (
-                  <span
-                    key={p.id}
-                    className="absolute left-1/2 top-1/2 h-2 w-2 rounded-full bg-amber-300 shadow-[0_0_8px_2px_rgba(252,211,77,0.8)]"
-                    style={
-                      {
-                        '--dx': `${p.dx}px`,
-                        '--dy': `${p.dy}px`,
-                        animation:
-                          'egg-spark 2500ms cubic-bezier(0.16, 1, 0.3, 1) forwards',
-                      } as React.CSSProperties
-                    }
-                  />
-                ))}
-              </span>
-            ))}
           </span>
         </div>
       </aside>

@@ -16,21 +16,32 @@ const EMBED_DIM = 384
 // return empty.
 const MIN_SCORE = 0.4
 
-// Subject codes whose 4-letter prefix doesn't share a substring with the
-// program's title, so the "title.includes(query-token)" boost below
-// wouldn't otherwise fire. Maps each odd code to keyword(s) that DO appear
-// in matching program titles. Multi-word values (e.g. "data science") use
-// plain substring match against the title.
+// Aliases for query terms that don't share a substring with the program /
+// faculty / school title they refer to, so the "title.includes(query-token)"
+// boost below wouldn't otherwise fire. Maps each alias to keyword(s) that
+// DO appear in matching program titles. Multi-word values (e.g. "data
+// science") use plain substring match against the title.
 //
-// Keep this list small and explicit. Most subject codes (ASTR, MATH, BIOL,
-// PHYS, ECON, HIST, ENGL, …) don't need an entry because their code is a
-// prefix of the program name and substring-on-title already matches.
-const SUBJECT_OVERRIDES: Record<string, string[]> = {
+// Two flavours of entry:
+//   - Subject codes whose 4-letter prefix isn't in the program title
+//     (CPSC → computer, DSCI → data science, COGS → cognitive, KIN, LFS).
+//     Most subject codes (ASTR, MATH, BIOL, PHYS, ECON, HIST, ENGL, …)
+//     don't need an entry because the code prefix already substring-matches
+//     "Astronomy", "Mathematics", "Biology", etc.
+//   - Colloquial school names that aren't in the official title (Sauder is
+//     "The Faculty of Commerce and Business Administration", etc.).
+//
+// Word-boundary regex on the original-case query, so "CPSC110", "Sauder",
+// and "sauder" all trigger but a substring inside another word doesn't.
+const ALIASES: Record<string, string[]> = {
   CPSC: ['computer'],
   DSCI: ['data science'],
   COGS: ['cognitive'],
   LFS: ['land and food'],
   KIN: ['kinesiology'],
+  Sauder: ['commerce and business'],
+  VSE: ['vancouver school of economics'],
+  iSchool: ['school of information'],
 }
 
 export interface Chunk {
@@ -118,29 +129,30 @@ export async function topK(
     }
   }
 
-  // Program boost: pure-semantic ranking buries the umbrella program-overview
-  // chunk under individual courses (more chunks, denser titles), so a query
-  // like "tell me about astronomy" or "what is CPSC" shows CPSC 110 / 121 /…
-  // before the actual CS or Astronomy program page. Add +1 to any program
-  // chunk whose title (lowercased) contains a query token of length ≥ 4.
-  // The 4-char floor avoids prepositions/articles; SUBJECT_OVERRIDES handles
-  // codes whose prefix doesn't appear in the program title (CPSC → computer).
-  // Magnitude is +1, deliberately under the +2 course-code boost so
-  // "CPSC 110 prereqs" still ranks the CPSC 110 course first.
+  // Program boost: pure-semantic ranking buries the umbrella program /
+  // faculty / school overview chunk under individual courses (more chunks,
+  // denser titles), so a query like "tell me about astronomy", "what is
+  // CPSC", or "tell me about Sauder" shows individual course chunks before
+  // the actual program/faculty page. Add +1 to any program-kind chunk
+  // whose title (lowercased) contains a query token of length ≥ 4. The
+  // 4-char floor avoids prepositions/articles; ALIASES handles cases where
+  // the query term doesn't appear in the title (CPSC → computer, Sauder →
+  // commerce and business). Magnitude is +1, deliberately under the +2
+  // course-code boost so "CPSC 110 prereqs" still ranks CPSC 110 first.
   const queryLower = query.toLowerCase()
   const tokens = queryLower
     .split(/[^a-z0-9]+/)
     .filter((t) => t.length >= 4)
-  const overrideKeywords: string[] = []
-  for (const [code, keywords] of Object.entries(SUBJECT_OVERRIDES)) {
+  const aliasKeywords: string[] = []
+  for (const [alias, keywords] of Object.entries(ALIASES)) {
     // Word-boundary match against the original query (case-insensitive)
     // so "CPSC110" still triggers (regex \b allows letter→digit boundary)
     // but "concepts" or "specifics" don't false-trigger on substring.
-    if (new RegExp(`\\b${code}\\b`, 'i').test(query)) {
-      overrideKeywords.push(...keywords.map((k) => k.toLowerCase()))
+    if (new RegExp(`\\b${alias}\\b`, 'i').test(query)) {
+      aliasKeywords.push(...keywords.map((k) => k.toLowerCase()))
     }
   }
-  const programNeedles = [...tokens, ...overrideKeywords]
+  const programNeedles = [...tokens, ...aliasKeywords]
   if (programNeedles.length > 0) {
     for (let i = 0; i < chunks.length; i++) {
       const c = chunks[i]

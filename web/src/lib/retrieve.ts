@@ -237,12 +237,21 @@ export async function topK(
   }
 
   // ---- Mode B: program mode ----
-  // Triggered when the query mentions a major / faculty / school name (or
-  // alias) but no specific course code. Returns the top PROGRAM_K program
-  // chunks across all matching programs by score. Multi-program comparison
-  // stays workable. No course chunks — the user wants to know what the
-  // major IS, not get distracted by random course descriptions.
-  if (programNeedles.length > 0) {
+  // Triggered when the query names a UBC program/faculty/school via an
+  // ALIASES hit (CPSC, Sauder, KIN, COGS, DSCI, LFS, VSE, iSchool). Returns
+  // the top PROGRAM_K program chunks across all matching programs by score —
+  // no course chunks, no easter chunks: when the user named a program by its
+  // canonical alias, they want to know what that program IS.
+  //
+  // The previous gate (`programNeedles.length > 0`) flipped this on for any
+  // query containing a ≥4-char English token (first, year, tell, about, …),
+  // which dragged unrelated queries — including easter-egg lookups — into
+  // program-only mode and silently filtered out their best matches. Pure-
+  // semantic program queries like "tell me about astronomy" still surface
+  // programs at the top of Mode C via the +1 title-match boost above; they
+  // just no longer hide course or easter chunks. Add to ALIASES when a new
+  // canonical program name should opt back into Mode B's program-only slice.
+  if (aliasKeywords.length > 0) {
     const PROGRAM_K = 3
     const out: Chunk[] = []
     for (const i of allIndicesByScore) {

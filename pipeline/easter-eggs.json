@@ -1,7 +1,17 @@
 [
   {
-    "id": "best-major",
-    "title": "what is the best major?",
-    "text": "cogs"
+    "id": "best-astronomy-prof",
+    "title": "who is the best astronomy professor?",
+    "text": "kunimoto prof :)"
+  },
+  {
+    "id": "best-data-science-prof",
+    "title": "who is the best data science professor?",
+    "text": "twin tompkins"
+  },
+  {
+    "id": "the-tale-of-the-first-year-residences",
+    "title": "Tell me about the tale of the first year residences.",
+    "text": "Vanielites, Orchordians, and Totards. The three residences lived in peace and harmony. Until one day big UBC did something that would disrupt the balance for generations to follow..."
   }
 ]

@@ -1,3 +1,5 @@
+import { useEffect, useRef, useState, type MouseEvent } from 'react'
+import { createPortal } from 'react-dom'
 import { useConversations, type View } from '../store/conversations'
 import { APP_VERSION } from '../version'
 
@@ -6,6 +8,8 @@ const TOOLS: { view: View; label: string; icon: string }[] = [
   { view: 'lookup', label: 'Course lookup', icon: '🔎' },
   { view: 'prereq', label: 'Prereq tree', icon: '🌳' },
 ]
+
+const POPUP_WIDTH = 224 // px; matches Tailwind's w-56
 
 export function Sidebar() {
   const conversations = useConversations((s) => s.conversations)
@@ -18,6 +22,69 @@ export function Sidebar() {
   const deleteConversation = useConversations((s) => s.deleteConversation)
   const setView = useConversations((s) => s.setView)
   const toggleSidebar = useConversations((s) => s.toggleSidebar)
+
+  // Inline delete-confirmation popup. Replaces window.confirm() so we get a
+  // styled prompt anchored to the row rather than a system dialog. We anchor
+  // by viewport coords (computed via the row's getBoundingClientRect on the
+  // X-button click) and render through a portal so the sidebar's
+  // overflow-y-auto can't clip the popup.
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
+  const [popupPos, setPopupPos] = useState<{ top: number; left: number } | null>(
+    null,
+  )
+  const popupRef = useRef<HTMLDivElement | null>(null)
+
+  function openDeletePrompt(e: MouseEvent<HTMLButtonElement>, id: string) {
+    e.stopPropagation()
+    const row = e.currentTarget.closest<HTMLElement>('[data-conv-row]')
+    if (!row) return
+    const rect = row.getBoundingClientRect()
+    setPopupPos({
+      top: rect.top,
+      // Pin to the right of the row but keep the popup on-screen if the
+      // sidebar is wide enough that flowing right would overflow.
+      left: Math.min(rect.right + 8, window.innerWidth - POPUP_WIDTH - 8),
+    })
+    setPendingDeleteId(id)
+  }
+
+  function closeDeletePrompt() {
+    setPendingDeleteId(null)
+    setPopupPos(null)
+  }
+
+  function confirmDelete() {
+    if (pendingDeleteId) deleteConversation(pendingDeleteId)
+    closeDeletePrompt()
+  }
+
+  // Dismiss on outside-click, Escape, or scroll/resize (the popup is anchored
+  // by absolute coords; if the row moves, repositioning is more work than
+  // just closing and letting the user click X again).
+  useEffect(() => {
+    if (!pendingDeleteId) return
+    function onMouseDown(ev: globalThis.MouseEvent) {
+      if (popupRef.current?.contains(ev.target as Node)) return
+      closeDeletePrompt()
+    }
+    function onKey(ev: KeyboardEvent) {
+      if (ev.key === 'Escape') closeDeletePrompt()
+    }
+    function onShift() {
+      closeDeletePrompt()
+    }
+    document.addEventListener('mousedown', onMouseDown)
+    document.addEventListener('keydown', onKey)
+    window.addEventListener('resize', onShift)
+    // capture: catch scrolls inside the history list, not just window-level.
+    window.addEventListener('scroll', onShift, true)
+    return () => {
+      document.removeEventListener('mousedown', onMouseDown)
+      document.removeEventListener('keydown', onKey)
+      window.removeEventListener('resize', onShift)
+      window.removeEventListener('scroll', onShift, true)
+    }
+  }, [pendingDeleteId])
 
   if (collapsed) {
     return (
@@ -34,91 +101,139 @@ export function Sidebar() {
     )
   }
 
+  const pendingConv = pendingDeleteId ? conversations[pendingDeleteId] : null
+
   return (
-    <aside className="w-72 shrink-0 flex flex-col bg-zinc-950 border-r border-zinc-800 p-3 gap-3 h-screen">
-      <div className="flex items-center justify-between">
-        <div className="flex items-baseline gap-2 min-w-0">
-          <h1 className="text-sm font-semibold tracking-wide">UBCLLM</h1>
-          <span className="text-[0.625rem] text-zinc-500">in-browser</span>
-        </div>
-        <button
-          onClick={toggleSidebar}
-          className="text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900 rounded p-1 text-base leading-none shrink-0"
-          aria-label="Collapse sidebar"
-          title="Collapse sidebar"
-        >
-          ◀
-        </button>
-      </div>
-
-      <button
-        onClick={() => newConversation()}
-        className="rounded bg-blue-600 hover:bg-blue-500 text-sm font-medium py-2"
-      >
-        + New chat
-      </button>
-
-      <div className="flex flex-col gap-1">
-        {TOOLS.map((t) => (
+    <>
+      <aside className="w-72 shrink-0 flex flex-col bg-zinc-950 border-r border-zinc-800 p-3 gap-3 h-screen">
+        <div className="flex items-center justify-between">
+          <div className="flex items-baseline gap-2 min-w-0">
+            <h1 className="text-sm font-semibold tracking-wide">UBCLLM</h1>
+            <span className="text-[0.625rem] text-zinc-500">in-browser</span>
+          </div>
           <button
-            key={t.view}
-            onClick={() => setView(t.view)}
-            className={
-              'flex items-center gap-2 rounded px-2 py-1.5 text-sm text-left ' +
-              (view === t.view
-                ? 'bg-zinc-800 text-zinc-100'
-                : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200')
-            }
+            onClick={toggleSidebar}
+            className="text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900 rounded p-1 text-base leading-none shrink-0"
+            aria-label="Collapse sidebar"
+            title="Collapse sidebar"
           >
-            <span aria-hidden>{t.icon}</span>
-            {t.label}
+            ◀
           </button>
-        ))}
-      </div>
+        </div>
 
-      <div className="border-t border-zinc-800 pt-2 text-[0.6875rem] uppercase tracking-wider text-zinc-500">
-        History
-      </div>
+        <button
+          onClick={() => newConversation()}
+          className="rounded bg-blue-600 hover:bg-blue-500 text-sm font-medium py-2"
+        >
+          + New chat
+        </button>
 
-      <div className="flex-1 overflow-y-auto -mx-1 px-1 space-y-1">
-        {order.length === 0 && (
-          <p className="text-xs text-zinc-500 px-2">No conversations yet.</p>
-        )}
-        {order.map((id) => {
-          const conv = conversations[id]
-          if (!conv) return null
-          const isActive = id === activeId && view === 'chat'
-          return (
-            <div
-              key={id}
+        <div className="flex flex-col gap-1">
+          {TOOLS.map((t) => (
+            <button
+              key={t.view}
+              onClick={() => setView(t.view)}
               className={
-                'group flex items-center gap-1 rounded px-2 py-1.5 text-sm cursor-pointer ' +
-                (isActive
+                'flex items-center gap-2 rounded px-2 py-1.5 text-sm text-left ' +
+                (view === t.view
                   ? 'bg-zinc-800 text-zinc-100'
-                  : 'text-zinc-300 hover:bg-zinc-900')
+                  : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200')
               }
-              onClick={() => setActive(id)}
             >
-              <span className="flex-1 truncate">{conv.title}</span>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  if (confirm(`Delete "${conv.title}"?`)) deleteConversation(id)
-                }}
-                className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-red-400 text-xs"
-                aria-label="Delete conversation"
+              <span aria-hidden>{t.icon}</span>
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="border-t border-zinc-800 pt-2 text-[0.6875rem] uppercase tracking-wider text-zinc-500">
+          History
+        </div>
+
+        <div className="flex-1 overflow-y-auto -mx-1 px-1 space-y-1">
+          {order.length === 0 && (
+            <p className="text-xs text-zinc-500 px-2">No conversations yet.</p>
+          )}
+          {order.map((id) => {
+            const conv = conversations[id]
+            if (!conv) return null
+            const isActive = id === activeId && view === 'chat'
+            const isPendingDelete = id === pendingDeleteId
+            return (
+              <div
+                key={id}
+                data-conv-row
+                className={
+                  'group flex items-center gap-1 rounded px-2 py-1.5 text-sm cursor-pointer ' +
+                  (isActive
+                    ? 'bg-zinc-800 text-zinc-100'
+                    : isPendingDelete
+                      ? 'bg-zinc-900 text-zinc-200 ring-1 ring-red-500/40'
+                      : 'text-zinc-300 hover:bg-zinc-900')
+                }
+                onClick={() => setActive(id)}
               >
-                ✕
+                <span className="flex-1 truncate">{conv.title}</span>
+                <button
+                  onClick={(e) => openDeletePrompt(e, id)}
+                  className={
+                    'text-zinc-500 hover:text-red-400 text-xs ' +
+                    (isPendingDelete
+                      ? 'opacity-100 text-red-400'
+                      : 'opacity-0 group-hover:opacity-100')
+                  }
+                  aria-label="Delete conversation"
+                  aria-haspopup="dialog"
+                  aria-expanded={isPendingDelete}
+                >
+                  ✕
+                </button>
+              </div>
+            )
+          })}
+        </div>
+
+        <div className="text-[0.625rem] text-zinc-600 leading-tight">
+          Gemma 4 E2B · WebGPU · MiniLM embeddings · UBC Vancouver calendar 2026/27.
+        </div>
+        <div className="text-[0.625rem] text-zinc-500 font-mono">v{APP_VERSION}</div>
+      </aside>
+
+      {pendingConv &&
+        popupPos &&
+        createPortal(
+          <div
+            ref={popupRef}
+            role="dialog"
+            aria-label="Delete conversation"
+            style={{ top: popupPos.top, left: popupPos.left, width: POPUP_WIDTH }}
+            className="fixed z-50 bg-zinc-900 border border-zinc-700 rounded-md shadow-lg shadow-black/40 p-2.5 flex flex-col gap-2"
+          >
+            <p className="text-xs text-zinc-300 leading-snug">
+              Delete{' '}
+              <span className="font-semibold text-zinc-100">
+                "{pendingConv.title}"
+              </span>
+              ?
+            </p>
+            <div className="flex gap-1.5 justify-end">
+              <button
+                onClick={closeDeletePrompt}
+                className="text-xs px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200"
+                autoFocus
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="text-xs px-2 py-1 rounded bg-red-600 hover:bg-red-500 text-white font-medium"
+              >
+                Delete
               </button>
             </div>
-          )
-        })}
-      </div>
-
-      <div className="text-[0.625rem] text-zinc-600 leading-tight">
-        Gemma 4 E2B · WebGPU · MiniLM embeddings · UBC Vancouver calendar 2026/27.
-      </div>
-      <div className="text-[0.625rem] text-zinc-500 font-mono">v{APP_VERSION}</div>
-    </aside>
+          </div>,
+          document.body,
+        )}
+    </>
   )
 }

@@ -1,20 +1,22 @@
 import type { Chunk } from './retrieve'
 
 export const SYSTEM_PROMPT =
-  `Answer questions about UBC Vancouver courses and programs using only the context entries provided in the user's message.
+  `Answer questions about UBC Vancouver courses and programs using only the sources provided in the user's message.
 
 DECIDE FIRST which output shape fits the user's message:
-  - Greeting / small talk / off-topic → one short sentence inviting a UBC question. No citations.
-  - On-topic but vague (just a subject code like "DSCI", just a course code with no specific question) → ask one short clarifying question. No citations.
-  - Specific UBC question → cite from the context. Every factual sentence must end with one or more [N] citations before its punctuation; a substantive reply with zero citations is wrong. If no context entry supports the answer, your entire reply must be exactly:
+  - Greeting / small talk / off-topic → one short sentence inviting a UBC question.
+  - On-topic but vague (just a subject code like "ABCD", just a course code with no specific question) → ask one short clarifying question.
+  - Specific UBC question → answer using the sources. If no source supports the answer, your entire reply must be exactly:
       I don't have that information in the UBC calendar.
     Do not substitute a different course or fall back on prior knowledge.
 
 CITATIONS:
-  - N is an integer in [1, K] where K is the number of context entries provided.
+  - N is an integer in [1, K] where K is the number of sources provided.
   - For multiple sources, adjacent brackets: [1][4].
   - Place each citation immediately after its claim, before sentence punctuation.
-  - When citing a course, include its code inline: "CPSC 110 has no prerequisites [3]."`.trim()
+  - When citing a course, include its code inline: "ABCD 999 has no prerequisites [3]."
+
+CITE FROM THE SOURCES! Every factual sentence in a substantive answer must end with one or more [N] citations before its punctuation. A reply with zero citations is wrong.`.trim()
 
 export function buildContext(chunks: Chunk[]): string {
   return chunks
@@ -46,7 +48,7 @@ export function userPromptWithContext(
 
   if (bareSubject) {
     parts.push(
-      `Note: The user typed only the subject code "${bareSubject}" with no question attached. Ask one short clarifying question (e.g. which specific course, or which aspect — prerequisites, description, requirements, level). Do not cite anything; ignore any context entries below.`,
+      `Note: The user typed only the subject code "${bareSubject}" with no question attached. Ask one short clarifying question (e.g. which specific course, or which aspect — prerequisites, description, requirements, level). Do not cite anything; ignore any sources below.`,
     )
   }
 
@@ -59,10 +61,10 @@ export function userPromptWithContext(
   }
 
   if (chunks.length === 0) {
-    parts.push(`Question: ${query}`, '(No matching context found in the UBC calendar.)')
+    parts.push(`Question: ${query}`, '(No matching sources found in the UBC calendar.)')
   } else {
     parts.push(
-      'Context from the UBC academic calendar:',
+      'Sources from the UBC academic calendar:',
       buildContext(chunks),
       `Question: ${query}`,
     )

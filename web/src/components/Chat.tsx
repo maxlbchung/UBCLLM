@@ -17,7 +17,14 @@ import {
 import { useConversations } from '../store/conversations'
 import { ChatMessage } from './ChatMessage'
 
-const HISTORY_TURNS = 6 // last N (user, assistant) pairs sent to the LLM
+// Last N (user, assistant) pairs sent to the LLM each turn. Each pair is
+// roughly 1 kB of text on average for an advisor reply, so 3 turns adds
+// ~6 kB to the prefill on top of the system prompt + RAG context. 6 used
+// to be the cap and was making long conversations TDR — bigger prefill =
+// more likely to exceed Windows' ~2s GPU compute limit. 3 covers
+// Q-A-Q-A-Q-A clarification chains, which is plenty for follow-ups like
+// "what about its prereqs?" while keeping the worst-case prompt bounded.
+const HISTORY_TURNS = 3
 
 // Bare subject codes ("DSCI", "CPSC", "MATH_V") embed close to their own
 // course chunks (cosine 0.5–0.65), so the threshold floor can't filter

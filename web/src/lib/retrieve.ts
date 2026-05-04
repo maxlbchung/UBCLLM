@@ -110,17 +110,14 @@ const ALIASES: Record<string, string[]> = {
 export interface Chunk {
   id: string
   // 'easter' chunks are hand-curated Q&A entries from
-  // pipeline/easter-eggs.json. They share the corpus and the cosine top-K
-  // with everything else, and ride along on whichever score boosts apply
-  // by signal: a query token substring-matching the chunk's title gets
-  // them the +1 program-title boost, and a "course"/"class" query gets
-  // them the +0.5 course-keyword boost. The intent is "level playing
-  // field" — easter chunks shouldn't be artificially preferred OR
-  // structurally disadvantaged relative to programs/courses they could
-  // plausibly answer. Boosts that are kind-specific by intent (none
-  // currently exist; the +2 course-code boost was removed in v0.9.30
-  // because Mode A's structural inclusion made it redundant) should
-  // stay kind-specific.
+  // pipeline/easter-eggs.json. They share the corpus and the cosine
+  // top-K with everything else, and ride the program-title boost when a
+  // query token substring-matches the chunk's title — that's a real
+  // signal of topical alignment, so the lift is earned. They do NOT
+  // ride the course-keyword boost: a "course"/"class" query word tells
+  // us nothing about whether a given easter is on-topic, and an
+  // unconditional kind-based lift would let easters win against
+  // genuinely matching course chunks for unrelated queries.
   kind: 'course' | 'program' | 'easter'
   code: string | null
   title: string
@@ -246,17 +243,16 @@ export async function topK(
   // above lifts programs whose title shares generic tokens like "course"
   // or "learning" with the query (e.g. "what course should I take to
   // learn linear algebra" → "Professional and Diploma Courses",
-  // "Adult Learning and Education" all jump to ~1.28). This +0.5 on every
-  // course or easter chunk nudges those past the boosted programs.
-  // Easter chunks ride along so a hand-curated course Q&A doesn't get
-  // outranked just because it shares a kind with programs in the boost
-  // table. Magnitude is +0.5 (down from +1 prior) — enough to overtake
-  // the program +1 boost in combination with cosine, without dominating
-  // the ranking on its own.
+  // "Adult Learning and Education" all jump). This boost on every course
+  // chunk nudges them past the boosted programs. Easter chunks
+  // deliberately do NOT ride along here — a hand-curated Q&A entry
+  // should win on its own title/topic match (via the program-title
+  // boost above when the alignment is real), not get a generic course-
+  // word lift that doesn't reflect any signal about whether the easter
+  // is actually on-topic for the query.
   if (COURSE_KEYWORD_RE.test(query)) {
     for (let i = 0; i < chunks.length; i++) {
-      const k = chunks[i].kind
-      if (k === 'course' || k === 'easter') scores[i] += 0.25
+      if (chunks[i].kind === 'course') scores[i] += 0.25
     }
   }
 

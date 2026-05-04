@@ -276,6 +276,7 @@ export function Sidebar() {
             >
               {discoveredCount}/{eggTotal || '–'}
             </span>
+            <span> Easter Eggs Found</span>
             {sparkBursts.map((burst) => (
               <span
                 key={burst.id}

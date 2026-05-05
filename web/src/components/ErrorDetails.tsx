@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { ChatError } from '../store/chat'
+import type { DiagEvent } from '../lib/llm'
 
 const STACK_LINE_LIMIT = 40
 
@@ -11,6 +12,54 @@ function truncateStack(stack: string): string {
     ...lines.slice(0, STACK_LINE_LIMIT),
     `… (${dropped} more frame${dropped === 1 ? '' : 's'} omitted)`,
   ].join('\n')
+}
+
+// Render a relative offset like "-2.3s" or "-1m12s" against the most
+// recent event. The error itself is the t=0 reference, so all events are
+// negative offsets from it. Easier to scan than absolute timestamps for
+// "did device-lost fire just before the error?" type questions.
+function formatDiagOffset(eventTs: number, anchorTs: number): string {
+  const deltaMs = eventTs - anchorTs
+  const sign = deltaMs >= 0 ? '+' : '-'
+  const absMs = Math.abs(deltaMs)
+  if (absMs < 1000) return `${sign}${absMs}ms`
+  const absS = absMs / 1000
+  if (absS < 60) return `${sign}${absS.toFixed(1)}s`
+  const m = Math.floor(absS / 60)
+  const s = Math.floor(absS % 60)
+  return `${sign}${m}m${s.toString().padStart(2, '0')}s`
+}
+
+function DiagTimeline({ events }: { events: DiagEvent[] }) {
+  if (events.length === 0) {
+    return (
+      <p className="mt-1 text-[0.6875rem] text-red-300/60">
+        (no diagnostic events recorded)
+      </p>
+    )
+  }
+  // Anchor at the most recent event (which fired just before / as the
+  // error was attached). All other events display as relative offsets.
+  const anchor = events[events.length - 1].timestamp
+  return (
+    <ul className="mt-1 space-y-0.5 font-mono text-[0.6875rem] leading-snug text-red-200/90">
+      {events.map((e, i) => {
+        const offset = formatDiagOffset(e.timestamp, anchor)
+        const detail =
+          e.detail && Object.keys(e.detail).length > 0
+            ? ' ' + JSON.stringify(e.detail)
+            : ''
+        return (
+          <li key={i}>
+            <span className="text-red-300/60">{offset.padStart(7)}</span>{' '}
+            <span className="text-red-300/80">{e.source}</span>{' '}
+            <span className="text-red-100">{e.event}</span>
+            <span className="text-red-200/70">{detail}</span>
+          </li>
+        )
+      })}
+    </ul>
+  )
 }
 
 /**
@@ -73,6 +122,15 @@ export function ErrorDetails({ error }: { error: ChatError }) {
             <pre className="mt-1 overflow-x-auto whitespace-pre-wrap break-words rounded bg-black/30 p-2 font-mono text-[0.6875rem] leading-snug text-red-100/90">
               {truncateStack(error.stack)}
             </pre>
+          </div>
+        )}
+
+        {error.diag && (
+          <div className="mt-2">
+            <p className="text-[0.625rem] uppercase tracking-wider text-red-300/60">
+              Recent events (timeline)
+            </p>
+            <DiagTimeline events={error.diag} />
           </div>
         )}
 

@@ -7,6 +7,74 @@
 // "Model not loaded" errors we kept hitting on the main-thread engine.
 import { WebWorkerMLCEngineHandler } from '@mlc-ai/web-llm'
 
+// Diagnostic instrumentation. We monkey-patch `navigator.gpu.requestAdapter`
+// before WebLLM's handler is constructed so we can intercept whatever
+// adapter + device its `detectGPUDevice` ends up creating. Subscribing to
+// `device.lost` here gives us ground truth on *whether* device-loss is the
+// proximate cause of the "Buffer was unmapped" errors users see, and
+// *when* it fires relative to user actions (visibility changes, sends).
+// Events are posted back to the main thread as `{ kind: 'diag', ... }`
+// messages, ignored by WebLLM's UUID-keyed proxy and consumed by the
+// matching listener in llm.ts.
+//
+// IMPORTANT: this must run before `new WebWorkerMLCEngineHandler()` so
+// the patch is in place when WebLLM's first reload() requests an adapter.
+function diagPost(event: string, detail?: Record<string, unknown>) {
+  self.postMessage({
+    kind: 'diag',
+    event,
+    timestamp: Date.now(),
+    detail: detail ?? null,
+  })
+}
+
+if (typeof navigator !== 'undefined' && navigator.gpu) {
+  const originalRequestAdapter = navigator.gpu.requestAdapter.bind(navigator.gpu)
+  navigator.gpu.requestAdapter = async (
+    ...args: Parameters<GPU['requestAdapter']>
+  ) => {
+    const adapter = await originalRequestAdapter(...args)
+    if (!adapter) {
+      diagPost('adapter-null')
+      return adapter
+    }
+    // adapter.info is on a relatively recent spec; fall back to vendor/
+    // architecture probes for older Chrome.
+    const info = adapter.info
+    diagPost('adapter-acquired', {
+      vendor: info?.vendor ?? null,
+      architecture: info?.architecture ?? null,
+      device: info?.device ?? null,
+      description: info?.description ?? null,
+    })
+    const originalRequestDevice = adapter.requestDevice.bind(adapter)
+    adapter.requestDevice = async (
+      ...deviceArgs: Parameters<GPUAdapter['requestDevice']>
+    ) => {
+      const device = await originalRequestDevice(...deviceArgs)
+      diagPost('device-acquired')
+      // device.lost is a Promise, not an event — it resolves once and
+      // never rejects. Any value here means the device is gone.
+      device.lost
+        .then((lostInfo) => {
+          diagPost('device-lost', {
+            reason: lostInfo.reason,
+            message: lostInfo.message,
+          })
+        })
+        .catch((err) => {
+          // Defensive: spec says device.lost never rejects, but we don't
+          // want a stray error to break diagnostics on quirky impls.
+          diagPost('device-lost-promise-error', {
+            message: err instanceof Error ? err.message : String(err),
+          })
+        })
+      return device
+    }
+    return adapter
+  }
+}
+
 const handler = new WebWorkerMLCEngineHandler()
 
 self.onmessage = (event: MessageEvent) => {

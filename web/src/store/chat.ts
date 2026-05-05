@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { Chunk } from '../lib/retrieve'
+import type { DiagEvent } from '../lib/llm'
 
 export type Role = 'user' | 'assistant'
 
@@ -13,6 +14,12 @@ export type Role = 'user' | 'assistant'
  * transparently retried and succeeded (in which case there's no error to
  * surface, so this is mainly the mid-stream case) or the worker has been
  * torn down and the next user send will spawn a fresh one.
+ *
+ * `diag` is the recent diagnostic timeline (visibility transitions, engine
+ * lifecycle, device.lost firings, etc.) snapshotted at the moment the
+ * error fired. Lets us tell whether the error correlates with a tab idle,
+ * a device-lost event, or something else — without needing the user to
+ * reproduce while DevTools is open.
  */
 export interface ChatError {
   message: string
@@ -24,6 +31,7 @@ export interface ChatError {
     sourceCount: number
     query: string
   }
+  diag?: DiagEvent[]
 }
 
 export interface Message {

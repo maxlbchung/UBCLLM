@@ -6,7 +6,7 @@ import {
   topK,
   type Chunk,
 } from '../lib/retrieve'
-import { streamChat } from '../lib/llm'
+import { getDiagSnapshot, streamChat } from '../lib/llm'
 import { SYSTEM_PROMPT, userPromptWithContext } from '../lib/prompts'
 import {
   makeMessage,
@@ -182,6 +182,11 @@ export function Chat() {
         stack: isErrInstance ? err.stack : undefined,
         recovered: Boolean((err as { recovered?: boolean })?.recovered),
         request: requestSnapshot,
+        // Snapshot of recent diag events (visibility, engine lifecycle,
+        // worker device.lost firings) — lets the user copy the timeline
+        // leading up to the error without having to reproduce with
+        // DevTools open.
+        diag: getDiagSnapshot(),
       }
       // console.error of a string shows no expand arrow. Group the raw
       // error, type-introspection facts, and the structured copy so any

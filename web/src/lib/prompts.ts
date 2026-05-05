@@ -19,7 +19,7 @@ const RESPONSE_INSTRUCTIONS = `RULES FOR YOUR REPLY (apply in order):
      I don't have access to that information.
      Do not substitute a different course or fall back on prior knowledge.
   4. Do NOT restate the user's words. Do NOT reply with a polished version of the question. Your first sentence must be the answer itself.
-  5. The "Earlier user queries" block (if present above) is reference only — use it ONLY to resolve pronouns or implicit topics in the current question (e.g. "what about its prereqs?" → look up what "its" refers to). It contains no facts and is NOT a source. Only the numbered sources above can back claims in your reply; if a course code or fact does not appear in those sources, you cannot use it.
+  5. The "Earlier user queries" block (if present above) is reference only — use it ONLY to resolve pronouns or implicit topics in the current question (e.g. "what about its prereqs?" → look up what "its" refers to). Otherwise, ignore chat history alltogether.
 
 HOW TO CITE FROM THE SOURCES ABOVE:
   - Every sentence referencing information from the sources must include a citation or citations.

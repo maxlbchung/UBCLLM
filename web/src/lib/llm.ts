@@ -19,6 +19,62 @@ import {
 let enginePromise: Promise<MLCEngineInterface> | null = null
 let activeWorker: Worker | null = null
 
+// ---------- Diagnostic ring buffer ----------
+//
+// We're investigating "Buffer was unmapped before mapping was resolved"
+// errors that fire from web-llm's deviceCopyFromGPU mapAsync. The proximate
+// cause is GPUDevice loss, but we don't yet have ground truth on the
+// trigger (tab idle, OS GPU reset, driver crash, etc.). This ring buffer
+// captures recent events from both threads so the next time the error
+// fires the user can hand us a copy of the timeline alongside the error.
+//
+// Sources:
+//   - main: visibility transitions, engine lifecycle (creating/ready/
+//     discarded), stream lifecycle (start/complete/error), worker errors.
+//   - worker: adapter/device acquired (with adapter.info), and most
+//     importantly device.lost firings — relayed via `kind: 'diag'`
+//     postMessages from llm.worker.ts.
+//
+// Capped at DIAG_LOG_MAX entries; oldest dropped first. Snapshotted into
+// ChatError.diag when streamChat throws so the user can copy the full
+// pre-error timeline from the error UI.
+export interface DiagEvent {
+  timestamp: number
+  source: 'main' | 'worker'
+  event: string
+  detail?: Record<string, unknown> | null
+}
+
+const DIAG_LOG_MAX = 100
+const diagLog: DiagEvent[] = []
+
+function logDiag(
+  source: DiagEvent['source'],
+  event: string,
+  detail?: Record<string, unknown> | null,
+): void {
+  diagLog.push({ timestamp: Date.now(), source, event, detail: detail ?? null })
+  if (diagLog.length > DIAG_LOG_MAX) diagLog.shift()
+  // Also mirror to console — `console.debug` so devtools doesn't surface
+  // it by default, but it's there if needed during live investigation.
+  if (detail) console.debug('[llm.diag]', source, event, detail)
+  else console.debug('[llm.diag]', source, event)
+}
+
+export function getDiagSnapshot(): DiagEvent[] {
+  return [...diagLog]
+}
+
+// Visibility transitions — recorded so we can tell whether a device-lost
+// firing immediately follows a hidden→visible flip (which would point at
+// browser GPU release on idle tabs).
+if (typeof document !== 'undefined') {
+  logDiag('main', 'visibility-initial', { state: document.visibilityState })
+  document.addEventListener('visibilitychange', () => {
+    logDiag('main', 'visibility', { state: document.visibilityState })
+  })
+}
+
 function pickModelId(): string {
   const ids = prebuiltAppConfig.model_list.map((m) => m.model_id)
   // Try a few naming conventions WebLLM has used for the Gemma 4 E2B family.
@@ -77,6 +133,7 @@ function isStaleEngineError(err: unknown): boolean {
 }
 
 function discardEngine() {
+  logDiag('main', 'engine-discarded', { hadWorker: activeWorker !== null })
   enginePromise = null
   // Tear down the worker so the next getLLM() spawns a fresh one with a
   // clean GPUDevice. Reusing the same worker after device-lost just leaves
@@ -88,6 +145,7 @@ function discardEngine() {
 }
 
 function spawnWorker(): Worker {
+  logDiag('main', 'worker-spawning')
   const worker = new Worker(new URL('./llm.worker.ts', import.meta.url), {
     type: 'module',
   })
@@ -97,6 +155,11 @@ function spawnWorker(): Worker {
   // value) at least logs loudly and tears the engine down so the next call
   // rebuilds instead of silently re-attaching to a corpse.
   worker.onerror = (e) => {
+    logDiag('main', 'worker-error', {
+      message: e.message,
+      filename: e.filename,
+      lineno: e.lineno,
+    })
     console.error('[llm.worker] error', {
       message: e.message,
       filename: e.filename,
@@ -106,24 +169,64 @@ function spawnWorker(): Worker {
     if (activeWorker === worker) discardEngine()
   }
   worker.onmessageerror = (e) => {
+    logDiag('main', 'worker-messageerror')
     console.error('[llm.worker] messageerror', e)
     if (activeWorker === worker) discardEngine()
   }
+  // Diag listener: relays `kind: 'diag'` messages from the worker into the
+  // shared diagLog. addEventListener (not onmessage) so it coexists with
+  // WebLLM's own UUID-keyed RPC listener — neither sees the other's
+  // messages because they use disjoint shapes.
+  worker.addEventListener('message', (ev: MessageEvent) => {
+    const data = ev.data as
+      | { kind?: string; event?: string; timestamp?: number; detail?: Record<string, unknown> | null }
+      | undefined
+    if (data?.kind !== 'diag' || typeof data.event !== 'string') return
+    diagLog.push({
+      timestamp: data.timestamp ?? Date.now(),
+      source: 'worker',
+      event: data.event,
+      detail: data.detail ?? null,
+    })
+    if (diagLog.length > DIAG_LOG_MAX) diagLog.shift()
+    if (data.detail) console.debug('[llm.diag] worker', data.event, data.detail)
+    else console.debug('[llm.diag] worker', data.event)
+    // device-lost is the smoking-gun event for our investigation. Promote
+    // it to a visible warning so the user notices in the live console too,
+    // not just inside the diagLog snapshot attached to a future error.
+    if (data.event === 'device-lost') {
+      console.warn(
+        '[llm] GPUDevice was lost in the worker:',
+        data.detail,
+        'discarding engine for next-send rebuild',
+      )
+      if (activeWorker === worker) discardEngine()
+    }
+  })
   return worker
 }
 
 export function getLLM(onProgress?: LoadProgress): Promise<MLCEngineInterface> {
   if (!enginePromise) {
+    logDiag('main', 'engine-creating')
     const worker = spawnWorker()
     activeWorker = worker
     enginePromise = CreateWebWorkerMLCEngine(worker, pickModelId(), {
       initProgressCallback: (r) => onProgress?.(r),
-    }).catch((err) => {
-      enginePromise = null
-      worker.terminate()
-      if (activeWorker === worker) activeWorker = null
-      throw err
     })
+      .then((engine) => {
+        logDiag('main', 'engine-ready')
+        return engine
+      })
+      .catch((err) => {
+        logDiag('main', 'engine-create-failed', {
+          message: err instanceof Error ? err.message : String(err),
+        })
+        enginePromise = null
+        worker.terminate()
+        if (activeWorker === worker) activeWorker = null
+        throw err
+      })
   }
   return enginePromise
 }
@@ -184,6 +287,7 @@ export async function* streamChat(
   })
 
   let recovered = false
+  logDiag('main', 'stream-start', { messageCount: messages.length })
   try {
     await previous
 
@@ -256,9 +360,19 @@ export async function* streamChat(
             }
           }
         }
+        logDiag('main', 'stream-complete', { recovered, attempt })
         return { recovered }
       } catch (err) {
-        if (isStaleEngineError(err)) {
+        const errMsg = err instanceof Error ? err.message : String(err)
+        const stale = isStaleEngineError(err)
+        logDiag('main', 'stream-error', {
+          message: errMsg,
+          name: err instanceof Error ? err.name : undefined,
+          stale,
+          yielded,
+          attempt,
+        })
+        if (stale) {
           // Force the next getLLM() to rebuild the engine from cached
           // weights. If we haven't yielded anything yet, retry transparently;
           // otherwise rethrow so the user sees what happened on this turn,

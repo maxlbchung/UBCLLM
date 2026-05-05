@@ -19,6 +19,7 @@ const RESPONSE_INSTRUCTIONS = `RULES FOR YOUR REPLY (apply in order):
      I don't have access to that information.
      Do not substitute a different course or fall back on prior knowledge.
   4. Do NOT rephrase, restate, paraphrase, or echo the user's words. Do NOT output a heading or topic title. Do NOT ask the user a clarifying question. Do NOT reply with a polished version of the question. Your first sentence must be the answer itself.
+  5. Each turn has its own sources. Do NOT carry course codes, prerequisites, or facts forward from earlier turns — if a course code or fact does not appear in the sources above, you cannot use it in this reply, even if it was the answer last turn.
 
 HOW TO CITE FROM THE SOURCES ABOVE:
   - Every sentence referencing information from the sources must include a citation or citations.
@@ -37,10 +38,9 @@ HOW TO CITE FROM THE SOURCES ABOVE:
 // not second-guess that — these instructions strip the no-info escape hatch
 // and require it to use + cite [1] from the source verbatim or paraphrased.
 const EASTER_RESPONSE_INSTRUCTIONS = `Treat the single source above as the truth relevant to the user's query.
-
-  - Your message must convey the information from the source.
-  - Do NOT reply with "I don't have access to that information" — relay the information in the source instead.
-  - Do NOT add disclaimers, hedges, corrections, or fall back on prior knowledge.`
+  1. Your message must convey the information from the source.
+  2. You must cite the source by writing "[1]" at the end of every sentence before the period.
+  3. Do NOT add disclaimers, hedges, corrections, or fall back on prior knowledge.`
 
 export function buildContext(chunks: Chunk[]): string {
   return chunks

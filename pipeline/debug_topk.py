@@ -149,18 +149,19 @@ def main() -> None:
             print(f"           text:  {c['text'][:200]!r}{'…' if len(c['text']) > 200 else ''}")
             print()
     else:
-        print("Mode C (default semantic, top K distinct URLs above minScore)")
+        print("Mode C (default semantic, top K distinct sources above minScore)")
         out = []
-        seen_urls = set()
+        seen_keys = set()
         for i in order:
             if len(out) >= args.k:
                 break
             if scores[i] < MIN_SCORE:
                 continue
             c = chunks[i]
-            if c["url"] in seen_urls:
+            key = c.get("code") or c["url"]
+            if key in seen_keys:
                 continue
-            seen_urls.add(c["url"])
+            seen_keys.add(key)
             out.append((i, c))
         print()
         for i, c in out:

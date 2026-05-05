@@ -451,10 +451,17 @@ export async function topK(
   // Top-K by score with the minScore floor. For greetings and off-topic
   // queries every chunk's cosine sits near zero, so this returns [];
   // userPromptWithContext + the SCOPE rule then handle the empty case.
-  // Same per-URL dedup as Mode B — top-K should be K distinct sources,
-  // not K slices of the same page.
+  //
+  // Per-source dedup: top-K should be K distinct sources, not K slices
+  // of the same page. We dedup on `c.code ?? c.url` because course
+  // chunks all share a single per-subject URL (every CPSC course points
+  // at /course-descriptions/subject/cpscv) — using URL alone collapsed
+  // every CPSC course into a single chunk and let lower-scoring chunks
+  // from other subjects (ATSC 212, MATH 442, …) take the freed slots.
+  // For programs and easters c.code is null, so dedup falls back to URL,
+  // preserving the original "one chunk per program page" behaviour.
   const modeC: Chunk[] = []
-  const seenUrlsC = new Set<string>()
+  const seenKeysC = new Set<string>()
   // Sorted descending by score, so break (not continue) once we drop
   // below minScore — every remaining chunk fails the gate. This is the
   // loop's natural termination condition; enforceTokenBudget below
@@ -462,8 +469,9 @@ export async function topK(
   for (const i of allIndicesByScore) {
     if (scores[i] < minScore) break
     const c = chunks[i]
-    if (seenUrlsC.has(c.url)) continue
-    seenUrlsC.add(c.url)
+    const key = c.code ?? c.url
+    if (seenKeysC.has(key)) continue
+    seenKeysC.add(key)
     modeC.push({ ...c, score: scores[i] })
   }
   return enforceTokenBudget(easterCollapse(modeC))

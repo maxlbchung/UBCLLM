@@ -102,7 +102,7 @@ export function Chat() {
       let missingCodes: string[] = []
       if (!bareSubject) {
         const [topKResult, courseIndex] = await Promise.all([
-          topK(q, 8),
+          topK(q),
           getCourseIndex(),
         ])
         sources = topKResult

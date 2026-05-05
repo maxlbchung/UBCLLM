@@ -25,6 +25,36 @@ const MIN_SCORE = 0.4
 // to programs/easters when the user asked for courses).
 const COURSE_KEYWORD_RE = /\b(course|courses|class|classes)\b/i
 
+// ---------- Source-block sizing ----------
+//
+// Gemma 2 2B (the model `pickModelId()` actually selects, despite the
+// "Gemma 4 E2B" branding) runs with a 4096-token context window. WebLLM
+// pre-flight checks numPromptTokens > contextWindowSize and throws
+// ContextWindowSizeExceededError, which our streamChat does NOT recognize
+// as recoverable — so an over-budget prompt surfaces as a chat error.
+// To prevent that, every retrieval mode runs its candidate list through
+// enforceSourceLimits at the end. Two layers stack:
+//
+//   (1) Per-kind hard caps. Course chunks are small (~80 tokens), so 12
+//       still fits comfortably; program chunks are large (~350 tokens) so
+//       8 is the practical ceiling before they dominate the prompt
+//       regardless of budget. Easter chunks are tiny and uncapped —
+//       easterCollapse handles their "answer alone" case separately.
+//   (2) Token budget. Sized to leave ~1900 tokens for the rest of the
+//       prompt (system ~30 + 6-message history ~1100 + question + rules
+//       ~400 + slack), keeping total prefill clearly under 4096 even on
+//       worst-case queries.
+const MAX_COURSE_CHUNKS = 12
+const MAX_PROGRAM_CHUNKS = 8
+const SOURCE_TOKEN_BUDGET = 2200
+
+// Conservative chars/token estimate for Gemma's SentencePiece tokenizer on
+// English calendar text. Real ratio averages ~3.5; using 4 keeps us on the
+// over-estimate side so the budget cuts off before the model's hard limit
+// kicks in. Good enough without paying the cost of running an actual
+// tokenizer in the browser.
+const CHARS_PER_TOKEN = 4
+
 // Allowlist of query terms that identify a UBC program. Doubles as both
 // (a) the gate for Mode B (program-only retrieval) and (b) a fallback
 // title-match source for the +1 program boost when the alias key itself
@@ -179,9 +209,44 @@ function easterCollapse(out: Chunk[]): Chunk[] {
   return out.length > 0 && out[0].kind === 'easter' ? [out[0]] : out
 }
 
+function estimateTokens(text: string): number {
+  return Math.ceil(text.length / CHARS_PER_TOKEN)
+}
+
+// Cost of one chunk in the formatted sources block (see buildContext in
+// prompts.ts):  [N] {text}\nSource: {url}\n\n
+// The +6 covers the "[N] ", "\nSource: ", and trailing "\n\n" framing.
+function chunkPromptCost(c: Chunk): number {
+  return estimateTokens(c.text) + estimateTokens(c.url) + 6
+}
+
+// Trim a candidate chunk list to fit per-kind hard caps AND the source
+// token budget. Walks the input in order (already sorted by score upstream),
+// dropping a chunk when it would push either limit, but always keeps the
+// top-ranked chunk even if it solo-exceeds budget — losing it to the
+// "no sources found" path is worse grounding than sending one big chunk.
+// Easter chunks are not subject to either kind cap; easterCollapse handles
+// the special "easter alone" case before this runs.
+function enforceSourceLimits(chunks: Chunk[]): Chunk[] {
+  const out: Chunk[] = []
+  let courseCount = 0
+  let programCount = 0
+  let tokensUsed = 0
+  for (const c of chunks) {
+    if (c.kind === 'course' && courseCount >= MAX_COURSE_CHUNKS) continue
+    if (c.kind === 'program' && programCount >= MAX_PROGRAM_CHUNKS) continue
+    const cost = chunkPromptCost(c)
+    if (out.length > 0 && tokensUsed + cost > SOURCE_TOKEN_BUDGET) break
+    if (c.kind === 'course') courseCount++
+    else if (c.kind === 'program') programCount++
+    out.push(c)
+    tokensUsed += cost
+  }
+  return out
+}
+
 export async function topK(
   query: string,
-  k = 8,
   minScore = MIN_SCORE,
 ): Promise<Chunk[]> {
   const [{ chunks, matrix }, qVec] = await Promise.all([loadCorpus(), embed(query)])
@@ -324,7 +389,7 @@ export async function topK(
     }
     // Pass 2: other courses whose chunk text mentions an asked code.
     for (const i of allIndicesByScore) {
-      if (out.length >= k) break
+      if (out.length >= MAX_COURSE_CHUNKS) break
       if (seen.has(i)) continue
       const c = chunks[i]
       if (c.kind !== 'course') continue
@@ -333,7 +398,7 @@ export async function topK(
         seen.add(i)
       }
     }
-    return out
+    return enforceSourceLimits(out)
   }
 
   // ---- Mode B: program / hand-curated mode ----
@@ -362,10 +427,9 @@ export async function topK(
   // the alias signal, so we fall through to Mode C and let course chunks
   // (with their +0.25 boost) compete on equal footing.
   if (aliasKeywords.length > 0 && !wantsCourses) {
-    const PROGRAM_K = 5
     const out: Chunk[] = []
     for (const i of allIndicesByScore) {
-      if (out.length >= PROGRAM_K) break
+      if (out.length >= MAX_PROGRAM_CHUNKS) break
       const c = chunks[i]
       if (c.kind !== 'program' && c.kind !== 'easter') continue
       if (scores[i] < minScore) continue
@@ -384,7 +448,7 @@ export async function topK(
       if (!aliasKeywords.some((kw) => haystack.includes(kw))) continue
       out.push({ ...c, score: scores[i] })
     }
-    return easterCollapse(out)
+    return enforceSourceLimits(easterCollapse(out))
   }
 
   // ---- Mode C: default semantic mode ----
@@ -395,15 +459,18 @@ export async function topK(
   // not K slices of the same page.
   const modeC: Chunk[] = []
   const seenUrlsC = new Set<string>()
+  // Loop ceiling at MAX_COURSE_CHUNKS; per-kind caps + token budget then
+  // run inside enforceSourceLimits below. 12 is a generous outer ceiling
+  // that lets enforceSourceLimits do the real allocation work.
   for (const i of allIndicesByScore) {
-    if (modeC.length >= k) break
+    if (modeC.length >= MAX_COURSE_CHUNKS) break
     if (scores[i] < minScore) continue
     const c = chunks[i]
     if (seenUrlsC.has(c.url)) continue
     seenUrlsC.add(c.url)
     modeC.push({ ...c, score: scores[i] })
   }
-  return easterCollapse(modeC)
+  return enforceSourceLimits(easterCollapse(modeC))
 }
 
 // ---------- Course-only helpers (used by CourseLookup + PrereqTree) ----------

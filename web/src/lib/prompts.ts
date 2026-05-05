@@ -38,8 +38,8 @@ HOW TO CITE FROM THE SOURCES ABOVE:
 // not second-guess that — these instructions strip the no-info escape hatch
 // and require it to use + cite [1] from the source verbatim or paraphrased.
 const EASTER_RESPONSE_INSTRUCTIONS = `Treat the single source above as the truth relevant to the user's query.
-  1. Your message must convey the information from the source.
-  2. You must cite the source by writing "[1]" at the end of every sentence before the period.
+  1. Your message must convey ALL the information in the source.
+  2. You must cite the source by writing "[1]" at the end of every sentence before the period (ex: The sky is blue [1].).
   3. Do NOT add disclaimers, hedges, corrections, or fall back on prior knowledge.`
 
 export function buildContext(chunks: Chunk[]): string {
@@ -56,13 +56,11 @@ export function buildContext(chunks: Chunk[]): string {
  *   no-info disclaimer instead of confabulating from embedding-neighbour
  *   chunks for similar codes.
  *
- * `bareSubject` — set when the user typed only a subject code or program
- *   name (e.g. "DSCI", "computer science") with no question attached. Bare
- *   topics pull legitimate-looking high-cosine matches (DSCI 200, CPSC 100,
- *   …) and the model otherwise picks one and narrates it without citing.
- *   The deterministic Note below tells it to ask a clarifying question
- *   instead. Despite the historical name, the value can be either a code
- *   or a discipline name.
+ * `bareSubject` — set when the user typed only a subject code (e.g. "DSCI")
+ *   with no question attached. Bare subjects pull legitimate-looking
+ *   high-cosine matches (DSCI 200, DSCI 100, …), so the model otherwise
+ *   picks one and narrates it without citing. The deterministic Note
+ *   below tells it to ask a clarifying question instead.
  */
 export function userPromptWithContext(
   query: string,
@@ -74,7 +72,7 @@ export function userPromptWithContext(
 
   if (bareSubject) {
     parts.push(
-      `Note: The user typed only "${bareSubject}" with no question attached. Ask one short clarifying question (e.g. which specific course, or which aspect — prerequisites, description, requirements, level). Do not cite anything; ignore any sources below.`,
+      `Note: The user typed only the subject code "${bareSubject}" with no question attached. Ask one short clarifying question (e.g. which specific course, or which aspect — prerequisites, description, requirements, level). Do not cite anything; ignore any sources below.`,
     )
   }
 

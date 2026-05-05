@@ -107,11 +107,11 @@ def main() -> None:
 
     if program_needles and not wants_courses:
         for i, c in enumerate(chunks):
-            if c["kind"] not in ("program", "easter"):
+            if c["kind"] != "program":
                 continue
             title = c["title"].lower()
             if any(n in title for n in program_needles):
-                scores[i] += 0.5
+                scores[i] += 0.25
 
     if wants_courses:
         for i, c in enumerate(chunks):
@@ -119,7 +119,7 @@ def main() -> None:
                 scores[i] += 0.25
 
     for i, c in enumerate(chunks):
-        if c["kind"] == "easter" and scores[i] <= 1.2:
+        if c["kind"] == "easter" and scores[i] <= 1:
             scores[i] = -np.inf
 
     order = np.argsort(-scores)

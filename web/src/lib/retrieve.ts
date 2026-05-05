@@ -268,15 +268,19 @@ export async function topK(
   }
 
   // Easter floor: an easter chunk only earns a slot when its post-boost
-  // score clears 1.0. Pure cosine maxes at 1.0, so this requires the
-  // +0.5 program-title boost to have fired AND raw cosine > 0.5 — i.e.,
-  // both signals (title match + semantic alignment) have to agree before
-  // we surface a hand-curated Q&A. Without this gate, weakly-aligned
-  // easters can drift into Mode C on cosine alone and hijack the
-  // easterCollapse path with off-topic curated answers. Setting score to
-  // -Infinity drops them below minScore in every downstream mode.
+  // score clears 1.2. With the +0.5 program-title boost, this requires
+  // raw cosine > 0.7 — strong topical alignment, not just shared
+  // keywords. The 1.0 floor was too lenient: e.g. "tell me about data
+  // science" gives the best-prof-dsci easter a raw cosine of 0.55, which
+  // post-boost (1.05) was barely above 1.0 and let the curated answer
+  // override actual program pages on a generic topic query. The targeted
+  // query "who is the best data science professor" puts the same easter
+  // at raw 0.83 / post-boost 1.33, which still passes 1.2 by a margin —
+  // so tightening the floor closes the off-target path without hurting
+  // the on-target one. Setting score to -Infinity drops rejected easters
+  // below minScore in every downstream mode.
   for (let i = 0; i < chunks.length; i++) {
-    if (chunks[i].kind === 'easter' && scores[i] <= 1) {
+    if (chunks[i].kind === 'easter' && scores[i] <= 1.2) {
       scores[i] = -Infinity
     }
   }

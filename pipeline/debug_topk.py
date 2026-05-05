@@ -119,7 +119,7 @@ def main() -> None:
                 scores[i] += 0.25
 
     for i, c in enumerate(chunks):
-        if c["kind"] == "easter" and scores[i] <= 1:
+        if c["kind"] == "easter" and scores[i] <= 1.2:
             scores[i] = -np.inf
 
     order = np.argsort(-scores)

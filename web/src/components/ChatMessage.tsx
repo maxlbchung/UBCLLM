@@ -295,7 +295,24 @@ export function ChatMessage({ message }: { message: Message }) {
             </ReactMarkdown>
           )
         ) : (
-          !isUser && <span className="text-zinc-500">…</span>
+          !isUser && (
+            <span
+              className="inline-flex items-center gap-1 text-zinc-500"
+              aria-label="Thinking"
+              role="status"
+            >
+              {[0, 160, 320].map((delay) => (
+                <span
+                  key={delay}
+                  className="inline-block h-1.5 w-1.5 rounded-full bg-current"
+                  style={{
+                    animation: 'thinking-dot 1200ms ease-in-out infinite',
+                    animationDelay: `${delay}ms`,
+                  }}
+                />
+              ))}
+            </span>
+          )
         )}
 
         {!isUser && sources.length > 0 && (

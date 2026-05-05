@@ -77,3 +77,12 @@ body {
   69%  { transform: translate(-50%, -50%) scale(1);    opacity: 0.85; }
   100% { transform: translate(-50%, -50%) scale(0.12); opacity: 0; }
 }
+
+/* Thinking-dots animation: each dot fades + lifts on a 1.2s loop, with the
+   three dots staggered 160ms apart so the bounce reads as a left-to-right
+   wave. Used by ChatMessage.tsx as the placeholder while the assistant
+   message is still empty (i.e. waiting for the first streamed delta). */
+@keyframes thinking-dot {
+  0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
+  30%           { opacity: 1;   transform: translateY(-0.2rem); }
+}

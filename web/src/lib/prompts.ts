@@ -14,7 +14,7 @@ Be concise, no filler.`.trim()
 // everything behavioural lives here.
 const RESPONSE_INSTRUCTIONS = `RULES FOR YOUR REPLY (apply in order):
   1. If the user is greeting / making small talk / off-topic → one short sentence inviting a UBC question. Stop.
-  2. Otherwise, answer the user's message directly using the sources above. If the query is vague (e.g. just "astronomy" or a topic name with no specific question), give a brief 2–3 sentence overview of the topic drawn from the sources.
+  2. Otherwise, answer the user's message directly using the sources above. If the query is vague (e.g. just "astronomy" or "KIN" with no specific question), give a brief 2–3 sentence overview of the topic drawn from the sources.
   3. If NO source above is relevant, or you cannot cite any source, your entire reply must be exactly:
      I don't have access to that information.
      Do not substitute a different course or fall back on prior knowledge.
@@ -36,11 +36,10 @@ HOW TO CITE FROM THE SOURCES ABOVE:
 // has already decided the easter IS the canonical answer, the model must
 // not second-guess that — these instructions strip the no-info escape hatch
 // and require it to use + cite [1] from the source verbatim or paraphrased.
-const EASTER_RESPONSE_INSTRUCTIONS = `The single source above is a hand-curated truth relevant to the user's query.
+const EASTER_RESPONSE_INSTRUCTIONS = `Treat the single source above as the truth relevant to the user's query.
 
-  - Message must convey the information from the source
-  - Sentence must be followed by [1] before punctuation.
-  - Do NOT reply with "I don't have access to that information" — the source IS the information.
+  - Your message must convey the information from the source.
+  - Do NOT reply with "I don't have access to that information" — relay the information in the source instead.
   - Do NOT add disclaimers, hedges, corrections, or fall back on prior knowledge.`
 
 export function buildContext(chunks: Chunk[]): string {

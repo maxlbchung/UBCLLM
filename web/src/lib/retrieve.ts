@@ -33,11 +33,18 @@ const COURSE_KEYWORD_RE = /\b(course|courses|class|classes)\b/i
 // ContextWindowSizeExceededError, which our streamChat does NOT recognize
 // as recoverable — so an over-budget prompt surfaces as a chat error.
 // To prevent that, every retrieval mode runs its candidate list through
-// enforceTokenBudget at the end. Sized to leave ~1900 tokens for the
-// rest of the prompt (system ~30 + 6-message history ~1100 + question +
-// RESPONSE_INSTRUCTIONS ~400 + slack), keeping total prefill clearly
-// under 4096 even on worst-case queries.
-const SOURCE_TOKEN_BUDGET = 2200
+// enforceTokenBudget at the end.
+//
+// Tuned down from 2200 to 1100 after a "CPSC 110" Mode A query returned
+// 17 chunks (CPSC 110 is widely listed as a prereq, so Pass 2 collected
+// every follow-on course). Total source tokens fit budget but inflated
+// GPU prefill pressure, contributing to a "Buffer was unmapped" mapAsync
+// race. Halving the budget caps Mode A at ~8-9 chunks for typical course
+// chunk sizes, which is enough grounding without filling the prefill.
+// Other slots: system ~30, 6-msg history ~1100, question + RESPONSE_INST
+// ruction ~400 → total worst-case prefill ~2630 tokens, comfortable under
+// 4096.
+const SOURCE_TOKEN_BUDGET = 1100
 
 // Conservative chars/token estimate for Gemma's SentencePiece tokenizer on
 // English calendar text. Real ratio averages ~3.5; using 4 keeps us on the

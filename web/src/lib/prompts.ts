@@ -18,8 +18,8 @@ const RESPONSE_INSTRUCTIONS = `RULES FOR YOUR REPLY (apply in order):
   3. If NO source above is relevant, or you cannot cite any source, your entire reply must be exactly:
      I don't have access to that information.
      Do not substitute a different course or fall back on prior knowledge.
-  4. Do NOT rephrase, restate, paraphrase, or echo the user's words. Do NOT output a heading or topic title. Do NOT ask the user a clarifying question. Do NOT reply with a polished version of the question. Your first sentence must be the answer itself.
-  5. Each turn has its own sources. Do NOT carry course codes, prerequisites, or facts forward from earlier turns — if a course code or fact does not appear in the sources above, you cannot use it in this reply, even if it was the answer last turn.
+  4. Do NOT restate the user's words. Do NOT reply with a polished version of the question. Your first sentence must be the answer itself.
+  5. The "Earlier user queries" block (if present above) is reference only — use it ONLY to resolve pronouns or implicit topics in the current question (e.g. "what about its prereqs?" → look up what "its" refers to). It contains no facts and is NOT a source. Only the numbered sources above can back claims in your reply; if a course code or fact does not appear in those sources, you cannot use it.
 
 HOW TO CITE FROM THE SOURCES ABOVE:
   - Every sentence referencing information from the sources must include a citation or citations.
@@ -48,6 +48,11 @@ export function buildContext(chunks: Chunk[]): string {
     .join('\n\n')
 }
 
+function formatPriorQueries(priorQueries: string[]): string {
+  const lines = priorQueries.map((q, i) => `  ${i + 1}. ${q}`).join('\n')
+  return `Earlier user queries (reference only — for resolving pronouns or implicit topics in the current Question; not facts, not sources):\n${lines}`
+}
+
 /**
  * Build the user-side prompt.
  *
@@ -61,12 +66,23 @@ export function buildContext(chunks: Chunk[]): string {
  *   high-cosine matches (DSCI 200, DSCI 100, …), so the model otherwise
  *   picks one and narrates it without citing. The deterministic Note
  *   below tells it to ask a clarifying question instead.
+ *
+ * `priorQueries` — earlier user messages from this conversation, oldest
+ *   first. Past assistant replies are deliberately NOT sent (see
+ *   Chat.tsx — that path was producing fact-bleed where the model
+ *   carried course codes from a prior reply into the next answer);
+ *   prior user queries are kept so the model can resolve pronouns
+ *   like "its prereqs?" against the topic the user named earlier.
+ *   Rendered as a "Earlier user queries" block right before the
+ *   Question line, with Rule 5 in RESPONSE_INSTRUCTIONS pinning
+ *   their semantics to "reference only, not facts".
  */
 export function userPromptWithContext(
   query: string,
   chunks: Chunk[],
   missingCodes: string[] = [],
   bareSubject?: string,
+  priorQueries: string[] = [],
 ): string {
   const parts: string[] = []
 
@@ -85,13 +101,16 @@ export function userPromptWithContext(
   }
 
   if (chunks.length === 0) {
+    if (priorQueries.length > 0) {
+      parts.push(formatPriorQueries(priorQueries))
+    }
     parts.push(`Question: ${query}`, '(No matching sources found in the UBC calendar.)')
   } else {
-    parts.push(
-      'Sources from the UBC academic calendar:',
-      buildContext(chunks),
-      `Question: ${query}`,
-    )
+    parts.push('Sources from the UBC academic calendar:', buildContext(chunks))
+    if (priorQueries.length > 0) {
+      parts.push(formatPriorQueries(priorQueries))
+    }
+    parts.push(`Question: ${query}`)
   }
 
   // Append the response-shape + citation rules at the very end so they

@@ -39,10 +39,18 @@ const BARE_SUBJECT_RE = /^[A-Z]{3,5}(?:_V)?$/i
 // past MiniLM's ~512-token window or eating the LLM's context budget.
 const MAX_INPUT_LENGTH = 500
 
-function toLLMHistory(history: Message[]): ChatCompletionMessageParam[] {
+// Earlier user queries fed back to the model as a "reference only" preamble
+// (see prompts.ts → formatPriorQueries). We deliberately drop past assistant
+// replies — they were the source of the fact-bleed bug where the model would
+// carry a course code from a prior answer into the next reply, even when the
+// new sources said something different. Keeping just the user's prior queries
+// lets the model still resolve "what about its prereqs?" / "tell me more"
+// follow-ups without re-introducing that bleed.
+function priorUserQueries(history: Message[]): string[] {
   return history
-    .filter((m) => m.content.trim().length > 0)
-    .map((m) => ({ role: m.role, content: m.content }))
+    .filter((m) => m.role === 'user')
+    .map((m) => m.content.trim())
+    .filter((q) => q.length > 0)
 }
 
 export function Chat() {
@@ -127,13 +135,23 @@ export function Chat() {
         .getState()
         .messages.slice(0, -2) // drop the just-added user + empty assistant
       recent = prior.slice(-HISTORY_TURNS * 2)
+      const earlierQueries = priorUserQueries(recent)
 
+      // No more alternating user/assistant turns sent to the LLM — earlier
+      // queries are bundled into the current user message via prompts.ts so
+      // the model sees them as reference-only context, not as authoritative
+      // prior answers.
       llmMessages = [
         { role: 'system', content: SYSTEM_PROMPT },
-        ...toLLMHistory(recent),
         {
           role: 'user',
-          content: userPromptWithContext(q, sources, missingCodes, bareSubject),
+          content: userPromptWithContext(
+            q,
+            sources,
+            missingCodes,
+            bareSubject,
+            earlierQueries,
+          ),
         },
       ]
 

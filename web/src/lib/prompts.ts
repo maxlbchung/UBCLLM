@@ -18,7 +18,7 @@ const RESPONSE_INSTRUCTIONS = `RULES FOR YOUR REPLY (apply in order):
   3. If NO source above is relevant, or you cannot cite any source, your entire reply must be exactly:
      I don't have access to that information.
      Do not substitute a different course or fall back on prior knowledge.
-  4. Do NOT rephrase, restate, paraphrase, or echo the user's words. Do NOT output a heading or topic title. Do NOT ask the user a clarifying question. Do NOT reply with a polished version of the question itself ("What are the admission requirements for…?" is wrong — that is the question, not the answer). Your first sentence must be the answer itself.
+  4. Do NOT rephrase, restate, paraphrase, or echo the user's words. Do NOT output a heading or topic title. Do NOT ask the user a clarifying question. Do NOT reply with a polished version of the question. Your first sentence must be the answer itself.
 
 HOW TO CITE FROM THE SOURCES ABOVE:
   - Every sentence referencing information from the sources must include a citation or citations.

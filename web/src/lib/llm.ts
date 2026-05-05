@@ -57,13 +57,22 @@ export type LoadProgress = (r: InitProgressReport) => void
 // engine's loaded flag flipped). Both recover by recreating the engine —
 // weights are still cached in IndexedDB so re-init is ~1–3 s, not the full
 // initial download.
+// Marker substring on the synthetic stall error thrown by streamChat when
+// the worker stops sending deltas. Matched by isStaleEngineError below so
+// the existing recovery path (discardEngine + retry on first attempt)
+// kicks in transparently — a stalled GPU process is functionally identical
+// to a stale engine and wants the same fix (rebuild from cached weights).
+const STREAM_STALL_MESSAGE =
+  'LLM stream stalled — no output from worker, rebuilding engine'
+
 function isStaleEngineError(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err)
   return (
     /Model not loaded/i.test(msg) ||
     /Buffer was unmapped/i.test(msg) ||
     /Buffer is destroyed/i.test(msg) ||
-    /device (?:is |was )?lost/i.test(msg)
+    /device (?:is |was )?lost/i.test(msg) ||
+    msg.includes(STREAM_STALL_MESSAGE)
   )
 }
 
@@ -140,6 +149,17 @@ let chainTail: Promise<void> = Promise.resolve()
 // sync with the number in SYSTEM_PROMPT (prompts.ts).
 const HARD_WORD_CAP = 200
 
+// Inactivity timeout for the worker stream. If no delta arrives within this
+// window — counted from either stream-start or the last received delta — we
+// assume the worker is wedged (GPU process crash, silent device-lost, etc.)
+// and throw a synthetic stall error. The catch below routes that through
+// the same discardEngine + retry path as a stale-engine error, so the user
+// gets a fresh rebuild on their next send instead of a permanently spinning
+// "Generating…" placeholder. 60s is generous enough to cover cold-start
+// prefill on a 2B model + the longest expected inter-token gap on a slow
+// laptop, but short enough that a real freeze doesn't trap the UI for ages.
+const STREAM_INACTIVITY_TIMEOUT_MS = 60_000
+
 /**
  * Stream chat completion deltas. The generator's *return value* (read via
  * the iterator protocol, not the for-await loop) signals whether the
@@ -182,7 +202,33 @@ export async function* streamChat(
           temperature: opts.temperature ?? 0,
         })
         let accumulated = ''
-        for await (const chunk of stream) {
+        // Manual iteration (not for-await) so each next() can be raced
+        // against an inactivity timer. for-await offers no hook to bail
+        // out when the worker silently stops responding.
+        const iter = stream[Symbol.asyncIterator]()
+        while (true) {
+          let timeoutId: ReturnType<typeof setTimeout> | undefined
+          const timeoutPromise = new Promise<never>((_, reject) => {
+            timeoutId = setTimeout(() => {
+              reject(new Error(STREAM_STALL_MESSAGE))
+            }, STREAM_INACTIVITY_TIMEOUT_MS)
+          })
+          let result: IteratorResult<Awaited<ReturnType<typeof iter.next>>['value']>
+          try {
+            // If the timeout wins, iter.next() is left pending. We don't
+            // await iter.return() here — a stalled worker won't respond
+            // to it either, and discardEngine() in the catch path
+            // terminates the worker outright, which is the only reliable
+            // way to release the suspended request.
+            result = (await Promise.race([
+              iter.next(),
+              timeoutPromise,
+            ])) as IteratorResult<Awaited<ReturnType<typeof iter.next>>['value']>
+          } finally {
+            if (timeoutId !== undefined) clearTimeout(timeoutId)
+          }
+          if (result.done) break
+          const chunk = result.value
           const delta = chunk.choices[0]?.delta?.content
           if (delta) {
             yielded = true
@@ -198,8 +244,8 @@ export async function* streamChat(
               try {
                 // Best-effort: tells the engine to stop generating so
                 // the GPU loop terminates cleanly. If it throws or is
-                // missing, breaking the for-await still ends our yield
-                // — the iterator's return() call propagates to the
+                // missing, breaking the loop still ends our yield —
+                // the iterator's return() call propagates to the
                 // worker, and resetChat() at the next call's start
                 // clears any leftover state anyway.
                 engine.interruptGenerate()

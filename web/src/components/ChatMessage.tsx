@@ -295,7 +295,12 @@ export function ChatMessage({ message }: { message: Message }) {
             </ReactMarkdown>
           )
         ) : (
-          !isUser && (
+          !isUser &&
+          // Suppress the thinking-dots animation once an error/timeout
+          // lands on this message — the streamed delta will never arrive,
+          // and a bouncing indicator next to a "Sources retrieved" + error
+          // block reads as if the model is still working.
+          !message.error && (
             <span
               className="inline-flex items-center gap-1 text-zinc-500"
               aria-label="Thinking"

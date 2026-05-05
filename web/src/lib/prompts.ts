@@ -12,33 +12,31 @@ Be concise, no filler.`.trim()
 // them in the system prompt where the sources later push them out of fresh
 // attention. SYSTEM_PROMPT keeps only the role + a brevity cue;
 // everything behavioural lives here.
-const RESPONSE_INSTRUCTIONS = `RULES FOR YOUR REPLY (apply in order):
-  1. If the user is greeting / making small talk / off-topic → one short sentence inviting a UBC question. Stop.
-  2. Otherwise, answer the user's message directly using the sources above. If the query is vague (e.g. just "astronomy" or "KIN" with no specific question), give a brief 2–3 sentence overview of the topic drawn from the sources.
-  3. If NO source above is relevant, or you cannot cite any source, your entire reply must be exactly:
-     I don't have access to that information.
-     Do not substitute a different course or fall back on prior knowledge.
-  4. Do NOT restate the user's words. Do NOT reply with a polished version of the question. Your first sentence must be the answer itself.
-  5. The "Earlier user queries" block (if present above) is reference only — use it ONLY to resolve pronouns or implicit topics in the current question (e.g. "what about its prereqs?" → look up what "its" refers to). Otherwise, ignore chat history alltogether.
+const RESPONSE_INSTRUCTIONS = `RULES (in order):
+  1. Greeting / small talk / off-topic → one short sentence inviting a UBC question. Stop.
+  2. No source above is relevant, or you cannot cite any → reply exactly:
+    I don't have access to that information.
+    No substitutions, no prior knowledge.
+  3. Otherwise, answer directly from the sources. Lead with the answer — never restate the user's question, never reply with another question. Vague queries (e.g. a bare subject code) get a 2–3 sentence overview from the sources.
+  4. "Earlier user queries" (if present above) is reference only — use to resolve pronouns ("its prereqs?" → what "its" refers to). Ignore otherwise.
 
-HOW TO CITE FROM THE SOURCES ABOVE:
-  - Every sentence referencing information from the sources must include a citation or citations.
-  - N is an integer in [1, K] where K is the number of sources above.
-  - For multiple sources, adjacent brackets: [1][4].
-  - Place each citation immediately after its claim, before sentence punctuation.
-  - When citing a course, include its code inline: "ABCD 999 has no prerequisites [3]."`
+CITATIONS:
+  - Cite every sentence drawn from a source as [N], N ∈ [1, K].
+  - Multiple sources: adjacent brackets ([1][4]). Place before sentence punctuation.
+  - Include course codes inline: "ABCD 999 has no prerequisites [3]."`
 
 // Used when the retrieval layer collapses the result to a single easter-egg
 // chunk (see easterCollapse in retrieve.ts). The default RESPONSE_INSTRUCTIONS
 // above include a "no source is relevant → reply with the no-info disclaimer"
-// path, and Gemma 4 E2B routinely takes that path on easter chunks because
-// the curated answer sounds absurd or contradicts its priors (e.g. asteroids
-// landing in craters "because of the pythagorean theorem"). When the corpus
-// has already decided the easter IS the canonical answer, the model must
-// not second-guess that — these instructions strip the no-info escape hatch
-// and require it to use + cite [1] from the source verbatim or paraphrased.
+// path, and small instruct models (Qwen 2.5 1.5B included) routinely take
+// that path on easter chunks because the curated answer sounds absurd or
+// contradicts their priors (e.g. asteroids landing in craters "because of
+// the pythagorean theorem"). When the corpus has already decided the easter
+// IS the canonical answer, the model must not second-guess that — these
+// instructions strip the no-info escape hatch and require it to use + cite
+// [1] from the source verbatim or paraphrased.
 const EASTER_RESPONSE_INSTRUCTIONS = `Treat the single source above as the truth relevant to the user's query.
-  1. Your message must convey ALL the information in the source.
+  1. Your message must convey ALL the information in the source, no summarization, no interpretation.
   2. You must cite the source by writing "[1]" at the end of every sentence before the period (ex: The sky is blue [1].).
   3. Do NOT add disclaimers, hedges, corrections, or fall back on prior knowledge.`
 
@@ -74,7 +72,7 @@ function formatPriorQueries(priorQueries: string[]): string {
  *   prior user queries are kept so the model can resolve pronouns
  *   like "its prereqs?" against the topic the user named earlier.
  *   Rendered as a "Earlier user queries" block right before the
- *   Question line, with Rule 5 in RESPONSE_INSTRUCTIONS pinning
+ *   Question line, with Rule 4 in RESPONSE_INSTRUCTIONS pinning
  *   their semantics to "reference only, not facts".
  */
 export function userPromptWithContext(

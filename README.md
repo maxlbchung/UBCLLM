@@ -1,6 +1,6 @@
 # UBCLLM
 
-Browser-native UBC academic-advisor chatbot. Gemma 4 E2B runs locally in your browser via WebGPU, answering academic questions grounded in a RAG corpus scraped from UBC's official course calendar. No backend inference, no API keys, no data leaves your machine after the initial model + data download.
+Browser-native UBC academic-advisor chatbot. Qwen 2.5 1.5B Instruct runs locally in your browser via WebGPU, answering academic questions grounded in a RAG corpus scraped from UBC's official course calendar. No backend inference, no API keys, no data leaves your machine after the initial model + data download.
 
 ## Architecture
 
@@ -19,7 +19,7 @@ UBC Calendar HTML                          User question
                                  │    system prompt + chunks + history
                                  │           │
                                  │           ▼
-                                 └──► WebLLM Gemma 4 E2B → streamed answer
+                                 └──► WebLLM Qwen 2.5 1.5B → streamed answer
 ```
 
 ## Project layout
@@ -27,7 +27,7 @@ UBC Calendar HTML                          User question
 - `web/` — Vite + React + TypeScript app (the only thing deployed)
 - `scraper/` — Python: crawls vancouver.calendar.ubc.ca, outputs JSON
 - `pipeline/` — Python: chunks JSON, computes embeddings, writes static assets
-- `smoke-test/` — One-off page to verify WebGPU + Gemma 4 E2B work in your browser
+- `smoke-test/` — One-off page to verify WebGPU + Qwen 2.5 1.5B work in your browser
 
 ## Build pipeline
 
@@ -43,4 +43,4 @@ cd web      && npm run build                # static site → web/dist/
 
 - Node 20+, Python 3.11+ (3.12 recommended for the pipeline; sentence-transformers wheels may lag on 3.14), `uv`, git
 - A browser with WebGPU enabled — Chrome 113+ or Edge 113+
-- ~2 GB free disk for the Gemma 4 E2B weights (cached in IndexedDB after first visit)
+- ~1 GB free disk for the Qwen 2.5 1.5B Instruct (q4f16) weights (cached in IndexedDB after first visit)

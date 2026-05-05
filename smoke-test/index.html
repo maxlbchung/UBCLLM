@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>UBCLLM &mdash; Gemma 4 E2B WebGPU Smoke Test</title>
+    <title>UBCLLM &mdash; Qwen 2.5 1.5B WebGPU Smoke Test</title>
     <style>
       :root { color-scheme: dark; }
       * { box-sizing: border-box; }
@@ -95,11 +95,11 @@
   <body>
     <main>
       <header>
-        <h1>UBCLLM &mdash; Gemma 4 E2B WebGPU Smoke Test</h1>
+        <h1>UBCLLM &mdash; Qwen 2.5 1.5B WebGPU Smoke Test</h1>
         <p class="sub">
-          Verifies (a) WebGPU is enabled in this browser, (b) WebLLM can download Gemma 4 E2B,
+          Verifies (a) WebGPU is enabled in this browser, (b) WebLLM can download Qwen 2.5 1.5B Instruct,
           and (c) generation actually streams. Runs entirely on your machine. First load downloads
-          ~1.5&ndash;2&nbsp;GB; cached in IndexedDB after that.
+          ~1&nbsp;GB; cached in IndexedDB after that.
         </p>
       </header>
 
@@ -117,7 +117,7 @@
       </section>
 
       <section class="panel">
-        <label for="model-select">Model (auto-filtered to Gemma 4 E2B variants)</label>
+        <label for="model-select">Model (auto-filtered to Qwen 2.5 1.5B Instruct variants)</label>
         <div class="row">
           <select id="model-select" disabled>
             <option>Loading model list&hellip;</option>
@@ -177,7 +177,7 @@
         }
       }
 
-      // 2. Load WebLLM and surface Gemma 4 E2B variants
+      // 2. Load WebLLM and surface Qwen 2.5 1.5B Instruct variants
       let webllm;
       try {
         webllm = await import("https://esm.run/@mlc-ai/web-llm");
@@ -191,18 +191,26 @@
 
       if (webllm) {
         const models = webllm.prebuiltAppConfig?.model_list ?? [];
-        // Match anything that smells like Gemma 4 E2B; if none, fall back to all Gemma models so the user can see options.
-        const isE2B = (id) => /gemma[\-_]?4.*e2b/i.test(id);
-        const isGemma = (id) => /gemma/i.test(id);
-        let candidates = models.filter((m) => isE2B(m.model_id));
+        // Match Qwen 2.5 1.5B Instruct, excluding the Coder/Math siblings
+        // that share the "1.5B-Instruct" stem. Fall back to any Qwen
+        // 1.5B Instruct, then any Qwen, so the user always sees options.
+        const isExcluded = (id) => /coder|math/i.test(id);
+        const isQwen25_15B = (id) => /qwen[\-_]?2\.?5[\-_]1\.?5b[\-_]instruct/i.test(id) && !isExcluded(id);
+        const isQwen15B = (id) => /qwen.*1\.?5b.*instruct/i.test(id) && !isExcluded(id);
+        const isQwen = (id) => /qwen/i.test(id);
+        let candidates = models.filter((m) => isQwen25_15B(m.model_id));
         let note = "";
         if (candidates.length === 0) {
-          candidates = models.filter((m) => isGemma(m.model_id));
-          note = " (no Gemma 4 E2B match found; showing all Gemma variants)";
+          candidates = models.filter((m) => isQwen15B(m.model_id));
+          note = " (no Qwen 2.5 1.5B Instruct match; showing other Qwen 1.5B Instruct variants)";
         }
         if (candidates.length === 0) {
-          modelSelect.innerHTML = `<option>No Gemma models in WebLLM prebuilt list (${models.length} total models)</option>`;
-          progressText.textContent = "WebLLM has " + models.length + " prebuilt models but none match Gemma. Check the WebLLM version or model registry.";
+          candidates = models.filter((m) => isQwen(m.model_id));
+          note = " (no Qwen 1.5B Instruct match; showing all Qwen variants)";
+        }
+        if (candidates.length === 0) {
+          modelSelect.innerHTML = `<option>No Qwen models in WebLLM prebuilt list (${models.length} total models)</option>`;
+          progressText.textContent = "WebLLM has " + models.length + " prebuilt models but none match Qwen. Check the WebLLM version or model registry.";
           progressText.style.color = "#fcd34d";
         } else {
           modelSelect.innerHTML = candidates.map((m) => `<option value="${m.model_id}">${m.model_id}</option>`).join("");

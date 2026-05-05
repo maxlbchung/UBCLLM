@@ -167,7 +167,7 @@ export function ModelLoader({ children }: { children: ReactNode }) {
             </>
           ) : (
             <p className="text-xs text-zinc-500 max-w-md">
-              UBCLLM needs WebGPU and ~2 GB of memory. Try Chrome 113+ or Edge 113+ on a desktop with a recent GPU.
+              UBCLLM needs WebGPU and ~2 GB of GPU memory. Try Chrome 113+ or Edge 113+ on a desktop with a recent GPU.
             </p>
           )}
         </div>
@@ -179,15 +179,15 @@ export function ModelLoader({ children }: { children: ReactNode }) {
   if (!s.ready) {
     // Heading: switch to "Loading from cache" once we know the weights are
     // already in IndexedDB, so a returning user immediately sees that this
-    // isn't another 1–2 GB download. Stays as "Loading Gemma 4 E2B" for
+    // isn't another ~1 GB download. Stays as "Loading Qwen 2.5 1.5B" for
     // both unknown (pre-classification) and cold paths — the cold caption
     // below already calls out the download size.
     const heading =
-      s.mode === 'warm' ? 'Loading Gemma 4 E2B from cache' : 'Loading Gemma 4 E2B'
+      s.mode === 'warm' ? 'Loading Qwen 2.5 1.5B from cache' : 'Loading Qwen 2.5 1.5B'
     const caption =
       s.mode === 'warm'
         ? 'Reusing the model weights cached in your browser from a previous visit — no re-download needed.'
-        : "First load downloads the model (~1–2 GB). It's cached in your browser, so the next visit starts instantly."
+        : "First load downloads the model (~1 GB). It's cached in your browser, so the next visit starts instantly."
     return (
       <>
         <div className="flex flex-col items-center justify-center h-screen p-8 gap-4">

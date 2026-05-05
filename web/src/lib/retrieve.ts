@@ -27,9 +27,9 @@ const COURSE_KEYWORD_RE = /\b(course|courses|class|classes)\b/i
 
 // ---------- Source-block token budget ----------
 //
-// Gemma 2 2B (the model `pickModelId()` actually selects, despite the
-// "Gemma 4 E2B" branding) runs with a 4096-token context window. WebLLM
-// pre-flight checks numPromptTokens > contextWindowSize and throws
+// Qwen 2.5 1.5B Instruct (the model `pickModelId()` selects) runs with a
+// 4096-token context window in WebLLM's prebuilt config. WebLLM pre-flight
+// checks numPromptTokens > contextWindowSize and throws
 // ContextWindowSizeExceededError, which our streamChat does NOT recognize
 // as recoverable — so an over-budget prompt surfaces as a chat error.
 // To prevent that, every retrieval mode runs its candidate list through
@@ -46,8 +46,8 @@ const COURSE_KEYWORD_RE = /\b(course|courses|class|classes)\b/i
 // 4096.
 const SOURCE_TOKEN_BUDGET = 1100
 
-// Conservative chars/token estimate for Gemma's SentencePiece tokenizer on
-// English calendar text. Real ratio averages ~3.5; using 4 keeps us on the
+// Conservative chars/token estimate for Qwen's BPE tokenizer on English
+// calendar text. Real ratio averages ~3.5–4; using 4 keeps us on the
 // over-estimate side so the budget cuts off before the model's hard limit
 // kicks in. Good enough without paying the cost of running an actual
 // tokenizer in the browser.

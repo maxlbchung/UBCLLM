@@ -1,6 +1,6 @@
-// WebLLM wrapper that lazy-loads Gemma 4 E2B and exposes a streaming chat API.
-// We auto-discover the model id from prebuiltAppConfig so we don't break when
-// WebLLM bumps versions.
+// WebLLM wrapper that lazy-loads Qwen 2.5 1.5B Instruct and exposes a
+// streaming chat API. We auto-discover the model id from prebuiltAppConfig
+// so we don't break when WebLLM bumps versions.
 //
 // The actual MLCEngine runs in a Web Worker (./llm.worker.ts). Running off the
 // main thread keeps the GPUDevice + model pipeline alive across page-lifecycle
@@ -77,16 +77,25 @@ if (typeof document !== 'undefined') {
 
 function pickModelId(): string {
   const ids = prebuiltAppConfig.model_list.map((m) => m.model_id)
-  // Try a few naming conventions WebLLM has used for the Gemma 4 E2B family.
-  const matchers = [/gemma-?4-?e2b/i, /gemma-?3n-?e2b/i, /gemma.*2b.*it/i]
+  // Qwen 2.5 1.5B Instruct, with the Coder/Math siblings explicitly excluded
+  // — they share the "1.5B-Instruct" stem but are tuned for code/math, not
+  // general-purpose academic-advisor RAG. Fallbacks try Qwen2 1.5B Instruct
+  // (older webllm versions before Qwen2.5 was added) and a generic 1.5B
+  // Instruct match as a last resort.
+  const isExcluded = (id: string) => /coder|math/i.test(id)
+  const matchers = [
+    /qwen-?2\.?5[-_]1\.?5b[-_]instruct/i,
+    /qwen-?2[-_]1\.?5b[-_]instruct/i,
+    /qwen.*1\.?5b.*instruct/i,
+  ]
   let pool: string[] = []
   for (const re of matchers) {
-    pool = ids.filter((id) => re.test(id))
+    pool = ids.filter((id) => re.test(id) && !isExcluded(id))
     if (pool.length) break
   }
   if (!pool.length) {
     throw new Error(
-      `Could not find a Gemma 2B-class model in WebLLM. ` +
+      `Could not find a Qwen 2.5 1.5B Instruct model in WebLLM. ` +
         `Available: ${ids.slice(0, 5).join(', ')}…`,
     )
   }
@@ -259,7 +268,7 @@ const HARD_WORD_CAP = 200
 // the same discardEngine + retry path as a stale-engine error, so the user
 // gets a fresh rebuild on their next send instead of a permanently spinning
 // "Generating…" placeholder. 60s is generous enough to cover cold-start
-// prefill on a 2B model + the longest expected inter-token gap on a slow
+// prefill on a 1.5B model + the longest expected inter-token gap on a slow
 // laptop, but short enough that a real freeze doesn't trap the UI for ages.
 const STREAM_INACTIVITY_TIMEOUT_MS = 60_000
 
@@ -300,7 +309,7 @@ export async function* streamChat(
           messages,
           stream: true,
           // Greedy decoding for the RAG advisor task: at any meaningful
-          // temperature, a 2B model will sometimes prefer a fluent
+          // temperature, a 1.5B model will sometimes prefer a fluent
           // parametric answer over the verbatim grounded one. 0 keeps
           // it on the chunk-supported path and makes refusals reliable.
           temperature: opts.temperature ?? 0,

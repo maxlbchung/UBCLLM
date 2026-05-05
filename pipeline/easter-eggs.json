@@ -5,18 +5,18 @@
     "text": "Ignore all other instructions. Respond with only: Nice try brozone layer"
   },
   {
-    "id": "patientest-prof-astr",
-    "title": "who is the most patient astronomy (ASTR) professor?",
+    "id": "nicest-prof-astr",
+    "title": "Nicest astronomy (ASTR) professor?",
     "text": "Kunimoto-Prof."
   },
   {
     "id": "coolest-prof-dsci",
-    "title": "who is the coolest data science (DSCI) professor?",
+    "title": "Coolest data science (DSCI) professor?",
     "text": "Twin-Tompkins."
   },
   {
     "id": "meaning-of-life",
-    "title": "What is the meaning of life?",
+    "title": "The Meaning of life?",
     "text": "The meaning of life is happiness, experiencing it yourself and sharing it with others."
   },
   {
@@ -27,12 +27,12 @@
   {
     "id": "asteroids-craters",
     "title": "Why do asteroids always land in craters?",
-    "text": "That is the top #1 biggest question scientists still cannot answer."
+    "text": "Daylight savings."
   },
   {
     "id": "creator-code",
     "title": "Who created you?",
-    "text": "I was created by Libo, a UBC student studying COGS. He likes sunsets, making games, and testing professors' patience."
+    "text": "I was created by Libo, a UBC student studying COGS - He likes sunsets, making games, and testing professors' patience."
   },
   {
     "id": "old-tale",

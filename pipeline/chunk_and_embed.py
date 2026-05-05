@@ -257,7 +257,16 @@ def main() -> None:
     log.info("Loading embedding model %s", MODEL_NAME)
     model = SentenceTransformer(MODEL_NAME)
 
-    texts = [c.text for c in chunks]
+    # Embed easter chunks from their TITLE alone, not title+body. The body
+    # is the curated answer (often long-form prose), and concatenating it
+    # into the embedding dilutes the title's semantic signature — e.g.
+    # "What is the Old tale?" with a 60-word answer body lands at cosine
+    # 0.55 against the verbatim query "what is the old tale?", below the
+    # easter retrieval floor. Embedding the title only puts that same
+    # query at cosine ~1.0, so on-topic queries actually fire the easter.
+    # The full text (title+body) still goes into chunks.json for the LLM
+    # to see at generation time; only the embedding source changes.
+    texts = [c.title if c.kind == "easter" else c.text for c in chunks]
     log.info("Embedding %d chunks (batch=%d)…", len(texts), args.batch_size)
     embeddings = model.encode(
         texts,

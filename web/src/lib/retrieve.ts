@@ -277,18 +277,18 @@ export async function topK(
     }
   }
 
-  // Easter floor: an easter chunk only earns a slot when its score
-  // clears 1.0. Since easters no longer receive the program-title
-  // boost (see the boost block above), score == raw cosine for an
-  // easter, and raw cosine maxes at 1.0 — so this floor only admits
-  // an easter whose embedding is essentially identical to the user's
-  // query. In practice nothing crosses it, which means easters never
-  // surface; if that's the desired off switch, the floor stays. If
-  // you want easters back, lower this to ~0.7 (raw cosine equivalent
-  // of "strong on-topic match"). Setting score to -Infinity drops
-  // rejected easters below minScore in every downstream mode.
+  // Easter floor: an easter chunk only earns a slot when its raw
+  // cosine clears 0.7 — strong on-topic alignment, not just shared
+  // keywords. Easters no longer receive the program-title boost (see
+  // the boost block above), so score == raw cosine for an easter and
+  // this floor lives in raw-cosine space. The two reference cases:
+  //   "tell me about data science" → easter raw 0.55 → rejected ✓
+  //   "who is the best data science professor" → easter raw 0.83 →
+  //     passes, ranks #1, easterCollapse fires ✓
+  // Setting rejected easters to -Infinity drops them below minScore
+  // in every downstream mode.
   for (let i = 0; i < chunks.length; i++) {
-    if (chunks[i].kind === 'easter' && scores[i] <= 1) {
+    if (chunks[i].kind === 'easter' && scores[i] <= 0.7) {
       scores[i] = -Infinity
     }
   }

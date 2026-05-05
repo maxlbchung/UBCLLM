@@ -34,6 +34,42 @@ const HISTORY_TURNS = 3
 // clarifying question via userPromptWithContext's bareSubject parameter.
 const BARE_SUBJECT_RE = /^[A-Z]{3,5}(?:_V)?$/i
 
+// Same intent as BARE_SUBJECT_RE but for program / discipline names — a
+// user typing just "computer science" or "astronomy" with no question
+// attached pulls high-cosine course chunks for that subject, and the model
+// otherwise picks one and narrates it as if the user asked about it. Match
+// is exact on the lowercased, whitespace-collapsed, trailing-punctuation-
+// stripped query. Add new disciplines as the corpus grows; the
+// `program-title` boost in retrieve.ts already handles the same names
+// inside larger queries, this set is just the bare-token guard.
+const BARE_PROGRAM_NAMES = new Set([
+  'astronomy',
+  'biochemistry',
+  'biology',
+  'business',
+  'chemistry',
+  'cognitive science',
+  'cognitive sciences',
+  'commerce',
+  'computer science',
+  'computer sciences',
+  'data science',
+  'data sciences',
+  'economics',
+  'engineering',
+  'geography',
+  'kinesiology',
+  'math',
+  'maths',
+  'mathematics',
+  'philosophy',
+  'physics',
+  'political science',
+  'political sciences',
+  'psychology',
+  'sociology',
+])
+
 // Hard cap on composer input. Real questions are well under this; the cap
 // keeps the prefill bounded and prevents pathological pastes from blowing
 // past MiniLM's ~512-token window or eating the LLM's context budget.
@@ -95,9 +131,17 @@ export function Chat() {
     let llmMessages: ChatCompletionMessageParam[] = []
 
     try {
-      const bareSubject = BARE_SUBJECT_RE.test(q)
-        ? q.toUpperCase().replace(/_V$/, '')
-        : undefined
+      // Strip trailing punctuation + collapse whitespace before matching
+      // so "computer science.", "ASTR?", "data  science" all hit the bare
+      // path. Original-cased trimmed form is what we send into the prompt
+      // so the model echoes the user's term back naturally.
+      const trimmedQ = q.replace(/\s+/g, ' ').replace(/[.!?]+$/, '').trim()
+      const loweredQ = trimmedQ.toLowerCase()
+      const bareSubject = BARE_SUBJECT_RE.test(trimmedQ)
+        ? trimmedQ.toUpperCase().replace(/_V$/, '')
+        : BARE_PROGRAM_NAMES.has(loweredQ)
+          ? trimmedQ
+          : undefined
 
       let missingCodes: string[] = []
       if (!bareSubject) {

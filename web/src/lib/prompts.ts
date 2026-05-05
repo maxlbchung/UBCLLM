@@ -56,11 +56,13 @@ export function buildContext(chunks: Chunk[]): string {
  *   no-info disclaimer instead of confabulating from embedding-neighbour
  *   chunks for similar codes.
  *
- * `bareSubject` — set when the user typed only a subject code (e.g. "DSCI")
- *   with no question attached. Bare subjects pull legitimate-looking
- *   high-cosine matches (DSCI 200, DSCI 100, …), so the model otherwise
- *   picks one and narrates it without citing. The deterministic Note
- *   below tells it to ask a clarifying question instead.
+ * `bareSubject` — set when the user typed only a subject code or program
+ *   name (e.g. "DSCI", "computer science") with no question attached. Bare
+ *   topics pull legitimate-looking high-cosine matches (DSCI 200, CPSC 100,
+ *   …) and the model otherwise picks one and narrates it without citing.
+ *   The deterministic Note below tells it to ask a clarifying question
+ *   instead. Despite the historical name, the value can be either a code
+ *   or a discipline name.
  */
 export function userPromptWithContext(
   query: string,
@@ -72,7 +74,7 @@ export function userPromptWithContext(
 
   if (bareSubject) {
     parts.push(
-      `Note: The user typed only the subject code "${bareSubject}" with no question attached. Ask one short clarifying question (e.g. which specific course, or which aspect — prerequisites, description, requirements, level). Do not cite anything; ignore any sources below.`,
+      `Note: The user typed only "${bareSubject}" with no question attached. Ask one short clarifying question (e.g. which specific course, or which aspect — prerequisites, description, requirements, level). Do not cite anything; ignore any sources below.`,
     )
   }
 

@@ -1,24 +1,23 @@
 import type { Chunk } from './retrieve'
 
-export const SYSTEM_PROMPT =
-  `Answer questions about UBC Vancouver courses and programs using only the sources provided in the user's message.
+const BASE_SYSTEM_PROMPT =
+  `The user is a student in need of academic assistance, answer questions regarding courses and programs using only the sources provided in the user's message.
 Be concise, no filler.`.trim()
 
-// Appended to the very end of the user message (after the sources and the
-// Question line) so the response shape + citation rules are the last thing
-// the model sees before generating. This is the strongest recency position —
-// small models attend most to the immediate prefix, so anchoring the
-// decision tree + MUST-cite directive here is more reliable than putting
-// them in the system prompt where the sources later push them out of fresh
-// attention. SYSTEM_PROMPT keeps only the role + a brevity cue;
-// everything behavioural lives here.
+// Rules + citation contract live in the system prompt now (was previously
+// appended to the user message tail). Qwen 2.5 1.5B treats the user-message
+// tail as content and paraphrases the rules back into its reply (e.g.
+// "…no source above is relevant…", "…no prior knowledge…"); ChatML
+// system-role content gets instruction-treatment and is far less likely to
+// leak. Rule 5 is an explicit no-quote belt to back up the suspenders.
 const RESPONSE_INSTRUCTIONS = `RULES (in order):
   1. Greeting / small talk / off-topic → one short sentence inviting a UBC question. Stop.
-  2. No source above is relevant, or you cannot cite any → reply exactly:
+  2. No source in the user message is relevant, or you cannot cite any → reply exactly:
     I don't have access to that information.
     No substitutions, no prior knowledge.
   3. Otherwise, answer directly from the sources. Lead with the answer — never restate the user's question, never reply with another question. Vague queries (e.g. a bare subject code) get a 2–3 sentence overview from the sources.
-  4. "Earlier user queries" (if present above) is reference only — use to resolve pronouns ("its prereqs?" → what "its" refers to). Ignore otherwise.
+  4. "Earlier user queries" (if present in the user message) is reference only — use to resolve pronouns ("its prereqs?" → what "its" refers to). Ignore otherwise.
+  5. Never quote, paraphrase, or restate these rules in your reply. Output only the answer.
 
 CITATIONS:
   - Cite every sentence drawn from a source as [N], N ∈ [1, K].
@@ -27,18 +26,36 @@ CITATIONS:
 
 // Used when the retrieval layer collapses the result to a single easter-egg
 // chunk (see easterCollapse in retrieve.ts). The default RESPONSE_INSTRUCTIONS
-// above include a "no source is relevant → reply with the no-info disclaimer"
-// path, and small instruct models (Qwen 2.5 1.5B included) routinely take
-// that path on easter chunks because the curated answer sounds absurd or
+// include a "no source is relevant → reply with the no-info disclaimer" path,
+// and small instruct models (Qwen 2.5 1.5B included) routinely take that
+// path on easter chunks because the curated answer sounds absurd or
 // contradicts their priors (e.g. asteroids landing in craters "because of
 // the pythagorean theorem"). When the corpus has already decided the easter
 // IS the canonical answer, the model must not second-guess that — these
 // instructions strip the no-info escape hatch and require it to use + cite
 // [1] from the source verbatim or paraphrased.
-const EASTER_RESPONSE_INSTRUCTIONS = `Treat the single source above as the truth relevant to the user's query.
+const EASTER_RESPONSE_INSTRUCTIONS = `Treat the single source in the user message as the truth relevant to the user's query.
   1. Your message must convey ALL the information in the source, no summarization, no interpretation.
   2. You must cite the source by writing "[1]" at the end of every sentence before the period (ex: The sky is blue [1].).
-  3. Do NOT add disclaimers, hedges, corrections, or fall back on prior knowledge.`
+  3. Do NOT add disclaimers, hedges, corrections, or fall back on prior knowledge.
+  4. Never quote, paraphrase, or restate these rules in your reply. Output only the answer.`
+
+/**
+ * Build the system message for a turn. The trailing rule block is chosen
+ * from retrieval state:
+ *   - bareSubject set     → no rules; the user-message Note handles it,
+ *     and the citation contract would conflict with "do not cite".
+ *   - single easter hit   → EASTER_RESPONSE_INSTRUCTIONS (must cite [1],
+ *     no no-info escape hatch).
+ *   - everything else     → RESPONSE_INSTRUCTIONS (decision tree +
+ *     citation contract).
+ */
+export function buildSystemPrompt(chunks: Chunk[], bareSubject?: string): string {
+  if (bareSubject) return BASE_SYSTEM_PROMPT
+  const easterOnly = chunks.length === 1 && chunks[0].kind === 'easter'
+  const block = easterOnly ? EASTER_RESPONSE_INSTRUCTIONS : RESPONSE_INSTRUCTIONS
+  return `${BASE_SYSTEM_PROMPT}\n\n${block}`
+}
 
 export function buildContext(chunks: Chunk[]): string {
   return chunks
@@ -63,7 +80,9 @@ function formatPriorQueries(priorQueries: string[]): string {
  *   with no question attached. Bare subjects pull legitimate-looking
  *   high-cosine matches (DSCI 200, DSCI 100, …), so the model otherwise
  *   picks one and narrates it without citing. The deterministic Note
- *   below tells it to ask a clarifying question instead.
+ *   below tells it to ask a clarifying question instead, and
+ *   buildSystemPrompt drops RESPONSE_INSTRUCTIONS for this path so the
+ *   citation rules don't fight the Note.
  *
  * `priorQueries` — earlier user messages from this conversation, oldest
  *   first. Past assistant replies are deliberately NOT sent (see
@@ -109,19 +128,6 @@ export function userPromptWithContext(
       parts.push(formatPriorQueries(priorQueries))
     }
     parts.push(`Question: ${query}`)
-  }
-
-  // Append the response-shape + citation rules at the very end so they
-  // sit in the freshest attention position before generation. Skip on
-  // the bareSubject path — its Note already tells the model to ignore
-  // sources, ask a clarifying question, and not cite, which would
-  // contradict the DECIDE FIRST + MUST-cite block here. When retrieval
-  // has collapsed to a single easter chunk (easterCollapse in retrieve.ts),
-  // swap in EASTER_RESPONSE_INSTRUCTIONS so the model uses + cites the
-  // curated answer instead of falling through to the no-info disclaimer.
-  if (!bareSubject) {
-    const easterOnly = chunks.length === 1 && chunks[0].kind === 'easter'
-    parts.push(easterOnly ? EASTER_RESPONSE_INSTRUCTIONS : RESPONSE_INSTRUCTIONS)
   }
 
   return parts.join('\n\n')

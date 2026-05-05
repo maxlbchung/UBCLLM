@@ -7,7 +7,7 @@ import {
   type Chunk,
 } from '../lib/retrieve'
 import { getDiagSnapshot, streamChat } from '../lib/llm'
-import { SYSTEM_PROMPT, userPromptWithContext } from '../lib/prompts'
+import { buildSystemPrompt, userPromptWithContext } from '../lib/prompts'
 import {
   makeMessage,
   useChat,
@@ -142,7 +142,7 @@ export function Chat() {
       // the model sees them as reference-only context, not as authoritative
       // prior answers.
       llmMessages = [
-        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'system', content: buildSystemPrompt(sources, bareSubject) },
         {
           role: 'user',
           content: userPromptWithContext(

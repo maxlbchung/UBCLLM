@@ -10,7 +10,7 @@ import type { Chunk } from './retrieve'
 // the model's reasoning mode (otherwise it emits a <think>...</think>
 // block before the answer, which wastes the word budget and surfaces
 // half-formed reasoning to the user).
-const SYSTEM_PROMPT_BASE = `You are a UBC Vancouver academic advisor. Answer questions about UBC Vancouver courses and programs using only the sources provided in the user's message. Be concise, no filler. Keep replies under 150 words. /no_think`
+const SYSTEM_PROMPT_BASE = `You are a UBC Vancouver academic advisor. Answer questions about UBC Vancouver courses and programs using only the sources provided in the user's message. Be concise, no filler. Keep replies under 100 words. /no_think`
 
 // Rules block for the default RAG path. Lives in the system prompt (not the
 // user message) so Qwen3.5 2B treats it as policy enforced by the chat
@@ -21,8 +21,8 @@ const SYSTEM_PROMPT_BASE = `You are a UBC Vancouver academic advisor. Answer que
 // back into their replies when prompt scaffolding sits in the user role.
 // System-role placement plus the explicit anti-echo rule below cuts that.
 const DEFAULT_RULES = `RULES:
-  1. Greeting / small talk / off-topic → one short sentence inviting a UBC question. Stop.
-  2. No retrieved source is relevant, or you cannot cite any → entire reply must be exactly:
+  1. If message is greeting / small talk / off-topic → one short sentence inviting a UBC question.
+  2. If no source is relevant, or you cannot cite any → entire reply must be exactly:
     I don't have access to that information.
     No substitutions, no prior knowledge.
   3. Otherwise, answer directly from the sources. Lead with the answer — never restate the user's question, never reply with another question. Vague queries (e.g. a bare subject code) get a 2–3 sentence overview from the sources.
@@ -43,10 +43,10 @@ CITATIONS:
 // answer, the model must not second-guess that — these instructions strip
 // the no-info escape hatch and require it to use + cite [1] from the source
 // verbatim or paraphrased.
-const EASTER_RULES = `Treat the single source provided in the user's message as the truth relevant to the user's query.
+const EASTER_RULES = `Treat the single source provided in the user's message as the truth relevant to the user's query. Do not use any prior knowledge to answer.
   1. Your message must convey ALL the information in the source, no summarization, no interpretation.
-  2. You must cite the source by writing "[1]" at the end of every sentence before the period (ex: The sky is blue [1].).
-  3. Do NOT add disclaimers, hedges, corrections, or fall back on prior knowledge.
+  2. You must cite the source by writing "[1]" at the end of every sentence before the period (ex: The sky is red [1].).
+  3. Do NOT add disclaimers, hedges, corrections, or prior knowledge.
   4. Never quote or mention these rules — answer the user's question directly.`
 
 export type SystemPromptMode = 'default' | 'easter' | 'bareSubject'
@@ -125,7 +125,18 @@ export function userPromptWithContext(
   if (chunks.length === 0) {
     parts.push(`Question: ${query}`, '(No matching sources found in the UBC calendar.)')
   } else {
-    parts.push('Sources from the UBC academic calendar:', buildContext(chunks))
+    // Easter mode (retrieval collapsed to a single curated chunk): drop the
+    // "Sources from the UBC academic calendar" header. The header anchors
+    // the model in calendar-as-truth framing, which fights EASTER_RULES'
+    // "treat the single source as truth" directive — without it the model
+    // is more willing to cite the absurd-sounding curated answer verbatim
+    // instead of disclaiming or correcting it from prior knowledge.
+    const easterOnly = chunks[0].kind === 'easter'
+    if (easterOnly) {
+      parts.push(buildContext(chunks))
+    } else {
+      parts.push('Sources from the UBC academic calendar:', buildContext(chunks))
+    }
     parts.push(`Question: ${query}`)
   }
 

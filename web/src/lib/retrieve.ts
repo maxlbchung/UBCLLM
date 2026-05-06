@@ -197,14 +197,21 @@ function dot(a: Float32Array, b: Float32Array, offset: number): number {
   return s
 }
 
-// If the top-ranked chunk in `out` is an easter-egg entry, drop everything
-// after it. Easter chunks are hand-curated Q&A pairs — when one wins the
-// top slot it IS the canonical answer, and surfacing additional sources
-// alongside it just gives the LLM material to confabulate from or cite
-// over the curated answer. Mode A doesn't return easter chunks at all,
-// so this only matters for Mode B and Mode C.
+// Easter chunks are hand-curated Q&A pairs that only make sense in their
+// canonical-answer slot. Two outcomes:
+//   - Top-ranked chunk IS an easter → drop everything after it. The easter
+//     IS the answer; additional sources just give the LLM material to
+//     confabulate from or cite over the curated answer.
+//   - Top-ranked chunk is NOT an easter → strip every easter chunk from the
+//     remainder. Surfacing easters lower in the source list lets them bleed
+//     into normal answers (the LLM might mix the curated quip into a
+//     prereq lookup, or cite an off-topic egg as a "related" source).
+// Mode A returns only courses (no easter chunks at all), so this only
+// matters for Mode B and Mode C.
 function easterCollapse(out: Chunk[]): Chunk[] {
-  return out.length > 0 && out[0].kind === 'easter' ? [out[0]] : out
+  if (out.length === 0) return out
+  if (out[0].kind === 'easter') return [out[0]]
+  return out.filter((c) => c.kind !== 'easter')
 }
 
 function estimateTokens(text: string): number {

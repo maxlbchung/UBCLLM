@@ -51,7 +51,7 @@ The full v1 stack from the original plan is shipped and live. Highlights:
 **App features shipped:**
 - **Chat** with streaming Qwen3.5 2B output, single-shot per turn (no chat history sent — fact-bleed prevention), RAG context from top-8 chunks per turn.
 - **Course Lookup** — one-shot detail card by code (case-insensitive: `CPSC 110` / `cpsc110` / `CPSC_V 110` all work).
-- **Prereq Tree** — full transitive BFS expansion, depth-capped at 12, cycle-safe; direct coreqs on the right (not transitively expanded). ReactFlow column layout, root on the right.
+- **Prereq Tree** — full transitive BFS expansion, depth-capped at 12, cycle-safe; direct coreqs on the right (not transitively expanded). Boolean structure modeled: `one of A, B, C` renders as a single dropdown block, `Either (a) … or (b) …` as a stacked group with radio selectors. Selecting an option swaps the upstream subtree to reflect the chosen branch. Custom ReactFlow node types in `DisjunctionNode.tsx` / `EitherOrNode.tsx`; column layout, root on the right.
 - **Sidebar** — conversation list (auto-titled from first user message), tool tabs, version badge bottom-left. Collapsible: toggle in the top-right shrinks it to a `w-12` strip; collapsed state is persisted via `useConversations.sidebarCollapsed`.
 - **Conversation persistence** — `localStorage` key `ubcllm-conversations` via `zustand/middleware/persist`; on reload the active conversation rehydrates into `useChat`.
 - **Citation surfacing** — `buildSystemPrompt('default')` requires `[N]` citations matching the bracketed numbering in `buildContext`; `ChatMessage` parses them, renders inline superscript chips linking to the chunk's UBC URL, and splits the sources panel into "Sources used" vs "Other retrieved context."
@@ -64,10 +64,10 @@ The full v1 stack from the original plan is shipped and live. Highlights:
 - **CI uses `npm install`, not `npm ci`**: the lockfile is generated on Windows and skips Linux-only platform-optional packages (e.g. `@tailwindcss/oxide-linux-x64-gnu` and its `@emnapi/*` transitives), so `npm ci` on the Ubuntu runner fails. `npm install` resolves them on the runner.
 - **`scraper/output/*.json` is committed.** Re-running the scraper hits UBC servers; the corpus snapshot in git is the source of truth that CI feeds to the pipeline.
 - **`web/public/data/{chunks.json, embeddings.bin}` are regenerated in CI**, not committed. Locally, run `cd pipeline && uv run chunk_and_embed.py` once after pulling, then `npm run dev`.
+- **Prereq AST parser** (`web/src/lib/prereqAst.ts`): recursive-descent over a small token alphabet (`one of`, `all of`, `either`, `and`, `or`, `;`, `.`, `,`, parens, branch labels, course codes, free text). Emits `Expr = And | Or-dropdown | Or-stacked | Code | Literal`. `parsePrereq` is null-safe for empty/whitespace input; unknown tokens collapse into `Literal` so the parser never throws on weird strings. `displayExpr` flattens an expression to a label string for dropdown / radio options. Top-level literals are dropped from the prereq tree (preserved as text in chat). Selection state in `PrereqTree` is keyed by `${ownerCourseCode}::${pathInExpr}` so toggling one disjunction doesn't perturb others, and selections persist across root-course switches.
 
 **Open opportunities** (none of these block daily use):
 - Programs crawl was capped at 800 — depth-4 leaves never reached. Bumping `--max-pages` would fill in deeper degree-requirement detail.
-- Boolean prereq parsing ("one of CPSC 107, CPSC 110") is shown as raw text in chat, not modeled in the prereq tree.
 - Sidebar can collapse, but there's no proper mobile drawer / hamburger pattern yet — small viewports still get the desktop layout, just narrower.
 - "Clear cache" affordance is only surfaced on the model-load error screen. No general-purpose cache reset button in the running app.
 

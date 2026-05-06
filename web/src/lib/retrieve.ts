@@ -8,13 +8,17 @@ const EMBED_DIM = 384
 // Minimum cosine similarity (post-boost) for a chunk to be returned by topK.
 // Course-code matches get +2 from the boost below and always pass; for
 // pure-semantic hits this is the floor. MiniLM-L6 puts most unrelated
-// short strings around 0.0–0.2, but a few greetings like "hi" cluster
-// surprisingly close to specific subjects (e.g. "hi" lands at 0.315 vs
-// HINU because the model learned "hi" → "hindi" in pretraining). 0.4
-// excludes those edge cases while real questions still sit at 0.5–0.7.
+// short strings around 0.0–0.2, and greetings like "hi" cluster surprisingly
+// close to specific subjects (e.g. "hi" lands at 0.315 vs HINU because the
+// model learned "hi" → "hindi" in pretraining). 0.5 excludes those edge
+// cases plus weakly-aligned tangential matches (a "data science" query
+// pulling 0.42-cosine stats / CS umbrella programs that aren't really
+// answering the question); real on-topic questions still sit at 0.5–0.7
+// raw and pass comfortably, especially with the +0.25 program-title and
+// +0.25 course-keyword boosts on top.
 // Tune: raise if irrelevant chunks leak through, lower if real questions
 // return empty.
-const MIN_SCORE = 0.4
+const MIN_SCORE = 0.5
 
 // When the user explicitly says "course"/"class" (incl. plurals), they
 // want a course chunk, not a program/faculty page. The matching `wantsCourses`
@@ -340,17 +344,21 @@ export async function topK(
   }
 
   // Easter floor: an easter chunk only earns a slot when its raw
-  // cosine clears 0.7 — strong on-topic alignment, not just shared
+  // cosine clears 0.75 — strong on-topic alignment, not just shared
   // keywords. Easters no longer receive the program-title boost (see
   // the boost block above), so score == raw cosine for an easter and
   // this floor lives in raw-cosine space. The two reference cases:
   //   "tell me about data science" → easter raw 0.55 → rejected ✓
   //   "who is the best data science professor" → easter raw 0.83 →
   //     passes, ranks #1, easterCollapse fires ✓
+  // Raised from 0.7 to 0.75 to suppress mid-strength matches where the
+  // egg's phrasing partly overlaps a generic query but isn't really the
+  // canonical answer (e.g. an "astronomy professor" egg firing on a
+  // bare "astronomy" query without the "who is" prefix).
   // Setting rejected easters to -Infinity drops them below minScore
   // in every downstream mode.
   for (let i = 0; i < chunks.length; i++) {
-    if (chunks[i].kind === 'easter' && scores[i] <= 0.7) {
+    if (chunks[i].kind === 'easter' && scores[i] <= 0.75) {
       scores[i] = -Infinity
     }
   }

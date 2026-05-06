@@ -1,10 +1,19 @@
-import { Handle, Position, type NodeProps } from 'reactflow'
+import { useEffect, useRef, useState } from 'react'
+import { Handle, Position, useReactFlow, type NodeProps } from 'reactflow'
 
 // ReactFlow custom node for an `Or-dropdown` group — used when the prereq
 // string says "one of A, B, C" (or a bare "A or B" without a wrapping
-// "either"). Renders as a single block with a <select> that lets the user
-// pick which option the upstream subtree should expand. Width matches
-// NODE_WIDTH in PrereqTree so column-layout x-coordinates stay valid.
+// "either"). Renders as a single block with a custom dropdown that lets
+// the user pick which option the upstream subtree should expand. Width
+// matches NODE_WIDTH in PrereqTree so column-layout x-coordinates stay
+// valid.
+//
+// We don't use a native `<select>` here. Native dropdown popups are
+// rendered by the OS outside the browser DOM, so they escape ReactFlow's
+// CSS transform — the closed control scales with the canvas zoom but the
+// open menu pops at native size. Building the menu as an absolutely-
+// positioned <div> inside the node's transformed container lets it scale
+// with the rest of the graph.
 
 export interface DisjunctionOption {
   display: string
@@ -36,7 +45,7 @@ export interface DisjunctionData {
   orientation?: 'horizontal' | 'vertical'
 }
 
-export function DisjunctionNode({ data }: NodeProps<DisjunctionData>) {
+export function DisjunctionNode({ id, data }: NodeProps<DisjunctionData>) {
   const { options, selectedIdx, onChange, detail, orientation = 'horizontal' } = data
   const detailKnown = detail?.kind === 'course' && detail.title !== null
   const detailUnknownCourse =
@@ -70,28 +79,12 @@ export function DisjunctionNode({ data }: NodeProps<DisjunctionData>) {
       >
         one of
       </div>
-      <select
-        value={selectedIdx}
-        onChange={(e) => onChange(Number(e.target.value))}
-        // Native <select> in a ReactFlow node — stop pointer events from
-        // bubbling to the canvas pan/zoom handlers when the user opens it.
-        onMouseDown={(e) => e.stopPropagation()}
-        style={{
-          width: '100%',
-          background: '#18181b',
-          border: '1px solid #3f3f46',
-          color: '#e5e7eb',
-          padding: '3px 4px',
-          borderRadius: 4,
-          fontSize: 11,
-        }}
-      >
-        {options.map((opt, i) => (
-          <option key={i} value={i}>
-            {opt.display}
-          </option>
-        ))}
-      </select>
+      <DropdownSelect
+        nodeId={id}
+        options={options}
+        selectedIdx={selectedIdx}
+        onChange={onChange}
+      />
       {detail && (
         <div
           style={{
@@ -110,6 +103,173 @@ export function DisjunctionNode({ data }: NodeProps<DisjunctionData>) {
         </div>
       )}
       <Handle type="source" position={sourcePos} />
+    </div>
+  )
+}
+
+// Zoom-friendly dropdown replacement for <select>. The trigger button is
+// a regular DOM element; the open menu is an absolutely-positioned <div>
+// inside the same transformed container as the node, so both inherit the
+// canvas zoom. Click-outside / mousedown-outside dismisses; pointer
+// events stop-propagating so they don't reach ReactFlow's pan/zoom
+// handlers and start a drag.
+function DropdownSelect({
+  nodeId,
+  options,
+  selectedIdx,
+  onChange,
+}: {
+  nodeId: string
+  options: DisjunctionOption[]
+  selectedIdx: number
+  onChange: (idx: number) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const wrapperRef = useRef<HTMLDivElement>(null)
+  const { setNodes } = useReactFlow()
+
+  // Click-outside-to-close. We listen for `pointerdown` (not `mousedown`)
+  // in the capture phase so the handler fires before any other listener
+  // can call preventDefault — ReactFlow's pane uses pointer events for
+  // pan/zoom and on some browsers preventDefault on pointerdown
+  // suppresses the synthesized mousedown, which is why a `mousedown`
+  // listener missed the canvas click here. Capture phase also bypasses
+  // the React root's event delegation so `e.stopPropagation()` calls on
+  // child handlers can't kill the listener either.
+  useEffect(() => {
+    if (!open) return
+    function handler(e: PointerEvent) {
+      if (!wrapperRef.current?.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('pointerdown', handler, true)
+    return () => document.removeEventListener('pointerdown', handler, true)
+  }, [open])
+
+  // Bump the parent node's zIndex while the menu is open. Each ReactFlow
+  // node creates its own stacking context, so the menu's local zIndex
+  // only orders elements inside this node — to paint over sibling nodes
+  // (which is what the user sees as "the menu being clipped by the next
+  // course block") the wrapper itself has to move forward in the
+  // sibling order. The cleanup restores zIndex on close + unmount.
+  useEffect(() => {
+    if (!open) return
+    setNodes((nodes) =>
+      nodes.map((n) => (n.id === nodeId ? { ...n, zIndex: 1000 } : n)),
+    )
+    return () => {
+      setNodes((nodes) =>
+        nodes.map((n) => (n.id === nodeId ? { ...n, zIndex: 0 } : n)),
+      )
+    }
+  }, [open, nodeId, setNodes])
+
+  const current = options[selectedIdx]?.display ?? ''
+
+  return (
+    <div ref={wrapperRef} style={{ position: 'relative', width: '100%' }}>
+      <button
+        type="button"
+        // Stop propagation on both pointerdown (capture-phase document
+        // listener fires before this, but stopping here keeps the canvas
+        // pan handler from starting a drag) and mousedown (covers
+        // browsers that haven't unified on pointer events).
+        onPointerDown={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation()
+          setOpen((o) => !o)
+        }}
+        style={{
+          width: '100%',
+          background: '#18181b',
+          border: '1px solid #3f3f46',
+          color: '#e5e7eb',
+          padding: '3px 4px',
+          borderRadius: 4,
+          fontSize: 11,
+          textAlign: 'left',
+          cursor: 'pointer',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: 4,
+          fontFamily: 'inherit',
+        }}
+      >
+        <span
+          style={{
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            flex: 1,
+          }}
+        >
+          {current}
+        </span>
+        <span style={{ color: '#71717a', fontSize: 9 }}>▾</span>
+      </button>
+      {open && (
+        <div
+          onPointerDown={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            right: 0,
+            marginTop: 2,
+            background: '#18181b',
+            border: '1px solid #52525b',
+            borderRadius: 4,
+            // High z-index so the menu paints over adjacent / next-row
+            // nodes that the menu might extend into vertically. ReactFlow
+            // node wrappers don't set explicit z-index by default, so 1000
+            // is enough to win the stacking race within this node's
+            // siblings.
+            zIndex: 1000,
+            maxHeight: 240,
+            overflowY: 'auto',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+          }}
+        >
+          {options.map((opt, i) => {
+            const isSelected = i === selectedIdx
+            return (
+              <div
+                key={i}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onChange(i)
+                  setOpen(false)
+                }}
+                onMouseEnter={(e) => {
+                  if (!isSelected) {
+                    ;(e.currentTarget as HTMLDivElement).style.background =
+                      '#1f1f22'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isSelected) {
+                    ;(e.currentTarget as HTMLDivElement).style.background =
+                      'transparent'
+                  }
+                }}
+                style={{
+                  padding: '4px 6px',
+                  fontSize: 11,
+                  lineHeight: 1.3,
+                  color: '#e5e7eb',
+                  background: isSelected ? '#27272a' : 'transparent',
+                  cursor: 'pointer',
+                  whiteSpace: 'normal',
+                }}
+              >
+                {opt.display}
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

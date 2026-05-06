@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import ReactFlow, {
   Background,
   Controls,
@@ -71,6 +71,25 @@ const DISJUNCTION_HEIGHT_WITH_DETAIL = 110
 const EITHEROR_HEADER = 30
 const EITHEROR_ROW = 36
 
+// Edge styling shared by every prereq / coreq edge in the graph. The
+// coreq label box (`labelBgStyle`) uses the same dark fill + border as
+// the course/program blocks so the floating label visually belongs in
+// the rest of the graph instead of popping out as a white pill — only
+// the stroke + text stay amber, which is enough to flag the edge as a
+// coreq without making the label box feel out of place.
+const PREREQ_EDGE_STYLE = {
+  style: { stroke: '#52525b', strokeWidth: 1.5 },
+} as const
+
+const COREQ_EDGE_STYLE = {
+  label: 'co-req',
+  style: { stroke: '#f59e0b', strokeWidth: 1.5 },
+  labelStyle: { fill: '#f59e0b', fontSize: 10 },
+  labelBgStyle: { fill: '#27272a', stroke: '#3f3f46', strokeWidth: 1 },
+  labelBgPadding: [4, 6] as [number, number],
+  labelBgBorderRadius: 4,
+} as const
+
 function heightOf(item: ColumnItem): number {
   if (item.kind === 'course') return COURSE_HEIGHT
   if (item.ui === 'dropdown') {
@@ -78,6 +97,101 @@ function heightOf(item: ColumnItem): number {
     return data.detail ? DISJUNCTION_HEIGHT_WITH_DETAIL : DISJUNCTION_HEIGHT
   }
   return EITHEROR_HEADER + item.optionCount * EITHEROR_ROW
+}
+
+// Pre-pass: walk the prereq tree once with the same selection logic the
+// main BFS uses, recording every dropdown absorption in a code → groupId
+// map. Running this *before* the main BFS guarantees the alias map is
+// fully populated up front, so that any course processed in the main BFS
+// (regardless of order) sees the alias and redirects its edge to the
+// dropdown — instead of attaching to a stale regular node that the
+// absorption later tries to suppress.
+function computeAbsorptions(
+  rootCode: string,
+  index: Map<string, Chunk>,
+  selections: Map<string, number>,
+): Map<string, string> {
+  const aliases = new Map<string, string>()
+  const visited = new Set<string>()
+
+  function visit(code: string, depth: number): void {
+    if (depth > MAX_DEPTH) return
+    if (visited.has(code)) return
+    visited.add(code)
+    const chunk = index.get(code)
+    if (!chunk) return
+    const parsed = parseCourseChunk(chunk)
+    const ast = parsePrereq(parsed.prerequisites)
+    if (ast) walkAst(ast, code, depth, '', false)
+    if (depth === 0) {
+      const coreqAst = parsePrereq(parsed.corequisites)
+      if (coreqAst) walkAst(coreqAst, code, 0, 'coreq', true)
+    }
+  }
+
+  function walkAst(
+    expr: Expr,
+    ownerCode: string,
+    depth: number,
+    path: string,
+    isCoreq: boolean,
+  ): void {
+    if (depth > MAX_DEPTH) return
+    switch (expr.kind) {
+      case 'and':
+        expr.children.forEach((child, i) =>
+          walkAst(child, ownerCode, depth, `${path}.and[${i}]`, isCoreq),
+        )
+        return
+      case 'or': {
+        const key = `${ownerCode}::${path}.or`
+        const groupId = `grp:${key}`
+        const chosenIdx = selections.get(key) ?? 0
+        const safeChosen = Math.max(0, Math.min(chosenIdx, expr.children.length - 1))
+        const chosenExpr = expr.children[safeChosen]
+        if (expr.ui === 'dropdown' && chosenExpr?.kind === 'code') {
+          // Last writer wins if the same code is the chosen option of two
+          // distinct dropdowns. Rare in practice; matches the main BFS's
+          // first-encountered semantics closely enough.
+          aliases.set(chosenExpr.code, groupId)
+        }
+        if (!chosenExpr) return
+        if (chosenExpr.kind === 'code') {
+          // Absorbed course's prereqs get walked inline by the main BFS
+          // for the prereq side (coreqs aren't transitive). Recurse here
+          // so deeper absorptions in the chain still get recorded.
+          if (!isCoreq) visit(chosenExpr.code, depth + 1)
+        } else if (chosenExpr.kind === 'and' || chosenExpr.kind === 'or') {
+          walkAst(
+            chosenExpr,
+            ownerCode,
+            depth + 1,
+            `${path}.or[${safeChosen}]`,
+            isCoreq,
+          )
+        }
+        return
+      }
+      case 'code':
+        // Coreq leaves don't expand transitively.
+        if (!isCoreq) visit(expr.code, depth + 1)
+        return
+      case 'literal':
+        return
+      case 'flattened':
+        // Walk the structured sub-expression of a flattened either-branch
+        // (a single Code, an Or-dropdown, an And of mixed atoms, …) so
+        // any deeper absorptions / structures land in the alias map the
+        // same way they would if the prose context wasn't around them.
+        if (expr.subExpr) {
+          walkAst(expr.subExpr, ownerCode, depth, `${path}.flat`, isCoreq)
+        }
+        return
+    }
+  }
+
+  visit(rootCode, 0)
+  return aliases
 }
 
 function buildGraph(
@@ -110,11 +224,14 @@ function buildGraph(
   const enqueued = new Set<string>([rootCode])
   const coreqIds = new Set<string>()
   // When a dropdown's chosen option is a course code, the dropdown block
-  // *is* that course in the graph — no separate course node trails it. We
-  // record the absorption here so that any *other* path that would have
-  // pointed an edge at the absorbed course code instead points at the
-  // dropdown's group id.
-  const codeAliases = new Map<string, string>()
+  // *is* that course in the graph — no separate course node trails it. Any
+  // *other* path that would have pointed an edge at the absorbed course
+  // code instead points at the dropdown's group id. We compute these
+  // aliases up front (pre-pass below) so the alias map is fully populated
+  // before the main BFS starts attaching edges — otherwise a course
+  // processed before the absorbing OR would slip in pointing at the
+  // wrong target.
+  const codeAliases = computeAbsorptions(rootCode, index, selections)
 
   type QItem = { code: string; parsed: ParsedCourse; depth: number }
   const queue: QItem[] = [{ code: rootCode, parsed: root, depth: 0 }]
@@ -163,6 +280,9 @@ function buildGraph(
         // course's identity so there's no trailing course node; the
         // either-or stacked variant doesn't absorb (each radio sub-block
         // already shows the option label inline).
+        // Resolve the dropdown's "selected detail". Aliasing was set up in
+        // the pre-pass (computeAbsorptions); here we only need the title
+        // for the rendered detail row.
         let dropdownDetail: DisjunctionDetail = null
         if (expr.ui === 'dropdown' && chosenExpr) {
           if (chosenExpr.kind === 'code') {
@@ -175,11 +295,6 @@ function buildGraph(
               code: chosenExpr.code,
               title: absorbedParsed?.title ?? null,
             }
-            // Mark the absorbed code so any other path that names it as a
-            // prereq points at this group instead of materializing a
-            // duplicate course node.
-            codeAliases.set(chosenExpr.code, groupId)
-            enqueued.add(chosenExpr.code)
           } else if (chosenExpr.kind === 'literal') {
             dropdownDetail = { kind: 'literal', text: chosenExpr.text }
           }
@@ -193,13 +308,7 @@ function buildGraph(
           ...(targetId === rootCode
             ? { targetHandle: isCoreq ? 'top-target' : 'left-target' }
             : {}),
-          ...(isCoreq
-            ? {
-                label: 'co-req',
-                style: { stroke: '#f59e0b', strokeWidth: 1.5 },
-                labelStyle: { fill: '#f59e0b', fontSize: 10 },
-              }
-            : { style: { stroke: '#52525b', strokeWidth: 1.5 } }),
+          ...(isCoreq ? COREQ_EDGE_STYLE : PREREQ_EDGE_STYLE),
         })
 
         if (!chosenExpr) return
@@ -242,6 +351,20 @@ function buildGraph(
               groupId,
               true,
             )
+          } else if (chosenExpr.kind === 'flattened') {
+            // Walk the flattened branch's structured sub-expression so
+            // embedded blocks (e.g. an inline "one of A, B") render as
+            // real upstream blocks feeding into this group.
+            if (chosenExpr.subExpr) {
+              walkAst(
+                chosenExpr.subExpr,
+                ownerCode,
+                depth + 1,
+                `${path}.or[${safeChosen}].flat`,
+                groupId,
+                true,
+              )
+            }
           }
           return
         }
@@ -258,6 +381,22 @@ function buildGraph(
             `${path}.or[${safeChosen}]`,
             groupId,
           )
+        } else if (chosenExpr.kind === 'flattened') {
+          // Flattened branch (e.g. "a score of 80% or higher in one of
+          // MATH 101, MATH 103"): display stays as the original prose on
+          // the sub-block, but the structured sub-expression — which may
+          // be a single Code, an Or-dropdown, or a mix — gets walked
+          // upstream so the user sees real blocks (and their transitive
+          // prereqs) trailing the literal.
+          if (chosenExpr.subExpr) {
+            walkAst(
+              chosenExpr.subExpr,
+              ownerCode,
+              depth + 1,
+              `${path}.or[${safeChosen}].flat`,
+              groupId,
+            )
+          }
         }
         // literal in stacked: terminates. The radio's text is the only
         // display.
@@ -270,6 +409,14 @@ function buildGraph(
       case 'literal':
         // Top-level literals carry no graph signal. Already preserved as
         // text in the chat view.
+        return
+      case 'flattened':
+        // Top-level flattened (rare — a flattened branch promoted by
+        // normalization or a single-branch either): walk the structured
+        // sub-expression directly into the current target.
+        if (expr.subExpr) {
+          walkAst(expr.subExpr, ownerCode, depth, `${path}.flat`, targetId, isCoreq)
+        }
         return
     }
   }
@@ -314,9 +461,7 @@ function buildGraph(
       source: sourceId,
       target: targetId,
       ...(targetId === rootCode ? { targetHandle: 'top-target' } : {}),
-      label: 'co-req',
-      style: { stroke: '#f59e0b', strokeWidth: 1.5 },
-      labelStyle: { fill: '#f59e0b', fontSize: 10 },
+      ...COREQ_EDGE_STYLE,
     })
     if (codeAliases.has(code)) return
     if (enqueued.has(code)) return
@@ -585,6 +730,13 @@ function buildGraph(
 // vertically and the user pans to reach lower courses. We feed `fitBounds`
 // a bbox with the chart's true horizontal extent and a 1-pixel height so
 // the horizontal axis always wins the zoom calculation.
+//
+// Important: `nodes` deliberately does NOT live in this effect's deps,
+// because every selection-change rebuilds the nodes array (new object
+// identity, new positions for some items) and we don't want to re-fit
+// the camera on every dropdown toggle. The effect re-runs only when
+// `fitKey` flips (initial mount, root-course lookup), and reads the
+// latest `nodes` via a ref so fitBounds always sees the current bbox.
 function HorizontalFitOnChange({
   nodes,
   fitKey,
@@ -593,13 +745,16 @@ function HorizontalFitOnChange({
   fitKey: string
 }) {
   const { fitBounds } = useReactFlow()
+  const nodesRef = useRef(nodes)
+  nodesRef.current = nodes
   useEffect(() => {
-    if (nodes.length === 0) return
+    const currentNodes = nodesRef.current
+    if (currentNodes.length === 0) return
     let minX = Infinity
     let maxX = -Infinity
     let minY = Infinity
     let maxY = -Infinity
-    for (const n of nodes) {
+    for (const n of currentNodes) {
       const x = n.position.x
       const y = n.position.y
       if (x < minX) minX = x
@@ -616,7 +771,7 @@ function HorizontalFitOnChange({
       },
       { padding: 0.05, duration: 200 },
     )
-  }, [nodes, fitKey, fitBounds])
+  }, [fitKey, fitBounds])
   return null
 }
 
@@ -628,8 +783,8 @@ const NODE_TYPES = {
 
 export function PrereqTree() {
   const [index, setIndex] = useState<Map<string, Chunk> | null>(null)
-  const [query, setQuery] = useState('CPSC 121')
-  const [activeCode, setActiveCode] = useState<string | null>('CPSC 121')
+  const [query, setQuery] = useState('COGS 300')
+  const [activeCode, setActiveCode] = useState<string | null>('COGS 300')
   // Per-disjunction selection map. Keys are `${ownerCourseCode}::${path}`
   // — stable across re-renders so toggling one selection doesn't disturb
   // unrelated ones. Defaults are option 0 when a key is absent, so the
@@ -661,18 +816,6 @@ export function PrereqTree() {
     const chunk = index.get(activeCode)
     return chunk ? parseCourseChunk(chunk) : null
   }, [index, activeCode])
-
-  // Hash the selections map into the fitKey so the view re-fits after a
-  // dropdown / radio change (column heights can shift when an either-or
-  // group's selected branch swaps a tall sub-tree in/out).
-  const selectionsKey = useMemo(
-    () =>
-      [...selections.entries()]
-        .map(([k, v]) => `${k}=${v}`)
-        .sort()
-        .join('|'),
-    [selections],
-  )
 
   function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -744,7 +887,7 @@ export function PrereqTree() {
             <Controls showInteractive={false} />
             <HorizontalFitOnChange
               nodes={graph.nodes}
-              fitKey={`${activeCode ?? ''}::${selectionsKey}`}
+              fitKey={activeCode ?? ''}
             />
           </ReactFlow>
         ) : (

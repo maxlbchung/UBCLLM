@@ -3,6 +3,7 @@ import ReactFlow, {
   Background,
   Controls,
   Position,
+  useReactFlow,
   type Edge,
   type Node,
 } from 'reactflow'
@@ -38,6 +39,7 @@ const MAX_DEPTH = 12 // safety cap; UBC chains rarely exceed 4–5
 
 const X_STEP = 280
 const Y_STEP = 90
+const NODE_WIDTH = 200
 
 function buildGraph(rootCode: string, index: Map<string, Chunk>): Graph {
   const rootChunk = index.get(rootCode)
@@ -143,13 +145,55 @@ function buildGraph(rootCode: string, index: Map<string, Chunk>): Graph {
           whiteSpace: 'pre-line',
           padding: isRoot ? 8 : 6,
           borderRadius: 6,
-          width: 200,
+          width: NODE_WIDTH,
         },
       })
     })
   }
 
   return { nodes, edges, depthCount }
+}
+
+// Horizontal-only auto-fit. ReactFlow's built-in `fitView` fits both axes,
+// so a tall narrow tree leaves big horizontal margins because the vertical
+// extent becomes the limiting factor. Spec: leftmost and rightmost blocks
+// stay in view at all times, even if that means the chart overflows
+// vertically and the user pans to reach lower courses. We feed `fitBounds`
+// a bbox with the chart's true horizontal extent and a 1-pixel height so
+// the horizontal axis always wins the zoom calculation.
+function HorizontalFitOnChange({
+  nodes,
+  fitKey,
+}: {
+  nodes: Node[]
+  fitKey: string
+}) {
+  const { fitBounds } = useReactFlow()
+  useEffect(() => {
+    if (nodes.length === 0) return
+    let minX = Infinity
+    let maxX = -Infinity
+    let minY = Infinity
+    let maxY = -Infinity
+    for (const n of nodes) {
+      const x = n.position.x
+      const y = n.position.y
+      if (x < minX) minX = x
+      if (x + NODE_WIDTH > maxX) maxX = x + NODE_WIDTH
+      if (y < minY) minY = y
+      if (y > maxY) maxY = y
+    }
+    fitBounds(
+      {
+        x: minX,
+        y: (minY + maxY) / 2,
+        width: maxX - minX,
+        height: 1,
+      },
+      { padding: 0.05, duration: 200 },
+    )
+  }, [nodes, fitKey, fitBounds])
+  return null
 }
 
 export function PrereqTree() {
@@ -233,14 +277,16 @@ export function PrereqTree() {
           <ReactFlow
             nodes={graph.nodes}
             edges={graph.edges}
-            fitView
-            fitViewOptions={{ padding: 0.2 }}
             nodesDraggable={false}
             nodesConnectable={false}
             proOptions={{ hideAttribution: true }}
           >
             <Background color="#27272a" gap={16} />
             <Controls showInteractive={false} />
+            <HorizontalFitOnChange
+              nodes={graph.nodes}
+              fitKey={activeCode ?? ''}
+            />
           </ReactFlow>
         ) : (
           <div className="h-full flex items-center justify-center text-zinc-500 text-sm">

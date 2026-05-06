@@ -262,6 +262,13 @@ let chainTail: Promise<void> = Promise.resolve()
 // to recompute on every delta without a real tokenizer.
 const HARD_WORD_CAP = 300
 
+// Qwen3.5 emits a leading "<think></think>" (sometimes with internal
+// whitespace) before the actual answer, even with `/no_think` in the
+// system prompt. Strip the leading block only — once we've yielded any
+// post-</think> content, all further deltas pass through untouched.
+const THINK_OPEN = '<think>'
+const THINK_CLOSE = '</think>'
+
 // Inactivity timeout for the worker stream. If no delta arrives within this
 // window — counted from either stream-start or the last received delta — we
 // assume the worker is wedged (GPU process crash, silent device-lost, etc.)
@@ -316,6 +323,11 @@ export async function* streamChat(
           temperature: opts.temperature ?? 0,
         })
         let accumulated = ''
+        // Leading-<think>-block strip state. Buffer deltas until we can
+        // confirm whether the response opens with <think> or not, then
+        // either eat through </think> or flush the buffer untouched.
+        let prefixStripped = false
+        let prefixBuf = ''
         // Manual iteration (not for-await) so each next() can be raced
         // against an inactivity timer. for-await offers no hook to bail
         // out when the worker silently stops responding.
@@ -345,9 +357,29 @@ export async function* streamChat(
           const chunk = result.value
           const delta = chunk.choices[0]?.delta?.content
           if (delta) {
+            let toYield: string
+            if (prefixStripped) {
+              toYield = delta
+            } else {
+              prefixBuf += delta
+              if (prefixBuf.startsWith(THINK_OPEN)) {
+                const closeIdx = prefixBuf.indexOf(THINK_CLOSE)
+                if (closeIdx === -1) continue // wait for </think>
+                toYield = prefixBuf
+                  .slice(closeIdx + THINK_CLOSE.length)
+                  .replace(/^\s+/, '')
+                prefixStripped = true
+              } else if (THINK_OPEN.startsWith(prefixBuf)) {
+                continue // buffer might still grow into <think>
+              } else {
+                toYield = prefixBuf
+                prefixStripped = true
+              }
+            }
+            if (!toYield) continue
             yielded = true
-            yield delta
-            accumulated += delta
+            yield toYield
+            accumulated += toYield
             // Whitespace-token count is approximate during streaming
             // (a partial word like "wor" reads as one token until the
             // closing delta arrives) but converges to the real count

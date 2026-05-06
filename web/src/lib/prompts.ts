@@ -22,7 +22,7 @@ const SYSTEM_PROMPT_BASE = `You are a UBC Vancouver academic advisor. Answer que
 // System-role placement plus the explicit anti-echo rule below cuts that.
 const DEFAULT_RULES = `RULES:
   1. Greeting / small talk / off-topic → one short sentence inviting a UBC question. Stop.
-  2. No retrieved source is relevant, or you cannot cite any → reply exactly:
+  2. No retrieved source is relevant, or you cannot cite any → entire reply must be exactly:
     I don't have access to that information.
     No substitutions, no prior knowledge.
   3. Otherwise, answer directly from the sources. Lead with the answer — never restate the user's question, never reply with another question. Vague queries (e.g. a bare subject code) get a 2–3 sentence overview from the sources.

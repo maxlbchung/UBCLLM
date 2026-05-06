@@ -14,7 +14,7 @@ const EMBED_DIM = 384
 // cases plus weakly-aligned tangential matches (a "data science" query
 // pulling 0.42-cosine stats / CS umbrella programs that aren't really
 // answering the question); real on-topic questions still sit at 0.5–0.7
-// raw and pass comfortably, especially with the +0.25 program-title and
+// raw and pass comfortably, especially with the +0.3 program-title and
 // +0.25 course-keyword boosts on top.
 // Tune: raise if irrelevant chunks leak through, lower if real questions
 // return empty.
@@ -23,7 +23,7 @@ const MIN_SCORE = 0.5
 // When the user explicitly says "course"/"class" (incl. plurals), they
 // want a course chunk, not a program/faculty page. The matching `wantsCourses`
 // flag in topK does three things: adds +0.25 to every course chunk so they
-// outrank similarly-scored programs, suppresses the +0.5 program-title boost
+// outrank similarly-scored programs, suppresses the +0.3 program-title boost
 // (so the umbrella program page can't dominate via the boost), and skips
 // Mode B entirely (so an alias hit like "ASTR" doesn't restrict the result
 // to programs/easters when the user asked for courses).
@@ -158,9 +158,9 @@ export interface Chunk {
   text: string
   url: string
   // Set by topK on returned chunks (post-boost ranking score). Pure cosine
-  // is in [-1, 1]; a chunk can pick up at most +0.5 program-title and
+  // is in [-1, 1]; a chunk can pick up at most +0.3 program-title and
   // +0.25 course-keyword on top, so the realistic envelope is roughly
-  // [-1, 1.75]. Undefined for chunks read straight from the corpus or
+  // [-1, 1.55]. Undefined for chunks read straight from the corpus or
   // rehydrated from older persisted conversations that pre-date this field.
   score?: number
 }
@@ -282,7 +282,7 @@ export async function topK(
   // program / faculty / school overview chunk under individual courses
   // (more chunks, denser titles), so a query like "tell me about astronomy",
   // "what is CPSC", or "tell me about Sauder" shows individual course chunks
-  // before the actual program/faculty page. Add +0.5 to any program OR
+  // before the actual program/faculty page. Add +0.3 to any program OR
   // easter chunk whose title (lowercased) contains a query token of length ≥ 4.
   // Easter chunks share this boost so the hand-curated Q&A entries can
   // compete on equal terms when their title aligns with the query — they're
@@ -310,17 +310,17 @@ export async function topK(
       // Boost programs only — easter chunks intentionally do NOT receive
       // the title-match lift. Easters are hand-curated Q&A entries; if
       // they win, they should win on raw cosine alignment to the user's
-      // exact phrasing, not on shared topic keywords. With +0.25 (down
-      // from +0.5) on programs, an off-target query like "tell me about
-      // data science" leaves the easter at raw 0.55 vs the top program
-      // at 0.44 + 0.25 = 0.69, so the program wins; a targeted query
-      // like "who is the best data science professor" puts the easter
-      // at raw 0.83 vs the top program at ~0.65, so the easter wins
-      // and easterCollapse fires.
+      // exact phrasing, not on shared topic keywords. With +0.3 (down
+      // from +0.5, then nudged up from +0.25) on programs, an off-target
+      // query like "tell me about data science" leaves the easter at raw
+      // 0.55 vs the top program at 0.44 + 0.3 = 0.74, so the program wins;
+      // a targeted query like "who is the best data science professor"
+      // puts the easter at raw 0.83 vs a non-matching top program (no
+      // boost), so the easter still wins and easterCollapse fires.
       if (c.kind !== 'program') continue
       const title = c.title.toLowerCase()
       if (programNeedles.some((n) => title.includes(n))) {
-        scores[i] += 0.25
+        scores[i] += 0.3
       }
     }
   }

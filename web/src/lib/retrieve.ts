@@ -14,16 +14,29 @@ const EMBED_DIM = 384
 // cases plus weakly-aligned tangential matches (a "data science" query
 // pulling 0.42-cosine stats / CS umbrella programs that aren't really
 // answering the question); real on-topic questions still sit at 0.5–0.7
-// raw and pass comfortably, especially with the +0.3 program-title and
-// +0.25 course-keyword boosts on top.
+// raw and pass comfortably, especially with the +0.25 program-title,
+// +0.1 buddy, and +0.25 course-keyword boosts on top.
 // Tune: raise if irrelevant chunks leak through, lower if real questions
 // return empty.
 const MIN_SCORE = 0.5
 
+// Score nudge applied to "buddy" chunks of the top-ranked program slice.
+// When the #1 chunk in the corpus is a program slice (e.g.
+// program:cognitive-systems:0), every other slice of that same page
+// (program:cognitive-systems:1, :2, …) gets this boost — they share a
+// URL and were bin-split from one scraped page, so the user's question
+// is almost always partly answered by them too. The nudge is small on
+// purpose: it only crosses the minScore floor for siblings that were
+// already close to passing (raw cosine ≥ ~0.4 after the +0.25 program-
+// title boost). It does not promote unrelated chunks; only siblings of
+// an already-winning page. See the buddy-boost block in topK for the
+// full rationale.
+const BUDDY_BOOST = 0.1
+
 // When the user explicitly says "course"/"class" (incl. plurals), they
 // want a course chunk, not a program/faculty page. The matching `wantsCourses`
 // flag in topK does three things: adds +0.25 to every course chunk so they
-// outrank similarly-scored programs, suppresses the +0.3 program-title boost
+// outrank similarly-scored programs, suppresses the +0.25 program-title boost
 // (so the umbrella program page can't dominate via the boost), and skips
 // Mode B entirely (so an alias hit like "ASTR" doesn't restrict the result
 // to programs/easters when the user asked for courses).
@@ -158,10 +171,11 @@ export interface Chunk {
   text: string
   url: string
   // Set by topK on returned chunks (post-boost ranking score). Pure cosine
-  // is in [-1, 1]; a chunk can pick up at most +0.3 program-title and
-  // +0.25 course-keyword on top, so the realistic envelope is roughly
-  // [-1, 1.55]. Undefined for chunks read straight from the corpus or
-  // rehydrated from older persisted conversations that pre-date this field.
+  // is in [-1, 1]; a program chunk can pick up at most +0.25 program-title
+  // and +0.1 buddy (= +0.35), a course chunk at most +0.25 course-keyword,
+  // so the realistic envelope is roughly [-1, 1.35]. Undefined for chunks
+  // read straight from the corpus or rehydrated from older persisted
+  // conversations that pre-date this field.
   score?: number
 }
 
@@ -282,7 +296,7 @@ export async function topK(
   // program / faculty / school overview chunk under individual courses
   // (more chunks, denser titles), so a query like "tell me about astronomy",
   // "what is CPSC", or "tell me about Sauder" shows individual course chunks
-  // before the actual program/faculty page. Add +0.3 to any program OR
+  // before the actual program/faculty page. Add +0.25 to any program OR
   // easter chunk whose title (lowercased) contains a query token of length ≥ 4.
   // Easter chunks share this boost so the hand-curated Q&A entries can
   // compete on equal terms when their title aligns with the query — they're
@@ -310,17 +324,17 @@ export async function topK(
       // Boost programs only — easter chunks intentionally do NOT receive
       // the title-match lift. Easters are hand-curated Q&A entries; if
       // they win, they should win on raw cosine alignment to the user's
-      // exact phrasing, not on shared topic keywords. With +0.3 (down
-      // from +0.5, then nudged up from +0.25) on programs, an off-target
-      // query like "tell me about data science" leaves the easter at raw
-      // 0.55 vs the top program at 0.44 + 0.3 = 0.74, so the program wins;
-      // a targeted query like "who is the best data science professor"
-      // puts the easter at raw 0.83 vs a non-matching top program (no
-      // boost), so the easter still wins and easterCollapse fires.
+      // exact phrasing, not on shared topic keywords. With +0.25 (down
+      // from +0.5) on programs, an off-target query like "tell me about
+      // data science" leaves the easter at raw 0.55 vs the top program
+      // at 0.44 + 0.25 = 0.69, so the program wins; a targeted query
+      // like "who is the best data science professor" puts the easter
+      // at raw 0.83 vs the top program at ~0.65, so the easter wins
+      // and easterCollapse fires.
       if (c.kind !== 'program') continue
       const title = c.title.toLowerCase()
       if (programNeedles.some((n) => title.includes(n))) {
-        scores[i] += 0.3
+        scores[i] += 0.25
       }
     }
   }
@@ -369,6 +383,51 @@ export async function topK(
   const allIndicesByScore = Array.from(scores.keys()).sort(
     (a, b) => scores[b] - scores[a],
   )
+
+  // ---------- Buddy boost ----------
+  // Programs are scraped as a single page then bin-split into multiple
+  // slices (program:cognitive-systems:0, :1, :2, …) — they share a URL
+  // because they're sub-sections of the same canonical page. When one
+  // slice wins the corpus-wide #1 spot, the rest of that page often has
+  // additional context the user wants but sits just below the minScore
+  // floor. The motivating case: "what is cogs?" puts slice :0 (the
+  // definitional opener) at the top with raw 0.458 + 0.25 program-title
+  // = 0.708, but slice :1 (the required-courses list) lands at raw 0.166
+  // + 0.25 = 0.416, just under the 0.5 floor — even though it answers
+  // "what courses does COGS require" which a user asking "what is cogs?"
+  // very plausibly also wants.
+  //
+  // The fix: if and only if the #1 chunk in the corpus is a program
+  // slice that already cleared minScore (so we know this is a real,
+  // confident match — not a greeting query where every chunk is near
+  // zero), give every other program slice with the same URL a +0.1
+  // bump. The nudge is small on purpose: it only crosses the floor for
+  // siblings already close to passing (post-program-title score ≥ 0.4).
+  // It doesn't promote unrelated chunks; the URL-equality gate scopes
+  // it strictly to the winning page.
+  //
+  // Scope: program kind only. Course chunks share a URL across an
+  // entire subject (every CPSC course points at /course-descriptions/
+  // subject/cpscv) so URL-grouping wouldn't mean "same page" for them
+  // — buddy-boosting all CPSC courses when one wins would be wildly
+  // over-inclusive. Easters are single-slice. Mode A is course-code-
+  // structural (Pass 2 already covers cross-course context) and ignores
+  // these scores anyway.
+  if (allIndicesByScore.length > 0) {
+    const topIdx = allIndicesByScore[0]
+    const topChunk = chunks[topIdx]
+    if (topChunk.kind === 'program' && scores[topIdx] >= minScore) {
+      const topUrl = topChunk.url
+      for (let i = 0; i < chunks.length; i++) {
+        if (i === topIdx) continue
+        const c = chunks[i]
+        if (c.kind === 'program' && c.url === topUrl) {
+          scores[i] += BUDDY_BOOST
+        }
+      }
+      allIndicesByScore.sort((a, b) => scores[b] - scores[a])
+    }
+  }
 
   // ---- Mode A: course-code mode ----
   // Triggered when the query names specific course codes (CPSC 110,

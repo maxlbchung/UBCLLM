@@ -27,7 +27,7 @@ const COURSE_KEYWORD_RE = /\b(course|courses|class|classes)\b/i
 
 // ---------- Source-block token budget ----------
 //
-// Qwen 2.5 1.5B Instruct (the model `pickModelId()` selects) runs with a
+// Qwen3.5 2B (the model `pickModelId()` selects) runs with a
 // 4096-token context window in WebLLM's prebuilt config. WebLLM pre-flight
 // checks numPromptTokens > contextWindowSize and throws
 // ContextWindowSizeExceededError, which our streamChat does NOT recognize

@@ -7,7 +7,11 @@ import {
   type Chunk,
 } from '../lib/retrieve'
 import { getDiagSnapshot, streamChat } from '../lib/llm'
-import { buildSystemPrompt, userPromptWithContext } from '../lib/prompts'
+import {
+  buildSystemPrompt,
+  userPromptWithContext,
+  type SystemPromptMode,
+} from '../lib/prompts'
 import {
   makeMessage,
   useChat,
@@ -39,13 +43,13 @@ const BARE_SUBJECT_RE = /^[A-Z]{3,5}(?:_V)?$/i
 // past MiniLM's ~512-token window or eating the LLM's context budget.
 const MAX_INPUT_LENGTH = 500
 
-// Earlier user queries fed back to the model as a "reference only" preamble
-// (see prompts.ts → formatPriorQueries). We deliberately drop past assistant
-// replies — they were the source of the fact-bleed bug where the model would
-// carry a course code from a prior answer into the next reply, even when the
-// new sources said something different. Keeping just the user's prior queries
-// lets the model still resolve "what about its prereqs?" / "tell me more"
-// follow-ups without re-introducing that bleed.
+// Earlier user queries fed back to the model as separate `role: 'user'`
+// chat-completion entries (see send() below). Past assistant replies are
+// deliberately dropped — they were the source of the fact-bleed bug where
+// the model would carry a course code from a prior answer into the next
+// reply, even when the new sources said something different. Keeping just
+// the user's prior queries as multi-turn history lets the model resolve
+// pronouns ("what about its prereqs?") without re-introducing that bleed.
 function priorUserQueries(history: Message[]): string[] {
   return history
     .filter((m) => m.role === 'user')
@@ -137,21 +141,37 @@ export function Chat() {
       recent = prior.slice(-HISTORY_TURNS * 2)
       const earlierQueries = priorUserQueries(recent)
 
-      // No more alternating user/assistant turns sent to the LLM — earlier
-      // queries are bundled into the current user message via prompts.ts so
-      // the model sees them as reference-only context, not as authoritative
-      // prior answers.
+      // Mode-aware system prompt: the citation/refusal/anti-echo rules live
+      // there (not at the user-message tail) so the chat template's
+      // <|im_start|>system fence marks them as policy. Mode is decided by
+      // the retrieval outcome:
+      //   - bareSubject → user typed just "DSCI"; user-message Note drives
+      //     behavior, so we drop the rules to avoid contradicting it.
+      //   - easter → retrieval collapsed to a single curated chunk; use the
+      //     strict-quote variant so the model doesn't refuse the absurd-
+      //     sounding answer.
+      //   - default → standard RAG path.
+      // Earlier user queries are sent as separate `role: 'user'` entries
+      // before the current message — multi-turn history Qwen reads via its
+      // chat template, with no labeled "Earlier user queries" block to
+      // echo. Past assistant replies stay omitted (fact-bleed prevention).
+      const easterMode = sources.length === 1 && sources[0].kind === 'easter'
+      const mode: SystemPromptMode = bareSubject
+        ? 'bareSubject'
+        : easterMode
+          ? 'easter'
+          : 'default'
+
+      const priorTurns: ChatCompletionMessageParam[] = earlierQueries.map(
+        (content) => ({ role: 'user', content }),
+      )
+
       llmMessages = [
-        { role: 'system', content: buildSystemPrompt(sources, bareSubject) },
+        { role: 'system', content: buildSystemPrompt(mode) },
+        ...priorTurns,
         {
           role: 'user',
-          content: userPromptWithContext(
-            q,
-            sources,
-            missingCodes,
-            bareSubject,
-            earlierQueries,
-          ),
+          content: userPromptWithContext(q, sources, missingCodes, bareSubject),
         },
       ]
 

@@ -312,7 +312,7 @@ export function Sidebar() {
         </div>
 
         <div className="text-[0.625rem] text-zinc-600 leading-tight">
-          Qwen 2.5 1.5B · WebGPU · MiniLM embeddings · UBC Vancouver calendar 2026/27.
+          Qwen3.5 2B · WebGPU · MiniLM embeddings · UBC Vancouver calendar 2026/27.
         </div>
         <div className="flex items-center justify-between text-[0.625rem] font-mono">
           <span className="text-zinc-500">v{APP_VERSION}</span>

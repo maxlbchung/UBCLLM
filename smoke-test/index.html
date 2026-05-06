@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>UBCLLM &mdash; Qwen 2.5 1.5B WebGPU Smoke Test</title>
+    <title>UBCLLM &mdash; Qwen3.5 2B WebGPU Smoke Test</title>
     <style>
       :root { color-scheme: dark; }
       * { box-sizing: border-box; }
@@ -95,9 +95,9 @@
   <body>
     <main>
       <header>
-        <h1>UBCLLM &mdash; Qwen 2.5 1.5B WebGPU Smoke Test</h1>
+        <h1>UBCLLM &mdash; Qwen3.5 2B WebGPU Smoke Test</h1>
         <p class="sub">
-          Verifies (a) WebGPU is enabled in this browser, (b) WebLLM can download Qwen 2.5 1.5B Instruct,
+          Verifies (a) WebGPU is enabled in this browser, (b) WebLLM can download Qwen3.5 2B,
           and (c) generation actually streams. Runs entirely on your machine. First load downloads
           ~1&nbsp;GB; cached in IndexedDB after that.
         </p>
@@ -117,7 +117,7 @@
       </section>
 
       <section class="panel">
-        <label for="model-select">Model (auto-filtered to Qwen 2.5 1.5B Instruct variants)</label>
+        <label for="model-select">Model (auto-filtered to Qwen3.5 2B variants)</label>
         <div class="row">
           <select id="model-select" disabled>
             <option>Loading model list&hellip;</option>
@@ -177,7 +177,7 @@
         }
       }
 
-      // 2. Load WebLLM and surface Qwen 2.5 1.5B Instruct variants
+      // 2. Load WebLLM and surface Qwen3.5 2B variants
       let webllm;
       try {
         webllm = await import("https://esm.run/@mlc-ai/web-llm");
@@ -191,22 +191,22 @@
 
       if (webllm) {
         const models = webllm.prebuiltAppConfig?.model_list ?? [];
-        // Match Qwen 2.5 1.5B Instruct, excluding the Coder/Math siblings
-        // that share the "1.5B-Instruct" stem. Fall back to any Qwen
-        // 1.5B Instruct, then any Qwen, so the user always sees options.
+        // Match Qwen3.5 2B, excluding any Coder/Math siblings that might
+        // share the "2B" stem. Fall back to any Qwen 2B, then any
+        // Qwen, so the user always sees options.
         const isExcluded = (id) => /coder|math/i.test(id);
-        const isQwen25_15B = (id) => /qwen[\-_]?2\.?5[\-_]1\.?5b[\-_]instruct/i.test(id) && !isExcluded(id);
-        const isQwen15B = (id) => /qwen.*1\.?5b.*instruct/i.test(id) && !isExcluded(id);
+        const isQwen35_2B = (id) => /qwen[\-_]?3\.?5[\-_]2b/i.test(id) && !isExcluded(id);
+        const isQwen2B = (id) => /qwen.*2b/i.test(id) && !isExcluded(id);
         const isQwen = (id) => /qwen/i.test(id);
-        let candidates = models.filter((m) => isQwen25_15B(m.model_id));
+        let candidates = models.filter((m) => isQwen35_2B(m.model_id));
         let note = "";
         if (candidates.length === 0) {
-          candidates = models.filter((m) => isQwen15B(m.model_id));
-          note = " (no Qwen 2.5 1.5B Instruct match; showing other Qwen 1.5B Instruct variants)";
+          candidates = models.filter((m) => isQwen2B(m.model_id));
+          note = " (no Qwen3.5 2B match; showing other Qwen 2B variants)";
         }
         if (candidates.length === 0) {
           candidates = models.filter((m) => isQwen(m.model_id));
-          note = " (no Qwen 1.5B Instruct match; showing all Qwen variants)";
+          note = " (no Qwen 2B match; showing all Qwen variants)";
         }
         if (candidates.length === 0) {
           modelSelect.innerHTML = `<option>No Qwen models in WebLLM prebuilt list (${models.length} total models)</option>`;

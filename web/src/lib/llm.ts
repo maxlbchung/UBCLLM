@@ -1,4 +1,4 @@
-// WebLLM wrapper that lazy-loads Qwen 2.5 1.5B Instruct and exposes a
+// WebLLM wrapper that lazy-loads Qwen3.5 2B and exposes a
 // streaming chat API. We auto-discover the model id from prebuiltAppConfig
 // so we don't break when WebLLM bumps versions.
 //
@@ -77,16 +77,15 @@ if (typeof document !== 'undefined') {
 
 function pickModelId(): string {
   const ids = prebuiltAppConfig.model_list.map((m) => m.model_id)
-  // Qwen 2.5 1.5B Instruct, with the Coder/Math siblings explicitly excluded
-  // — they share the "1.5B-Instruct" stem but are tuned for code/math, not
-  // general-purpose academic-advisor RAG. Fallbacks try Qwen2 1.5B Instruct
-  // (older webllm versions before Qwen2.5 was added) and a generic 1.5B
-  // Instruct match as a last resort.
+  // Qwen3.5 2B, with the Coder/Math siblings explicitly excluded — they share
+  // the "2B" stem but are tuned for code/math, not general-purpose
+  // academic-advisor RAG. Qwen3.5 ships as chat-tuned by default (no separate
+  // "Instruct" suffix in the model_id, unlike Qwen2.5). Fallbacks try a
+  // generic Qwen 2B match as a last resort.
   const isExcluded = (id: string) => /coder|math/i.test(id)
   const matchers = [
-    /qwen-?2\.?5[-_]1\.?5b[-_]instruct/i,
-    /qwen-?2[-_]1\.?5b[-_]instruct/i,
-    /qwen.*1\.?5b.*instruct/i,
+    /qwen-?3\.?5[-_]2b/i,
+    /qwen.*2b/i,
   ]
   let pool: string[] = []
   for (const re of matchers) {
@@ -95,7 +94,7 @@ function pickModelId(): string {
   }
   if (!pool.length) {
     throw new Error(
-      `Could not find a Qwen 2.5 1.5B Instruct model in WebLLM. ` +
+      `Could not find a Qwen3.5 2B model in WebLLM. ` +
         `Available: ${ids.slice(0, 5).join(', ')}…`,
     )
   }
@@ -252,13 +251,16 @@ let chainTail: Promise<void> = Promise.resolve()
 // Hard cutoff for the streamed response, used as a backstop against the
 // model entering a degenerate repeat loop on adversarial / off-topic
 // queries (e.g. "why do asteroids always land in craters?" hit a
-// never-ending repeating answer). The system prompt asks for concise
-// replies (the soft cap); HARD_WORD_CAP at 200 is the JS-side backstop
-// that triggers interruptGenerate() so a runaway generation can't keep
-// the GPU pinned forever. Measured in whitespace-separated tokens —
-// close enough to "words" for a length backstop, and cheap to recompute
-// on every delta without a real tokenizer.
-const HARD_WORD_CAP = 200
+// never-ending repeating answer). The system prompt asks for under 150
+// words (the soft cap, in SYSTEM_PROMPT_BASE in prompts.ts); HARD_WORD_CAP
+// at 300 is the JS-side backstop that triggers interruptGenerate() so a
+// runaway generation can't keep the GPU pinned forever. The 2× ratio
+// between soft and hard gives the model headroom to overshoot the soft
+// target on legitimate detailed answers without getting clipped, while
+// still cutting off true runaway loops. Measured in whitespace-separated
+// tokens — close enough to "words" for a length backstop, and cheap
+// to recompute on every delta without a real tokenizer.
+const HARD_WORD_CAP = 300
 
 // Inactivity timeout for the worker stream. If no delta arrives within this
 // window — counted from either stream-start or the last received delta — we
@@ -267,7 +269,7 @@ const HARD_WORD_CAP = 200
 // the same discardEngine + retry path as a stale-engine error, so the user
 // gets a fresh rebuild on their next send instead of a permanently spinning
 // "Generating…" placeholder. 60s is generous enough to cover cold-start
-// prefill on a 1.5B model + the longest expected inter-token gap on a slow
+// prefill on a 2B model + the longest expected inter-token gap on a slow
 // laptop, but short enough that a real freeze doesn't trap the UI for ages.
 const STREAM_INACTIVITY_TIMEOUT_MS = 60_000
 
@@ -308,7 +310,7 @@ export async function* streamChat(
           messages,
           stream: true,
           // Greedy decoding for the RAG advisor task: at any meaningful
-          // temperature, a 1.5B model will sometimes prefer a fluent
+          // temperature, a 2B model will sometimes prefer a fluent
           // parametric answer over the verbatim grounded one. 0 keeps
           // it on the chunk-supported path and makes refusals reliable.
           temperature: opts.temperature ?? 0,

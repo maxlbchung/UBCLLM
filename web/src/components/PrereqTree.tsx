@@ -49,7 +49,7 @@ type ColumnItem =
       id: string
       code: string
       parsed: ParsedCourse | null
-      role: 'root' | 'prereq' | 'coreq'
+      role: 'root' | 'prereq' | 'coreq' | 'note'
     }
   | {
       kind: 'group'
@@ -90,8 +90,12 @@ const COREQ_EDGE_STYLE = {
   labelBgBorderRadius: 4,
 } as const
 
+const NOTE_HEIGHT = 80
+
 function heightOf(item: ColumnItem): number {
-  if (item.kind === 'course') return COURSE_HEIGHT
+  if (item.kind === 'course') {
+    return item.role === 'note' ? NOTE_HEIGHT : COURSE_HEIGHT
+  }
   if (item.ui === 'dropdown') {
     const data = item.data as DisjunctionData
     return data.detail ? DISJUNCTION_HEIGHT_WITH_DETAIL : DISJUNCTION_HEIGHT
@@ -407,8 +411,16 @@ function buildGraph(
         else attachPrereqCode(expr.code, depth, targetId)
         return
       case 'literal':
-        // Top-level literals carry no graph signal. Already preserved as
-        // text in the chat view.
+        // Any literal that lands here is a real prereq the parser
+        // couldn't structure as a course-code subtree (class-standing
+        // prose, credit requirements, instructor consent, high-school
+        // course names, …). Render it as a small italic info block.
+        // normalize() upstream has already collapsed disjunctions/
+        // conjunctions of prose into single literals, so we don't get
+        // multiple shredded blocks per idiom.
+        if (expr.text.trim()) {
+          attachNoteLiteral(expr.text, `${ownerCode}::${path}`, depth, targetId, isCoreq)
+        }
         return
       case 'flattened':
         // Top-level flattened (rare — a flattened branch promoted by
@@ -451,6 +463,40 @@ function buildGraph(
       depth,
     })
     if (parsed) queue.push({ code, parsed, depth })
+  }
+
+  // A class-standing prose block surfaced as a small info node. Same edge
+  // styling as a prereq/coreq code, but the source is a synthesized id
+  // keyed by `${ownerCode}::${pathInExpr}` so two different courses' notes
+  // don't collide. No transitive expansion (it's prose, not a course).
+  function attachNoteLiteral(
+    text: string,
+    key: string,
+    depth: number,
+    targetId: string,
+    isCoreq: boolean,
+  ): void {
+    const sourceId = `note:${key}`
+    if (sourceId === targetId) return
+    edges.push({
+      id: `${isCoreq ? 'coreq' : 'prereq'}:${sourceId}->${targetId}`,
+      source: sourceId,
+      target: targetId,
+      ...(targetId === rootCode
+        ? { targetHandle: isCoreq ? 'top-target' : 'left-target' }
+        : {}),
+      ...(isCoreq ? COREQ_EDGE_STYLE : PREREQ_EDGE_STYLE),
+    })
+    if (byId.has(sourceId)) return
+    byId.set(sourceId, {
+      kind: 'course',
+      id: sourceId,
+      code: text,
+      parsed: null,
+      role: 'note',
+      depth: isCoreq ? 0 : depth,
+    })
+    if (isCoreq) coreqIds.add(sourceId)
   }
 
   function attachCoreqCode(code: string, targetId: string): void {
@@ -557,15 +603,67 @@ function buildGraph(
   // bottommost coreq, whose edge still terminates at the root.
   const coreqChain: string[] = []
 
-  for (const [colKey, items] of byColumn) {
-    const isCoreqCol = colKey === 'coreq'
-    items.sort((a, b) => {
-      if (a.kind !== b.kind) return a.kind === 'course' ? -1 : 1
-      if (a.kind === 'course' && b.kind === 'course') {
-        return a.code.localeCompare(b.code)
+  // Barycenter sort: order each prereq column by the mean y of each item's
+  // already-placed successors (the items it feeds into in the next column
+  // toward root). Reduces edge crossings vs the prior alphabetical sort —
+  // a prereq that only feeds into one downstream node lands at that
+  // node's y; one that feeds two diverging targets lands between them.
+  // Ties (notably the d1 case where every prereq feeds the root at y=0)
+  // fall through to the existing courses-before-groups + alphabetical
+  // tiebreak so the order stays deterministic.
+  const successors = new Map<string, string[]>()
+  for (const e of edges) {
+    if (typeof e.source !== 'string' || typeof e.target !== 'string') continue
+    const list = successors.get(e.source)
+    if (list) list.push(e.target)
+    else successors.set(e.source, [e.target])
+  }
+  const yByItem = new Map<string, number>()
+  const baryOf = (item: ColumnItem): number => {
+    const succs = successors.get(item.id)
+    if (!succs) return 0
+    let sum = 0
+    let count = 0
+    for (const s of succs) {
+      const y = yByItem.get(s)
+      if (y !== undefined) {
+        sum += y
+        count++
       }
-      return a.id.localeCompare(b.id)
-    })
+    }
+    return count === 0 ? 0 : sum / count
+  }
+  const tiebreak = (a: ColumnItem, b: ColumnItem): number => {
+    if (a.kind !== b.kind) return a.kind === 'course' ? -1 : 1
+    if (a.kind === 'course' && b.kind === 'course') {
+      return a.code.localeCompare(b.code)
+    }
+    return a.id.localeCompare(b.id)
+  }
+
+  // Lay out columns shallowest-first (d0, d1, d2, …) so each deeper
+  // column can read its successors' y's from `yByItem` when sorting.
+  // Coreq column goes last — it's an independent bottom-up stack and
+  // doesn't feed any prereq column.
+  const sortedColKeys = [...byColumn.keys()].sort((a, b) => {
+    if (a === 'coreq') return 1
+    if (b === 'coreq') return -1
+    return Number(a.slice(1)) - Number(b.slice(1))
+  })
+
+  for (const colKey of sortedColKeys) {
+    const items = byColumn.get(colKey)!
+    const isCoreqCol = colKey === 'coreq'
+    if (isCoreqCol) {
+      items.sort(tiebreak)
+    } else {
+      items.sort((a, b) => {
+        const da = baryOf(a)
+        const db = baryOf(b)
+        if (da !== db) return da - db
+        return tiebreak(a, b)
+      })
+    }
 
     if (isCoreqCol) {
       // Coreq column sits in the same x as the root, stacked directly
@@ -580,22 +678,24 @@ function buildGraph(
         const h = heightOf(item)
         const positionY = nextBottomY - h
         if (item.kind === 'course') {
+          const isNote = item.role === 'note'
           const known = item.parsed !== null
           const title = item.parsed?.title ?? '(not in calendar)'
-          const bg = known ? '#27272a' : '#3f1d1d'
-          const border = known ? '#3f3f46' : '#7f1d1d'
+          const bg = isNote ? '#1f1f23' : known ? '#27272a' : '#3f1d1d'
+          const border = isNote ? '#52525b' : known ? '#3f3f46' : '#7f1d1d'
           nodes.push({
             id: item.id,
             position: { x, y: positionY },
-            data: { label: `${item.code}\n${title}` },
+            data: { label: isNote ? item.code : `${item.code}\n${title}` },
             sourcePosition: Position.Bottom,
             targetPosition: Position.Top,
             style: {
               background: bg,
-              color: '#e5e7eb',
-              border: `1px solid ${border}`,
+              color: isNote ? '#a1a1aa' : '#e5e7eb',
+              border: `1px ${isNote ? 'dashed' : 'solid'} ${border}`,
               fontSize: 11,
-              whiteSpace: 'pre-line',
+              fontStyle: isNote ? 'italic' : 'normal',
+              whiteSpace: isNote ? 'normal' : 'pre-line',
               padding: 6,
               borderRadius: 6,
               width: NODE_WIDTH,
@@ -615,6 +715,7 @@ function buildGraph(
             style: { width: NODE_WIDTH },
           })
         }
+        yByItem.set(item.id, positionY + h / 2)
         nextBottomY = positionY - Y_GAP
       }
       // Record the chain in top-to-bottom order.
@@ -635,10 +736,13 @@ function buildGraph(
       const slot = slotHeights[i]
       const yCenter = cursor + slot / 2
       cursor += slot + (i < items.length - 1 ? Y_GAP : 0)
+      yByItem.set(item.id, yCenter)
 
       if (item.kind === 'course') {
         const known = item.parsed !== null
         const isRoot = item.role === 'root'
+        const isNote = item.role === 'note'
+        const nodeH = isNote ? NOTE_HEIGHT : COURSE_HEIGHT
         const title = item.parsed?.title ?? '(not in calendar)'
         if (isRoot) {
           // Custom node so the coreq chain can land on a top handle while
@@ -650,20 +754,21 @@ function buildGraph(
             data: { label: `${item.code}\n${title}`, isRoot: true, known },
           })
         } else {
-          const bg = known ? '#27272a' : '#3f1d1d'
-          const border = known ? '#3f3f46' : '#7f1d1d'
+          const bg = isNote ? '#1f1f23' : known ? '#27272a' : '#3f1d1d'
+          const border = isNote ? '#52525b' : known ? '#3f3f46' : '#7f1d1d'
           nodes.push({
             id: item.id,
-            position: { x, y: yCenter - COURSE_HEIGHT / 2 },
-            data: { label: `${item.code}\n${title}` },
+            position: { x, y: yCenter - nodeH / 2 },
+            data: { label: isNote ? item.code : `${item.code}\n${title}` },
             sourcePosition: Position.Right,
             targetPosition: Position.Left,
             style: {
               background: bg,
-              color: '#e5e7eb',
-              border: `1px solid ${border}`,
+              color: isNote ? '#a1a1aa' : '#e5e7eb',
+              border: `1px ${isNote ? 'dashed' : 'solid'} ${border}`,
               fontSize: 11,
-              whiteSpace: 'pre-line',
+              fontStyle: isNote ? 'italic' : 'normal',
+              whiteSpace: isNote ? 'normal' : 'pre-line',
               padding: 6,
               borderRadius: 6,
               width: NODE_WIDTH,

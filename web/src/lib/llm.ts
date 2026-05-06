@@ -95,7 +95,7 @@ function pickModelId(): string {
   if (!pool.length) {
     throw new Error(
       `Could not find a Qwen3.5 2B model in WebLLM. ` +
-        `Available: ${ids.slice(0, 5).join(', ')}…`,
+      `Available: ${ids.slice(0, 5).join(', ')}…`,
     )
   }
   // Prefer 4-bit / 16-bit float quantization for size + speed.
@@ -251,15 +251,17 @@ let chainTail: Promise<void> = Promise.resolve()
 // Hard cutoff for the streamed response, used as a backstop against the
 // model entering a degenerate repeat loop on adversarial / off-topic
 // queries (e.g. "why do asteroids always land in craters?" hit a
-// never-ending repeating answer). The system prompt asks for under 150
-// words (the soft cap, in SYSTEM_PROMPT_BASE in prompts.ts); HARD_WORD_CAP
-// at 300 is the JS-side backstop that triggers interruptGenerate() so a
-// runaway generation can't keep the GPU pinned forever. The 2× ratio
-// between soft and hard gives the model headroom to overshoot the soft
-// target on legitimate detailed answers without getting clipped, while
-// still cutting off true runaway loops. Measured in whitespace-separated
-// tokens — close enough to "words" for a length backstop, and cheap
-// to recompute on every delta without a real tokenizer.
+// never-ending repeating answer). The system prompt asks for under 80
+// words / 4 sentences (the soft cap, in SYSTEM_PROMPT_BASE in prompts.ts);
+// HARD_WORD_CAP at 200 is the JS-side backstop that triggers
+// interruptGenerate() so a runaway generation can't keep the GPU pinned
+// forever. The 2.5× ratio between soft and hard gives the model headroom
+// to overshoot the soft target on legitimate detailed answers without
+// getting clipped, while still cutting off true runaway loops earlier
+// than the old 300-word cap (which let visibly-too-long answers stream
+// for ~10 s before tripping). Measured in whitespace-separated tokens —
+// close enough to "words" for a length backstop, and cheap to recompute
+// on every delta without a real tokenizer.
 const HARD_WORD_CAP = 300
 
 // Qwen3.5 emits a leading "<think></think>" (sometimes with internal
@@ -429,7 +431,7 @@ export async function* streamChat(
         // that masks the real GPU error in the user's debug surface.
         // Promote to a real Error first so the original message survives.
         const wrapped = err instanceof Error ? err : new Error(String(err))
-        ;(wrapped as { recovered?: boolean }).recovered = recovered
+          ; (wrapped as { recovered?: boolean }).recovered = recovered
         throw wrapped
       }
     }

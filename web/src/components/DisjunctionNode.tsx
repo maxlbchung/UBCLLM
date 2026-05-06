@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Handle, Position, useReactFlow, type NodeProps } from 'reactflow'
+import { Handle, Position, type NodeProps } from 'reactflow'
 
 // ReactFlow custom node for an `Or-dropdown` group — used when the prereq
 // string says "one of A, B, C" (or a bare "A or B" without a wrapping
@@ -45,7 +45,7 @@ export interface DisjunctionData {
   orientation?: 'horizontal' | 'vertical'
 }
 
-export function DisjunctionNode({ id, data }: NodeProps<DisjunctionData>) {
+export function DisjunctionNode({ data }: NodeProps<DisjunctionData>) {
   const { options, selectedIdx, onChange, detail, orientation = 'horizontal' } = data
   const detailKnown = detail?.kind === 'course' && detail.title !== null
   const detailUnknownCourse =
@@ -80,7 +80,6 @@ export function DisjunctionNode({ id, data }: NodeProps<DisjunctionData>) {
         one of
       </div>
       <DropdownSelect
-        nodeId={id}
         options={options}
         selectedIdx={selectedIdx}
         onChange={onChange}
@@ -114,19 +113,16 @@ export function DisjunctionNode({ id, data }: NodeProps<DisjunctionData>) {
 // events stop-propagating so they don't reach ReactFlow's pan/zoom
 // handlers and start a drag.
 function DropdownSelect({
-  nodeId,
   options,
   selectedIdx,
   onChange,
 }: {
-  nodeId: string
   options: DisjunctionOption[]
   selectedIdx: number
   onChange: (idx: number) => void
 }) {
   const [open, setOpen] = useState(false)
   const wrapperRef = useRef<HTMLDivElement>(null)
-  const { setNodes } = useReactFlow()
 
   // Click-outside-to-close. We listen for `pointerdown` (not `mousedown`)
   // in the capture phase so the handler fires before any other listener
@@ -145,23 +141,29 @@ function DropdownSelect({
     return () => document.removeEventListener('pointerdown', handler, true)
   }, [open])
 
-  // Bump the parent node's zIndex while the menu is open. Each ReactFlow
-  // node creates its own stacking context, so the menu's local zIndex
-  // only orders elements inside this node — to paint over sibling nodes
-  // (which is what the user sees as "the menu being clipped by the next
-  // course block") the wrapper itself has to move forward in the
-  // sibling order. The cleanup restores zIndex on close + unmount.
+  // Bump the parent `.react-flow__node` wrapper's z-index while the menu is
+  // open. Each ReactFlow node has `transform: translate(...)`, which creates
+  // a stacking context — so the menu's local z-index only orders elements
+  // inside its own node. To paint over sibling nodes (the user-visible "menu
+  // is clipped by the next course block" symptom) the wrapper itself has to
+  // move forward in the sibling order.
+  //
+  // Why DOM and not ReactFlow's `setNodes`: in controlled mode (no
+  // `defaultNodes`, no `onNodesChange` — which is how PrereqTree wires up
+  // ReactFlow), `useReactFlow().setNodes` is a no-op. We bypass it and
+  // mutate the wrapper's inline style directly.
   useEffect(() => {
     if (!open) return
-    setNodes((nodes) =>
-      nodes.map((n) => (n.id === nodeId ? { ...n, zIndex: 1000 } : n)),
-    )
+    const nodeEl = wrapperRef.current?.closest(
+      '.react-flow__node',
+    ) as HTMLElement | null
+    if (!nodeEl) return
+    const prev = nodeEl.style.zIndex
+    nodeEl.style.zIndex = '1000'
     return () => {
-      setNodes((nodes) =>
-        nodes.map((n) => (n.id === nodeId ? { ...n, zIndex: 0 } : n)),
-      )
+      nodeEl.style.zIndex = prev
     }
-  }, [open, nodeId, setNodes])
+  }, [open])
 
   const current = options[selectedIdx]?.display ?? ''
 

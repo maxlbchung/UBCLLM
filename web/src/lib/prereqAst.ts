@@ -88,6 +88,21 @@ function tokenize(input: string): Token[] {
       i += labelMatch[0].length
       continue
     }
+    // Loose label: "a)", "b)", … without leading paren. Some prereq
+    // strings (e.g. MATH 121: "Either a) a score of …, b) …") use this
+    // shorthand. Gated on word-start so we don't mis-tokenize a random
+    // ")" inside prose like "yeah)" — must be preceded by whitespace,
+    // a comma, semicolon, period, or be at position 0.
+    const looseLabelStart = i === 0 || /[\s,;.]/.test(input[i - 1])
+    if (looseLabelStart) {
+      const looseMatch = input.slice(i).match(/^([a-z])\s*\)/i)
+      if (looseMatch) {
+        flushText()
+        tokens.push({ type: 'LABEL' })
+        i += looseMatch[0].length
+        continue
+      }
+    }
 
     if (ch === '(') {
       flushText()
@@ -192,13 +207,17 @@ class Parser {
     return expr
   }
 
-  // and_expr := or_expr (("and" | ";" | ".") or_expr)*
+  // and_expr := or_expr (("and" | ";" | ".")+ or_expr)*
+  // Consecutive joiners are absorbed as a single bridge so a sequence
+  // like ". And " (DOT then AND, common in UBC prereq prose like
+  // "…361. And 3rd year standing") doesn't lose its right-hand side
+  // through atom()'s catch-all consume-and-bail eating the AND.
   private andExpr(): Expr | null {
     const children: Expr[] = []
     const first = this.orExpr()
     if (first) children.push(first)
     while (this.match('AND', 'SEMI', 'DOT')) {
-      this.consume()
+      while (this.match('AND', 'SEMI', 'DOT')) this.consume()
       const next = this.orExpr()
       if (next) children.push(next)
     }
@@ -279,36 +298,72 @@ class Parser {
     return null
   }
 
-  // code_list := code_or_text ("," code_or_text)* ("," "and" code_or_text)?
-  // Comma-separated atoms inside "one of …" / "all of …". A trailing
-  // "and X" inside the list is treated as just another item ("one of A, B,
-  // and C" → 3 items).
+  // code_list := code_or_text ("," ("and"|"or")? code_or_text)*
+  // Comma-separated slots inside "one of …" / "all of …". A trailing
+  // "and X" / "or X" inside the list is treated as just another item
+  // ("one of A, B, and C" / "one of A, B, or C" → 3 items). The OR is
+  // only consumed when the next token is NOT a LABEL — `, or (e) …`
+  // signals that "(e)" is an outer labeled branch, so the OR belongs to
+  // the parent disjunction, not this comma list. Without this guard
+  // APBI 210's branch (d) ALL_OF would greedily swallow ", or (e) 7
+  // credits of first-year" into its own item list.
   private codeList(): Expr[] {
     const items: Expr[] = []
     const first = this.codeListItem()
     if (first) items.push(first)
     while (this.match('COMMA')) {
       this.consume()
-      // Allow "A, B, and C" — eat the "and" after a comma.
       if (this.match('AND')) this.consume()
+      else if (this.match('OR') && this.peek(1)?.type !== 'LABEL') {
+        this.consume()
+      }
       const next = this.codeListItem()
       if (next) items.push(next)
     }
     return items
   }
 
+  // One slot inside a "one of" / "all of" comma list. Strips a leading
+  // branch label ("(a)", "(b)", …), recurses through atom() so the slot
+  // can contain nested "one of …", "all of …", "either …", or a parens-
+  // grouped sub-expr (not just a bare CODE/TEXT), and — only when the
+  // slot started with a label — absorbs any OR-joined alternatives that
+  // follow as part of the same labeled branch.
+  //
+  // The label gate matters: in "all of A, B or X", the "or X" is an
+  // OUTER alternative ("the all-of is satisfied OR X"), not part of
+  // slot B. Without the gate, slot B would greedily eat "or X" and
+  // produce the wrong tree (And[A, Or[B, X]] instead of leaving "or X"
+  // for the outer parser). With the gate, only labeled slots like
+  // "(a) X or Y" — where the writer has explicitly delimited the slot
+  // boundary — opt into the OR loop.
+  //
+  // The guard at the top prevents atom()'s catch-all consume-and-bail
+  // from silently swallowing a list-level joiner ("," / "and") or
+  // parent-grammar terminator ("or" / ";" / "." / ")") it doesn't own.
   private codeListItem(): Expr | null {
-    const t = this.peek()
-    if (!t) return null
-    if (t.type === 'CODE') {
+    let hadLabel = false
+    while (this.match('LABEL')) {
       this.consume()
-      return { kind: 'code', code: t.value }
+      hadLabel = true
     }
-    if (t.type === 'TEXT') {
+    if (this.match('OR', 'AND', 'COMMA', 'SEMI', 'DOT', 'RPAREN')) {
+      return null
+    }
+    const first = this.atom()
+    if (!first) return null
+    if (!hadLabel || !this.match('OR')) return first
+    const children: Expr[] = [first]
+    while (this.match('OR')) {
       this.consume()
-      return { kind: 'literal', text: t.value }
+      if (this.match('AND', 'COMMA', 'SEMI', 'DOT', 'RPAREN')) break
+      const next = this.atom()
+      if (!next) break
+      children.push(next)
     }
-    return null
+    return children.length === 1
+      ? children[0]
+      : { kind: 'or', ui: 'dropdown', children }
   }
 
   // After "either": collect labeled branches separated by "or" / ";". Each
@@ -398,10 +453,8 @@ class Parser {
         this.consume()
         continue
       }
-      if (t.type === 'AND') {
-        this.consume()
-        continue
-      }
+      // Stray AND (and any other unexpected joiner) is swallowed by atom()'s
+      // catch-all consume-and-bail; we don't need an explicit handler here.
       const beforePos = this.pos
       const a = this.atom()
       if (!a) {
@@ -486,8 +539,69 @@ function tokenText(t: Token): string {
 
 // ---------- Normalization ----------
 
+// True if `expr` is a "structural" subtree — every leaf is a Code with no
+// prose mixed in. Pure-code branches stay actionable in the rendered
+// graph (the user can select / expand them); anything else collapses to
+// a single literal info block.
+function isPureCode(expr: Expr): boolean {
+  switch (expr.kind) {
+    case 'code':
+      return true
+    case 'literal':
+    case 'flattened':
+      return false
+    case 'and':
+    case 'or':
+      return expr.children.every(isPureCode)
+  }
+}
+
+// Flatten an expression back to a single prose string for the
+// collapsed-literal info block. Joins And/Or with their natural English
+// connectives so the block reads close to the source text.
+function flattenToProse(expr: Expr): string {
+  switch (expr.kind) {
+    case 'code':
+      return expr.code
+    case 'literal':
+    case 'flattened':
+      return expr.text
+    case 'and':
+      return expr.children
+        .map(flattenToProse)
+        .filter((s) => s)
+        .join(' and ')
+    case 'or':
+      return expr.children
+        .map(flattenToProse)
+        .filter((s) => s)
+        .join(' or ')
+  }
+}
+
 // Flatten same-kind nesting (And inside And, Or-dropdown inside Or-dropdown
-// at the same UI level) and collapse single-child groups.
+// at the same UI level), collapse single-child groups, then apply the
+// structural per-branch rule:
+//
+//   - Disjunction (Or-dropdown / Or-stacked): each branch must be either
+//     a pure-code subtree (stays selectable / expandable) or a single
+//     literal (inert prose). Mixed-tree branches like And[Code, Lit]
+//     collapse to one literal showing the branch's verbatim prose — the
+//     partial structure isn't actionable, and shredding it across
+//     dropdown rows confuses the user. After per-branch collapse, if
+//     every branch is now a literal, the whole disjunction collapses to
+//     one literal. Flattened either-branches are passed through (their
+//     hybrid prose-label + subExpr-walk is intentional structure).
+//
+//   - Conjunction (And): keep all children as-is — conjunction means
+//     "satisfy all", so every child belongs in the graph. The exception
+//     is And-of-all-literals, which collapses to a single literal so
+//     things like "Third- or fourth-year class standing and permission
+//     of the Department Head" land in one info block instead of two.
+//
+// This replaces the previous per-idiom heuristics ("standing", "credits
+// from", …) with a structural rule that doesn't care what the prose
+// says — only whether the parser turned it into actionable structure.
 function normalize(expr: Expr): Expr {
   if (expr.kind === 'code' || expr.kind === 'literal') return expr
   if (expr.kind === 'flattened') {
@@ -510,8 +624,30 @@ function normalize(expr: Expr): Expr {
 
   if (children.length === 0) return { kind: 'literal', text: '' }
   if (children.length === 1) return children[0]
-  if (expr.kind === 'and') return { kind: 'and', children }
-  return { kind: 'or', ui: expr.ui, children }
+
+  if (expr.kind === 'or') {
+    const collapsed: Expr[] = children.map((c) => {
+      if (c.kind === 'flattened') return c
+      return isPureCode(c) ? c : { kind: 'literal', text: flattenToProse(c) }
+    })
+    if (collapsed.every((c) => c.kind === 'literal')) {
+      const text = collapsed
+        .map((c) => (c as Extract<Expr, { kind: 'literal' }>).text)
+        .filter((s) => s)
+        .join(' or ')
+      return { kind: 'literal', text }
+    }
+    return { kind: 'or', ui: expr.ui, children: collapsed }
+  }
+
+  if (children.every((c) => c.kind === 'literal')) {
+    const text = children
+      .map((c) => (c as Extract<Expr, { kind: 'literal' }>).text)
+      .filter((s) => s)
+      .join(' and ')
+    return { kind: 'literal', text }
+  }
+  return { kind: 'and', children }
 }
 
 // ---------- Public API ----------
@@ -527,10 +663,16 @@ function normalize(expr: Expr): Expr {
 //
 // Match runs up to the first ".", ";", or end of string so we don't eat
 // past the items list into trailing constraints ("…; and 3rd-year
-// standing"). The 'g' / 'i' flags let multiple grade phrases in one
-// prereq string each get rewritten.
+// standing"). The capture is non-greedy with a lookahead that also stops
+// at the next labeled branch boundary — `, b)` / `, or c)` / `, (b)` —
+// so a multi-branch prereq like MATH 121's "Either a) a score of 68%
+// or higher in MATH 120, b) a score of 80% or higher in MATH 100, …"
+// gets two separate rewrites instead of one over-greedy slurp from the
+// first phrase to end-of-string. The 'g' / 'i' flags let multiple grade
+// phrases per prereq each get rewritten and case-fold the whole pattern
+// so "A Grade of 80%…" matches the same as "a grade of 80%…".
 const GRADE_PREFIX_RE =
-  /\b[Aa]\s+(?:grade|score)\s+of\s+\d+\s*%\s+or\s+higher\s+in\s+([^.;]+)/g
+  /\ba\s+(?:grade|score)\s+of\s+\d+\s*%\s+or\s+higher\s+in\s+([^.;]+?)(?=\s*,\s*(?:and\s+|or\s+)?\(?\s*[a-z]\s*\)|;|\.|$)/gi
 
 function stripGradePrefix(input: string): string {
   return input.replace(GRADE_PREFIX_RE, (_match, items: string) => {

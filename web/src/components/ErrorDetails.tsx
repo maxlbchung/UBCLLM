@@ -108,7 +108,6 @@ export function ErrorDetails({ error }: { error: ChatError }) {
             </p>
             <ul className="mt-1 space-y-0.5 font-mono text-[0.6875rem] text-red-200/90">
               <li>query: {JSON.stringify(error.request.query)}</li>
-              <li>historyTurns: {error.request.historyTurns}</li>
               <li>sourceCount: {error.request.sourceCount}</li>
             </ul>
           </div>

@@ -16,20 +16,10 @@ import {
   makeMessage,
   useChat,
   type ChatError,
-  type Message,
 } from '../store/chat'
 import { useConversations } from '../store/conversations'
 import { useEasterEggs } from '../store/easterEggs'
 import { ChatMessage } from './ChatMessage'
-
-// Last N (user, assistant) pairs sent to the LLM each turn. Each pair is
-// roughly 1 kB of text on average for an advisor reply, so 3 turns adds
-// ~6 kB to the prefill on top of the system prompt + RAG context. 6 used
-// to be the cap and was making long conversations TDR — bigger prefill =
-// more likely to exceed Windows' ~2s GPU compute limit. 3 covers
-// Q-A-Q-A-Q-A clarification chains, which is plenty for follow-ups like
-// "what about its prereqs?" while keeping the worst-case prompt bounded.
-const HISTORY_TURNS = 3
 
 // Bare subject codes ("DSCI", "CPSC", "MATH_V") embed close to their own
 // course chunks (cosine 0.5–0.65), so the threshold floor can't filter
@@ -42,20 +32,6 @@ const BARE_SUBJECT_RE = /^[A-Z]{3,5}(?:_V)?$/i
 // keeps the prefill bounded and prevents pathological pastes from blowing
 // past MiniLM's ~512-token window or eating the LLM's context budget.
 const MAX_INPUT_LENGTH = 500
-
-// Earlier user queries fed back to the model as separate `role: 'user'`
-// chat-completion entries (see send() below). Past assistant replies are
-// deliberately dropped — they were the source of the fact-bleed bug where
-// the model would carry a course code from a prior answer into the next
-// reply, even when the new sources said something different. Keeping just
-// the user's prior queries as multi-turn history lets the model resolve
-// pronouns ("what about its prereqs?") without re-introducing that bleed.
-function priorUserQueries(history: Message[]): string[] {
-  return history
-    .filter((m) => m.role === 'user')
-    .map((m) => m.content.trim())
-    .filter((q) => q.length > 0)
-}
 
 export function Chat() {
   const messages = useChat((s) => s.messages)
@@ -103,7 +79,6 @@ export function Chat() {
     // Hoisted so the catch block can attach a request snapshot to the
     // ChatError. They start empty/undefined and get filled inside the try.
     let sources: Chunk[] = []
-    let recent: Message[] = []
     let llmMessages: ChatCompletionMessageParam[] = []
 
     try {
@@ -135,12 +110,6 @@ export function Chat() {
         useEasterEggs.getState().markDiscovered(top.id)
       }
 
-      const prior = useChat
-        .getState()
-        .messages.slice(0, -2) // drop the just-added user + empty assistant
-      recent = prior.slice(-HISTORY_TURNS * 2)
-      const earlierQueries = priorUserQueries(recent)
-
       // Mode-aware system prompt: the citation/refusal/anti-echo rules live
       // there (not at the user-message tail) so the chat template's
       // <|im_start|>system fence marks them as policy. Mode is decided by
@@ -151,10 +120,11 @@ export function Chat() {
       //     strict-quote variant so the model doesn't refuse the absurd-
       //     sounding answer.
       //   - default → standard RAG path.
-      // Earlier user queries are sent as separate `role: 'user'` entries
-      // before the current message — multi-turn history Qwen reads via its
-      // chat template, with no labeled "Earlier user queries" block to
-      // echo. Past assistant replies stay omitted (fact-bleed prevention).
+      // Each turn is single-shot — no prior user queries or assistant
+      // replies are sent. Multi-turn history was producing fact-bleed
+      // (model carried a course code from a prior reply into the next
+      // answer); reverting to stateless calls makes each answer derive
+      // strictly from the current turn's RAG sources.
       const easterMode = sources.length === 1 && sources[0].kind === 'easter'
       const mode: SystemPromptMode = bareSubject
         ? 'bareSubject'
@@ -162,13 +132,8 @@ export function Chat() {
           ? 'easter'
           : 'default'
 
-      const priorTurns: ChatCompletionMessageParam[] = earlierQueries.map(
-        (content) => ({ role: 'user', content }),
-      )
-
       llmMessages = [
         { role: 'system', content: buildSystemPrompt(mode) },
-        ...priorTurns,
         {
           role: 'user',
           content: userPromptWithContext(q, sources, missingCodes, bareSubject),
@@ -187,7 +152,6 @@ export function Chat() {
       // recovery happened transparently, only when an error is thrown.
     } catch (err) {
       const requestSnapshot = {
-        historyTurns: Math.floor(recent.length / 2),
         sourceCount: sources.length,
         query: q,
       }

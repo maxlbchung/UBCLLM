@@ -5,7 +5,13 @@ import type { Chunk } from './retrieve'
 // llm.ts (currently 300) is the runaway-loop backstop. Keep these in
 // rough 2× sync — too tight a hard cap clips legitimate detailed
 // answers, too loose a soft cap loses the brevity cue.
-const SYSTEM_PROMPT_BASE = `You are a UBC Vancouver academic advisor. Answer questions about UBC Vancouver courses and programs using only the sources provided in the user's message. Be concise, no filler. Keep replies under 150 words.`
+//
+// `/no_think` is a Qwen3 / Qwen3.5 chat-template directive that disables
+// the model's reasoning mode (otherwise it emits a <think>...</think>
+// block before the answer, which wastes the word budget and surfaces
+// half-formed reasoning to the user). Defense-in-depth: streamChat in
+// llm.ts also strips any <think>...</think> blocks that slip through.
+const SYSTEM_PROMPT_BASE = `You are a UBC Vancouver academic advisor. Answer questions about UBC Vancouver courses and programs using only the sources provided in the user's message. Be concise, no filler. Keep replies under 150 words. /no_think`
 
 // Rules block for the default RAG path. Lives in the system prompt (not the
 // user message) so Qwen3.5 2B treats it as policy enforced by the chat
@@ -76,11 +82,11 @@ export function buildContext(chunks: Chunk[]): string {
 /**
  * Build the user-side prompt for the current turn.
  *
- * Prior user messages from this conversation are NOT bundled in here — they
- * are sent as separate `role: 'user'` entries in the chat-completion messages
- * array (see Chat.tsx). Past assistant replies are deliberately not sent at
- * all (was producing fact-bleed where the model carried a course code from
- * a prior reply into the next answer).
+ * Each turn is single-shot — no chat history is sent to the model (see
+ * Chat.tsx). Prior user queries + assistant replies were both producing
+ * fact-bleed (the model carried a course code from a prior turn into the
+ * next answer); reverting to stateless calls makes each answer derive
+ * strictly from the current turn's RAG sources.
  *
  * `missingCodes` — course codes the user mentioned that don't exist in the
  *   UBC calendar index. Surfaced as a hard signal so the model uses the

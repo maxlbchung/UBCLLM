@@ -12,7 +12,7 @@ Original setup plan (kept for reference; some details now stale):
 ## Architecture (one-liner per piece)
 
 - **Build time** (offline, Python via `uv`): `scraper/` crawls `vancouver.calendar.ubc.ca` → JSON. `pipeline/` chunks + embeds with `sentence-transformers` (MiniLM-L6-v2, 384-dim) → ships `chunks.json` + `embeddings.bin` as static assets to `web/public/data/`.
-- **Runtime** (browser only): Vite + React 19 + TS + Tailwind v4. `@xenova/transformers` embeds the user query with the *same* MiniLM (`Xenova/all-MiniLM-L6-v2`). Cosine similarity vs `embeddings.bin` (in-memory Float32Array, ~10.9k rows, brute-force, ~10 ms). Top-K chunks + system prompt + last 6 chat turns → `@mlc-ai/web-llm` streams Qwen3.5 2B output. Cited context entries are surfaced in the UI via `[N]` markers parsed out of the response.
+- **Runtime** (browser only): Vite + React 19 + TS + Tailwind v4. `@xenova/transformers` embeds the user query with the *same* MiniLM (`Xenova/all-MiniLM-L6-v2`). Cosine similarity vs `embeddings.bin` (in-memory Float32Array, ~10.9k rows, brute-force, ~10 ms). Top-K chunks + system prompt + current user message → `@mlc-ai/web-llm` streams Qwen3.5 2B output. Each turn is single-shot — no chat history is sent (fact-bleed prevention). Cited context entries are surfaced in the UI via `[N]` markers parsed out of the response.
 - **Deploy:** GitHub Actions workflow re-runs the embedding pipeline on every push (Hugging Face cache speeds it up to ~1–2 min after the first run), then `npm install && npm run build`, then publishes `web/dist/` via `actions/deploy-pages@v4`.
 
 ## Project layout
@@ -49,7 +49,7 @@ The full v1 stack from the original plan is shipped and live. Highlights:
 - Median chunk text size: ~246 chars (course) vs ~1,430 chars (program). Programs dominate the LLM context budget when retrieved.
 
 **App features shipped:**
-- **Chat** with streaming Qwen3.5 2B output, last 3 turns of prior user queries (assistant replies dropped) sent as multi-turn `role: 'user'` history, RAG context from top-8 chunks per turn.
+- **Chat** with streaming Qwen3.5 2B output, single-shot per turn (no chat history sent — fact-bleed prevention), RAG context from top-8 chunks per turn.
 - **Course Lookup** — one-shot detail card by code (case-insensitive: `CPSC 110` / `cpsc110` / `CPSC_V 110` all work).
 - **Prereq Tree** — full transitive BFS expansion, depth-capped at 12, cycle-safe; direct coreqs on the right (not transitively expanded). ReactFlow column layout, root on the right.
 - **Sidebar** — conversation list (auto-titled from first user message), tool tabs, version badge bottom-left. Collapsible: toggle in the top-right shrinks it to a `w-12` strip; collapsed state is persisted via `useConversations.sidebarCollapsed`.

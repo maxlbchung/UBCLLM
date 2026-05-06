@@ -27,7 +27,6 @@ export interface ChatError {
   stack?: string
   recovered?: boolean
   request?: {
-    historyTurns: number
     sourceCount: number
     query: string
   }

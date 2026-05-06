@@ -262,6 +262,77 @@ let chainTail: Promise<void> = Promise.resolve()
 // to recompute on every delta without a real tokenizer.
 const HARD_WORD_CAP = 300
 
+// Streaming filter that strips Qwen3 / Qwen3.5 thinking blocks
+// (<think>...</think>) from the output. The system prompt already passes
+// `/no_think` to disable reasoning at the chat-template level, but if the
+// model emits the tags anyway (some quants ignore the directive), we want
+// the user to never see them.
+//
+// The wrinkle is that <think> / </think> can land split across streaming
+// deltas — e.g. delta 1 ends with "<thi" and delta 2 starts with "nk>".
+// Naively yielding each delta would leak the partial tag. We hold back the
+// trailing HOLDBACK chars of the buffer in 'outside' state so a partial
+// open tag never gets yielded; in 'inside' state we discard everything
+// anyway, but keep the same trailing window so a partial close tag can
+// still be detected when the next delta arrives.
+//
+// HOLDBACK = max(<think>, </think>) - 1 = 7. One char larger than needed
+// for the open tag (only 6 chars matter there) but harmless — the held-back
+// char gets yielded on the next delta.
+const THINK_OPEN = '<think>'
+const THINK_CLOSE = '</think>'
+const THINK_HOLDBACK = THINK_CLOSE.length - 1
+
+class ThinkFilter {
+  private buffer = ''
+  private inThink = false
+
+  // Push a streamed delta; return text safe to yield (may be empty).
+  push(delta: string): string {
+    this.buffer += delta
+    let out = ''
+    while (true) {
+      if (this.inThink) {
+        const closeIdx = this.buffer.indexOf(THINK_CLOSE)
+        if (closeIdx === -1) {
+          // Trim the buffer to the trailing window so it can't grow
+          // unboundedly inside a never-closing think block.
+          this.buffer = this.buffer.slice(
+            Math.max(0, this.buffer.length - THINK_HOLDBACK),
+          )
+          return out
+        }
+        this.buffer = this.buffer.slice(closeIdx + THINK_CLOSE.length)
+        this.inThink = false
+      } else {
+        const openIdx = this.buffer.indexOf(THINK_OPEN)
+        if (openIdx === -1) {
+          const safeLen = Math.max(0, this.buffer.length - THINK_HOLDBACK)
+          out += this.buffer.slice(0, safeLen)
+          this.buffer = this.buffer.slice(safeLen)
+          return out
+        }
+        out += this.buffer.slice(0, openIdx)
+        this.buffer = this.buffer.slice(openIdx + THINK_OPEN.length)
+        this.inThink = true
+      }
+    }
+  }
+
+  // Drain at end of stream. If the model never closed a think block
+  // (shouldn't happen), discard the held-back chars rather than leaking
+  // them. Otherwise yield whatever's left in the safe-tail window.
+  flush(): string {
+    if (this.inThink) {
+      this.buffer = ''
+      return ''
+    }
+    const out = this.buffer
+    this.buffer = ''
+    return out
+  }
+}
+
 // Inactivity timeout for the worker stream. If no delta arrives within this
 // window — counted from either stream-start or the last received delta — we
 // assume the worker is wedged (GPU process crash, silent device-lost, etc.)
@@ -315,6 +386,11 @@ export async function* streamChat(
           // it on the chunk-supported path and makes refusals reliable.
           temperature: opts.temperature ?? 0,
         })
+        // Per-call <think>...</think> stripper for Qwen3 / Qwen3.5. We
+        // count words against `accumulated` (post-filter content), not raw
+        // deltas, so a runaway thinking block can't trip HARD_WORD_CAP
+        // before the actual answer even starts.
+        const thinkFilter = new ThinkFilter()
         let accumulated = ''
         // Manual iteration (not for-await) so each next() can be raced
         // against an inactivity timer. for-await offers no hook to bail
@@ -345,30 +421,41 @@ export async function* streamChat(
           const chunk = result.value
           const delta = chunk.choices[0]?.delta?.content
           if (delta) {
-            yielded = true
-            yield delta
-            accumulated += delta
-            // Whitespace-token count is approximate during streaming
-            // (a partial word like "wor" reads as one token until the
-            // closing delta arrives) but converges to the real count
-            // by stream end. Slight over-count here makes us cut a
-            // few tokens early — fine for a length backstop.
-            const wordCount = accumulated.match(/\S+/g)?.length ?? 0
-            if (wordCount >= HARD_WORD_CAP) {
-              try {
-                // Best-effort: tells the engine to stop generating so
-                // the GPU loop terminates cleanly. If it throws or is
-                // missing, breaking the loop still ends our yield —
-                // the iterator's return() call propagates to the
-                // worker, and resetChat() at the next call's start
-                // clears any leftover state anyway.
-                engine.interruptGenerate()
-              } catch {
-                /* fall through to the break below */
+            const filtered = thinkFilter.push(delta)
+            if (filtered) {
+              yielded = true
+              yield filtered
+              accumulated += filtered
+              // Whitespace-token count is approximate during streaming
+              // (a partial word like "wor" reads as one token until the
+              // closing delta arrives) but converges to the real count
+              // by stream end. Slight over-count here makes us cut a
+              // few tokens early — fine for a length backstop.
+              const wordCount = accumulated.match(/\S+/g)?.length ?? 0
+              if (wordCount >= HARD_WORD_CAP) {
+                try {
+                  // Best-effort: tells the engine to stop generating so
+                  // the GPU loop terminates cleanly. If it throws or is
+                  // missing, breaking the loop still ends our yield —
+                  // the iterator's return() call propagates to the
+                  // worker, and resetChat() at the next call's start
+                  // clears any leftover state anyway.
+                  engine.interruptGenerate()
+                } catch {
+                  /* fall through to the break below */
+                }
+                break
               }
-              break
             }
           }
+        }
+        // Drain the filter's safe-tail window after the model finishes —
+        // anything held back to disambiguate a partial tag is real content
+        // now that no more deltas are coming.
+        const tail = thinkFilter.flush()
+        if (tail) {
+          yielded = true
+          yield tail
         }
         logDiag('main', 'stream-complete', { recovered, attempt })
         return { recovered }

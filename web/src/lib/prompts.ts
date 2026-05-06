@@ -9,8 +9,7 @@ import type { Chunk } from './retrieve'
 // `/no_think` is a Qwen3 / Qwen3.5 chat-template directive that disables
 // the model's reasoning mode (otherwise it emits a <think>...</think>
 // block before the answer, which wastes the word budget and surfaces
-// half-formed reasoning to the user). Defense-in-depth: streamChat in
-// llm.ts also strips any <think>...</think> blocks that slip through.
+// half-formed reasoning to the user).
 const SYSTEM_PROMPT_BASE = `You are a UBC Vancouver academic advisor. Answer questions about UBC Vancouver courses and programs using only the sources provided in the user's message. Be concise, no filler. Keep replies under 150 words. /no_think`
 
 // Rules block for the default RAG path. Lives in the system prompt (not the

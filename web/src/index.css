@@ -47,6 +47,41 @@ body {
   background: transparent;
 }
 
+/* ReactFlow Controls (zoom in / out / fit-view) — repaint the default
+   white control panel to match the zinc dark theme used by every node in
+   the prereq tree.
+   Specificity note: the library ships these styles in
+   reactflow/dist/style.css, which is imported from PrereqTree.tsx — that
+   makes it load AFTER index.css in the bundle. Equal-specificity selectors
+   would lose the cascade race, so each override is scoped under .react-flow
+   to bump specificity from 0,1,0 to 0,2,0 and win regardless of import
+   order. */
+.react-flow .react-flow__controls {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  border: 1px solid #3f3f46;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.react-flow .react-flow__controls-button {
+  background: #18181b;
+  border: none;
+  border-bottom: 1px solid #3f3f46;
+  color: #e5e7eb;
+  fill: #e5e7eb;
+  width: 24px;
+  height: 24px;
+}
+.react-flow .react-flow__controls-button:last-child {
+  border-bottom: none;
+}
+.react-flow .react-flow__controls-button:hover {
+  background: #27272a;
+  fill: #fff;
+}
+.react-flow .react-flow__controls-button svg {
+  fill: currentColor;
+}
+
 /* Easter-egg counter pop + spark particles. Triggered when the discovered
    count increments (see Sidebar.tsx). The pop scales the number briefly;
    sparks fly outward along per-particle --dx/--dy CSS vars and decelerate

@@ -5,6 +5,7 @@ import {
   type Chunk,
   type ParsedCourse,
 } from '../lib/retrieve'
+import { ABCD_EASTER_ID, useEasterEggs } from '../store/easterEggs'
 
 type ParsedQuery =
   | { kind: 'none' }
@@ -15,7 +16,11 @@ type ParsedQuery =
 
 /**
  * Parse a lookup-bar input into one of:
- *   - exact:   "CPSC 110"            → single course
+ *   - exact:   "CPSC 110" / "CPSC 22" → code-shaped query (1–4 digits).
+ *              lookup() resolves these in two stages: first index.get(code)
+ *              for a complete code, falling back to a prefix scan over
+ *              `codes` so partial numbers ("CPSC 22") surface CPSC 220,
+ *              221, 226, … as an expandable list.
  *   - subject: "CPSC"                → all courses in that subject
  *   - filter:  "CPSC 100 =" / "+" / "-" → all courses in subject whose first
  *              digit equals / is ≥ / is < the query's first digit
@@ -53,7 +58,12 @@ function parseQuery(raw: string): ParsedQuery {
     }
   }
 
-  const exactMatch = q.match(/^([A-Z]{2,5})(?:_V)?\s*(\d{2,4}[A-Z]?)$/)
+  // Code-shape input: subject + 1–4 digits, optional letter suffix. The
+  // 1-digit lower bound is what powers partial-prefix lookups (e.g.
+  // "CPSC 2" → all CPSC 2xx/2xxx). lookup() resolves the exact branch by
+  // first trying index.get(code); on miss it falls back to a prefix scan
+  // over `codes`, so this regex doesn't need a separate `partial` kind.
+  const exactMatch = q.match(/^([A-Z]{2,5})(?:_V)?\s*(\d{1,4}[A-Z]?)$/)
   if (exactMatch) {
     return { kind: 'exact', code: `${exactMatch[1]} ${exactMatch[2]}` }
   }
@@ -64,6 +74,27 @@ function parseQuery(raw: string): ParsedQuery {
   }
 
   return { kind: 'none' }
+}
+
+// Hidden easter — typed "ABCD" in the lookup bar surfaces this as the only
+// match. No real UBC subject code is ABCD, so this can't collide with a
+// legitimate search. Text is laid out in the pipeline's chunk format so
+// parseCourseChunk lifts Credits + Prerequisites out into their fields and
+// leaves the description (with the song embedded) for CourseCard. The id
+// is shared with easterEggs.ts via ABCD_EASTER_ID so markDiscovered ↔
+// validIds use the same string.
+const ABCD_EASTER_CHUNK: Chunk = {
+  id: ABCD_EASTER_ID,
+  kind: 'course',
+  code: 'ABCD 123',
+  title: 'Introduction to the Alphabet',
+  text: [
+    'ABCD 123: Introduction to the Alphabet',
+    'Credits: 26',
+    "A foundational survey of the 26-letter Latin alphabet, taught entirely through song: A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, and Z. Now I know my ABCs — next time won't you sing with me?",
+    'Prerequisites: A nice singing voice.',
+  ].join('\n'),
+  url: 'https://en.wikipedia.org/wiki/Alphabet_song',
 }
 
 function describeFilter(p: Extract<ParsedQuery, { kind: 'filter' }>): string {
@@ -81,6 +112,12 @@ export function CourseLookup() {
   const [matchHeading, setMatchHeading] = useState<string>('')
   const [error, setError] = useState<string | null>(null)
   const [suggestions, setSuggestions] = useState<string[]>([])
+  // Course codes currently expanded inline in the subject/filter list.
+  // Multi-value: opening a new block does not collapse previous ones; the
+  // only way to collapse a block is to click it again. Reset to empty on
+  // every new search (in lookup() below) so a fresh subject/filter query
+  // starts collapsed.
+  const [expandedCodes, setExpandedCodes] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     void getCourseIndex().then(setIndex)
@@ -94,6 +131,7 @@ export function CourseLookup() {
   function lookup(raw: string) {
     setQuery(raw)
     setError(null)
+    setExpandedCodes(new Set())
     if (!index) return
 
     const parsed = parseQuery(raw)
@@ -124,7 +162,25 @@ export function CourseLookup() {
         setSuggestions([])
         return
       }
+      // No exact hit. Try a prefix scan over the canonical "SUBJ 22"
+      // form so partial-number queries (CPSC 2 → CPSC 200…298 + 2xxx)
+      // surface as a real expandable list rather than dead-end "Did
+      // you mean?" suggestions. `codes` is sorted alphabetically; for
+      // mixed 3- and 4-digit numbers the lex order is fine (CPSC 220
+      // before CPSC 2200, both grouped under "starting with 22").
       setCourse(null)
+      const prefixHits = codes.filter((c) => c.startsWith(parsed.code))
+      if (prefixHits.length > 0) {
+        const prefixChunks = prefixHits
+          .map((c) => index.get(c))
+          .filter((c): c is Chunk => Boolean(c))
+        setMatches(prefixChunks)
+        setMatchHeading(`${parsed.code} courses`)
+        setSuggestions([])
+        return
+      }
+      // Last resort: substring suggestions for typos that prefix
+      // matching can't reach (e.g. mistyped subject codes).
       setMatches([])
       setMatchHeading('')
       const codeNoSpace = parsed.code.replaceAll(' ', '')
@@ -133,6 +189,17 @@ export function CourseLookup() {
         .slice(0, 8)
       setSuggestions(matched)
       if (matched.length === 0) setError(`No course matches "${raw}".`)
+      return
+    }
+
+    // Easter egg: typing the pseudo-subject "ABCD" surfaces a single
+    // synthetic course block. Intercepts before the real subject/filter
+    // lookup so the "no courses found" path doesn't fire.
+    if (parsed.kind === 'subject' && parsed.subject === 'ABCD') {
+      setMatches([ABCD_EASTER_CHUNK])
+      setMatchHeading('ABCD courses')
+      setCourse(null)
+      setSuggestions([])
       return
     }
 
@@ -228,22 +295,60 @@ export function CourseLookup() {
               {matches.length.toLocaleString()} {matchHeading} ({matches.length === 1 ? 'match' : 'matches'})
             </p>
             <ul className="flex flex-col gap-1">
-              {matches.map((c) => (
-                <li key={c.id}>
-                  <button
-                    onClick={() => setCourse(parseCourseChunk(c))}
-                    className="w-full text-left rounded border border-zinc-800 bg-zinc-900/60 hover:bg-zinc-800 hover:border-zinc-700 px-3 py-2 text-sm"
-                  >
-                    <span className="font-mono text-zinc-100">{c.code}</span>
-                    <span className="text-zinc-400"> — {c.title}</span>
-                  </button>
-                </li>
-              ))}
+              {matches.map((c) => {
+                const expanded = c.code !== null && expandedCodes.has(c.code)
+                // Easter chunks get a gold-tinted border so they read as
+                // "found something special" without screaming. Same amber-300
+                // shade used by the sidebar counter + chat ring/spark, scaled
+                // back to /60 opacity so it's a hint rather than a banner.
+                const isEaster = c.id.startsWith('easter:')
+                const buttonStateClass = isEaster
+                  ? expanded
+                    ? 'border-amber-300 bg-zinc-800'
+                    : 'border-amber-300/60 bg-zinc-900/60 hover:bg-zinc-800 hover:border-amber-300/80'
+                  : expanded
+                    ? 'border-zinc-600 bg-zinc-800'
+                    : 'border-zinc-800 bg-zinc-900/60 hover:bg-zinc-800 hover:border-zinc-700'
+                return (
+                  <li key={c.id} className="flex flex-col gap-1.5">
+                    <button
+                      onClick={() => {
+                        const code = c.code
+                        if (code === null) return
+                        const willExpand = !expandedCodes.has(code)
+                        setExpandedCodes((prev) => {
+                          const next = new Set(prev)
+                          if (next.has(code)) next.delete(code)
+                          else next.add(code)
+                          return next
+                        })
+                        // Discovery counter ticks on the transition from
+                        // collapsed → expanded only. Re-collapsing or
+                        // re-expanding doesn't double-count (markDiscovered
+                        // is idempotent on its own, but skipping the call on
+                        // collapse keeps the intent obvious in the trace).
+                        if (willExpand && isEaster) {
+                          useEasterEggs.getState().markDiscovered(c.id)
+                        }
+                      }}
+                      aria-expanded={expanded}
+                      className={`w-full text-left rounded border px-3 py-2 text-sm transition-colors ${buttonStateClass}`}
+                    >
+                      <span className="font-mono text-zinc-100">{c.code}</span>
+                      <span className="text-zinc-400"> — {c.title}</span>
+                    </button>
+                    {expanded && <CourseCard course={parseCourseChunk(c)} />}
+                  </li>
+                )
+              })}
             </ul>
           </section>
         )}
 
-        {course && <CourseCard course={course} />}
+        {/* Standalone card for exact-match queries (e.g. "CPSC 110"). The
+            subject/filter flow now expands inline above and never reaches
+            here — `course` is only set by the exact branch in lookup(). */}
+        {course && matches.length === 0 && <CourseCard course={course} />}
       </div>
     </div>
   )

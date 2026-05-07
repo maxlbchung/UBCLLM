@@ -7,6 +7,18 @@ import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { loadCorpus } from '../lib/retrieve'
 
+// Synthetic easter IDs — eggs that don't live in the scraped corpus but
+// should still count toward the discoverable pool. Most easters are hand-
+// curated chunks in pipeline/easter-eggs.json (kind 'easter') and get
+// triggered from Chat.tsx when they win the top retrieval slot. UI-local
+// easters (no retrieval signal) need to be enumerated here so loadFromCorpus
+// can include them in validIds — otherwise their markDiscovered call lands
+// in `discovered` but the validIds intersection in Sidebar drops it and the
+// counter never moves. Single source of truth for the ID; whichever
+// component owns the easter imports the constant so the strings can't drift.
+export const ABCD_EASTER_ID = 'easter:abcd-song'
+const SYNTHETIC_EASTER_IDS: string[] = [ABCD_EASTER_ID]
+
 interface State {
   // Raw discovered chunk IDs (e.g. "easter:best-astr-prof"). Persisted.
   discovered: string[]
@@ -32,9 +44,12 @@ export const useEasterEggs = create<State>()(
       loadFromCorpus: async () => {
         if (get().validIds.length > 0) return
         const { chunks } = await loadCorpus()
-        const validIds = chunks
+        const corpusIds = chunks
           .filter((c) => c.kind === 'easter')
           .map((c) => c.id)
+        // Dedupe in case a synthetic ID is also present in the corpus
+        // (shouldn't happen, but the Set keeps things stable if it does).
+        const validIds = [...new Set([...corpusIds, ...SYNTHETIC_EASTER_IDS])]
         set({ validIds })
       },
     }),

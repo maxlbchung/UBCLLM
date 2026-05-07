@@ -25,6 +25,8 @@ import {
 } from './DisjunctionNode'
 import { EitherOrNode, type EitherOrData } from './EitherOrNode'
 import { CourseNode, type CourseNodeVariant } from './CourseNode'
+import { SoftEdge, type SoftEdgeData } from './SoftEdge'
+import { useConversations } from '../store/conversations'
 
 function normalize(query: string): string {
   const m = query.toUpperCase().match(/^([A-Z]{2,5})(?:_V)?\s*(\d{2,4}[A-Z]?)$/)
@@ -49,6 +51,10 @@ type ColumnItem =
       code: string
       parsed: ParsedCourse | null
       role: 'root' | 'prereq' | 'coreq' | 'note'
+      // True when this node only appears in the graph because of a
+      // soft (optional) branch whose toggle is currently disabled. The
+      // node is rendered at low opacity and its prereqs aren't loaded.
+      faded?: boolean
     }
   | {
       kind: 'group'
@@ -56,6 +62,7 @@ type ColumnItem =
       ui: 'dropdown' | 'stacked'
       optionCount: number
       data: DisjunctionData | EitherOrData
+      faded?: boolean
     }
 
 const MAX_DEPTH = 12 // safety cap; UBC chains rarely exceed 4–5
@@ -64,11 +71,10 @@ const X_STEP = 280
 const Y_STEP = 90 // minimum vertical slot per item — wider groups grow past this
 const Y_GAP = 20 // additional gap between items when a tall item bumps the slot
 const NODE_WIDTH = 200
-const COURSE_HEIGHT = 50
-const DISJUNCTION_HEIGHT = 70
-const DISJUNCTION_HEIGHT_WITH_DETAIL = 110
-const EITHEROR_HEADER = 30
-const EITHEROR_ROW = 36
+
+// Per-line text height used by the heightOf estimator below.
+// 11px font × 1.3 line-height, rounded up.
+const TEXT_LINE_HEIGHT = 15
 
 // Edge styling shared by every prereq / coreq edge in the graph. The
 // coreq label box (`labelBgStyle`) uses the same dark fill + border as
@@ -101,17 +107,104 @@ const COREQ_EDGE_STYLE = {
   labelBgBorderRadius: 4,
 } as const
 
-const NOTE_HEIGHT = 80
+// "Optional" edge — applied to the immediate edge between a soft prereq's
+// first-level block and the downstream target. The dashed style signals
+// that the upstream is optional; the SoftEdge custom edge component then
+// renders an "optional" button at the path midpoint. Inner edges (i.e.
+// edges from prereqs of an opt-in soft block to that block itself) use
+// the regular PREREQ_EDGE_STYLE — once the user opts in, those become
+// required for that path.
+const SOFT_EDGE_STYLE = {
+  sourceHandle: 'right-source',
+  targetHandle: 'left-target',
+  type: 'soft',
+  style: { stroke: '#52525b', strokeWidth: 1.5, strokeDasharray: '5 5' },
+} as const
+
+// Carried through walkAst whenever the current expression sits inside a
+// `kind: 'soft'` wrapper. The key uniquely identifies the wrapper (so the
+// toggle button on the edge knows which soft branch to flip), and the
+// disabled flag governs whether attachments inside this subtree should
+// fade their nodes / suppress upstream walks.
+type SoftContext = { key: string; disabled: boolean }
+
+// Block heights aren't measured at render time; they're estimated from
+// text length so the column layout can leave the right amount of vertical
+// room. Using fixed nominal heights underestimates tall content (long
+// course titles, long literal notes, long either-or option text) and lets
+// blocks visually overlap their next-slot neighbour. The chars-per-line
+// bounds below are intentionally a bit tighter than reality so the
+// estimator tends to over-shoot height by one line — extra vertical gap
+// is cheap, overlap is the bug we're fixing.
+function estimateLines(text: string, charsPerLine: number): number {
+  if (!text) return 0
+  const words = text.split(/\s+/).filter(Boolean)
+  if (words.length === 0) return 0
+  let lines = 1
+  let used = 0
+  for (const word of words) {
+    if (used === 0) {
+      used = word.length
+    } else if (used + 1 + word.length <= charsPerLine) {
+      used += 1 + word.length
+    } else {
+      lines += 1
+      used = word.length
+    }
+    while (used > charsPerLine) {
+      // Single word longer than a line — it wraps internally.
+      lines += 1
+      used -= charsPerLine
+    }
+  }
+  return lines
+}
 
 function heightOf(item: ColumnItem): number {
   if (item.kind === 'course') {
-    return item.role === 'note' ? NOTE_HEIGHT : COURSE_HEIGHT
+    if (item.role === 'note') {
+      // CourseNode 'note': border 1+1 + padding 9+9 = 20 of chrome,
+      // italic text wrapping inside ~180px usable width.
+      const lines = Math.max(1, estimateLines(item.code, 24))
+      return 20 + TEXT_LINE_HEIGHT * lines
+    }
+    // CourseNode root/known/unknown: 20 chrome + code line + title row
+    // (margin 6 + pad 6 + 1px border = 13 between code and title).
+    const titleText = item.parsed?.title ?? '(not in calendar)'
+    const titleLines = Math.max(1, estimateLines(titleText, 24))
+    return 20 + TEXT_LINE_HEIGHT + 13 + TEXT_LINE_HEIGHT * titleLines
   }
   if (item.ui === 'dropdown') {
     const data = item.data as DisjunctionData
-    return data.detail ? DISJUNCTION_HEIGHT_WITH_DETAIL : DISJUNCTION_HEIGHT
+    // border 1+1 + outer pad 6+6 = 14 chrome, button ≈ 24.
+    let h = 14 + 24
+    if (data.detail) {
+      const text =
+        data.detail.kind === 'literal'
+          ? data.detail.text
+          : (data.detail.title ?? '(not in calendar)')
+      // Detail row usable width ≈ 188px → ~26 chars/line.
+      const lines = Math.max(1, estimateLines(text, 26))
+      // Detail block separator: margin 6 + pad 6 + 1px border = 13.
+      h += 13 + TEXT_LINE_HEIGHT * lines
+    }
+    return h
   }
-  return EITHEROR_HEADER + item.optionCount * EITHEROR_ROW
+  // EitherOr stacked: border 1+1 + outer pad 6+6 + header (text 12 +
+  // marginBottom 4) = 30 chrome before the rows.
+  const data = item.data as EitherOrData
+  let h = 30
+  for (let i = 0; i < data.options.length; i++) {
+    const opt = data.options[i]
+    const text = (opt.label ? `(${opt.label}) ` : '') + opt.display
+    // Row inner text width ≈ 156px (radio + gaps eat ~30px). ~22
+    // chars/line nominally; use 19 to keep a margin.
+    const lines = Math.max(1, estimateLines(text, 19))
+    // Each row: border 1+1 + pad 4+4 = 10 chrome + text lines.
+    h += 10 + TEXT_LINE_HEIGHT * lines
+    if (i < data.options.length - 1) h += 4 // inter-row gap
+  }
+  return h
 }
 
 // Pre-pass: walk the prereq tree once with the same selection logic the
@@ -125,6 +218,7 @@ function computeAbsorptions(
   rootCode: string,
   index: Map<string, Chunk>,
   selections: Map<string, number>,
+  softDisabled: Map<string, boolean>,
 ): Map<string, string> {
   const aliases = new Map<string, string>()
   const visited = new Set<string>()
@@ -203,6 +297,16 @@ function computeAbsorptions(
           walkAst(expr.subExpr, ownerCode, depth, `${path}.flat`, isCoreq)
         }
         return
+      case 'soft':
+        // Soft / optional wrapper — alias discovery doesn't care about
+        // the soft styling, just walk through to the wrapped subtree.
+        // Skip the wrapped subtree entirely if the user has toggled this
+        // soft branch off; otherwise we'd absorb codes into dropdowns
+        // that won't be rendered, leaving stale aliases the main BFS
+        // would route phantom edges through.
+        if (softDisabled.get(`${ownerCode}::${path}.soft`)) return
+        walkAst(expr.child, ownerCode, depth, `${path}.soft`, isCoreq)
+        return
     }
   }
 
@@ -215,6 +319,8 @@ function buildGraph(
   index: Map<string, Chunk>,
   selections: Map<string, number>,
   setSelection: (key: string, idx: number) => void,
+  softDisabled: Map<string, boolean>,
+  toggleSoft: (key: string) => void,
 ): Graph {
   const rootChunk = index.get(rootCode)
   if (!rootChunk) return { nodes: [], edges: [], depthCount: 0 }
@@ -239,6 +345,12 @@ function buildGraph(
   const edges: Edge[] = []
   const enqueued = new Set<string>([rootCode])
   const coreqIds = new Set<string>()
+  // Courses currently in the graph only because of a soft (optional)
+  // branch whose toggle is disabled. They render faded and have no
+  // upstream walk. If the same course is later reached through a hard
+  // (or enabled-soft) path, attachPrereqCode promotes it: clears the
+  // faded flag, removes it from this set, and queues its prereqs.
+  const fadedOnly = new Set<string>()
   // When a dropdown's chosen option is a course code, the dropdown block
   // *is* that course in the graph — no separate course node trails it. Any
   // *other* path that would have pointed an edge at the absorbed course
@@ -247,7 +359,7 @@ function buildGraph(
   // before the main BFS starts attaching edges — otherwise a course
   // processed before the absorbing OR would slip in pointing at the
   // wrong target.
-  const codeAliases = computeAbsorptions(rootCode, index, selections)
+  const codeAliases = computeAbsorptions(rootCode, index, selections, softDisabled)
 
   type QItem = { code: string; parsed: ParsedCourse; depth: number }
   const queue: QItem[] = [{ code: rootCode, parsed: root, depth: 0 }]
@@ -276,14 +388,50 @@ function buildGraph(
     path: string,
     targetId: string,
     isCoreq = false,
+    softContext: SoftContext | null = null,
   ): void {
     if (depth > MAX_DEPTH) return
     switch (expr.kind) {
       case 'and':
+        // AND children all sit at the same "level" as the parent — if the
+        // parent is soft, every child's edge to the target is soft too.
         expr.children.forEach((child, i) =>
-          walkAst(child, ownerCode, depth, `${path}.and[${i}]`, targetId, isCoreq),
+          walkAst(
+            child,
+            ownerCode,
+            depth,
+            `${path}.and[${i}]`,
+            targetId,
+            isCoreq,
+            softContext,
+          ),
         )
         return
+      case 'soft': {
+        // Recommendation wrapper: tag the immediate edge(s) coming out of
+        // this subtree with a SoftContext so they render as the dashed
+        // SoftEdge variant (with a click-to-toggle "optional" button at
+        // the midpoint). When the toggle is currently disabled, the
+        // first-level block(s) inside the wrapper still render but at
+        // reduced opacity, and we suppress walking their prereqs — this
+        // is enforced inside attachPrereqCode / attachNoteLiteral /
+        // registerGroup based on softContext.disabled.
+        const key = `${ownerCode}::${path}.soft`
+        const nextCtx: SoftContext = {
+          key,
+          disabled: softDisabled.get(key) ?? false,
+        }
+        walkAst(
+          expr.child,
+          ownerCode,
+          depth,
+          `${path}.soft`,
+          targetId,
+          isCoreq,
+          nextCtx,
+        )
+        return
+      }
       case 'or': {
         const key = `${ownerCode}::${path}.or`
         const groupId = `grp:${key}`
@@ -316,15 +464,32 @@ function buildGraph(
           }
         }
 
-        registerGroup(groupId, key, expr, safeChosen, depth, isCoreq, dropdownDetail)
-        edges.push({
-          id: `${isCoreq ? 'coreq' : 'prereq'}:${groupId}->${targetId}`,
-          source: groupId,
-          target: targetId,
-          ...(isCoreq ? COREQ_EDGE_STYLE : PREREQ_EDGE_STYLE),
-        })
+        registerGroup(
+          groupId,
+          key,
+          expr,
+          safeChosen,
+          depth,
+          isCoreq,
+          dropdownDetail,
+          /*faded=*/ softContext?.disabled === true,
+        )
+        edges.push(
+          softContext
+            ? buildSoftEdge(groupId, targetId, softContext)
+            : {
+                id: `${isCoreq ? 'coreq' : 'prereq'}:${groupId}->${targetId}`,
+                source: groupId,
+                target: targetId,
+                ...(isCoreq ? COREQ_EDGE_STYLE : PREREQ_EDGE_STYLE),
+              },
+        )
 
         if (!chosenExpr) return
+        // Soft + disabled: the dropdown / either-or block stays in the
+        // graph (faded), but we don't expand any of its upstream — the
+        // user has explicitly opted out of loading the optional path.
+        if (softContext?.disabled) return
 
         // Dropdown + course → dropdown IS the course; absorb. Walk the
         // absorbed course's own prereqs inline with target = groupId —
@@ -353,7 +518,10 @@ function buildGraph(
         if (expr.ui === 'dropdown' && chosenExpr.kind === 'literal') return
 
         // Either-or stacked, or dropdown with a nested chosen expression:
-        // fall through to the existing "edges target groupId" walk.
+        // fall through to the existing "edges target groupId" walk. Inner
+        // walks drop softContext — once the user opts in via the toggle,
+        // the inner expression becomes required for that path, so its
+        // edges should render as ordinary (solid) prereq edges.
         if (isCoreq) {
           if (chosenExpr.kind === 'code') {
             attachCoreqCode(chosenExpr.code, groupId)
@@ -419,7 +587,7 @@ function buildGraph(
       }
       case 'code':
         if (isCoreq) attachCoreqCode(expr.code, targetId)
-        else attachPrereqCode(expr.code, depth, targetId)
+        else attachPrereqCode(expr.code, depth, targetId, softContext)
         return
       case 'literal':
         // Any literal that lands here is a real prereq the parser
@@ -430,7 +598,14 @@ function buildGraph(
         // conjunctions of prose into single literals, so we don't get
         // multiple shredded blocks per idiom.
         if (expr.text.trim()) {
-          attachNoteLiteral(expr.text, `${ownerCode}::${path}`, depth, targetId, isCoreq)
+          attachNoteLiteral(
+            expr.text,
+            `${ownerCode}::${path}`,
+            depth,
+            targetId,
+            isCoreq,
+            softContext,
+          )
         }
         return
       case 'flattened':
@@ -438,27 +613,90 @@ function buildGraph(
         // normalization or a single-branch either): walk the structured
         // sub-expression directly into the current target.
         if (expr.subExpr) {
-          walkAst(expr.subExpr, ownerCode, depth, `${path}.flat`, targetId, isCoreq)
+          walkAst(
+            expr.subExpr,
+            ownerCode,
+            depth,
+            `${path}.flat`,
+            targetId,
+            isCoreq,
+            softContext,
+          )
         }
         return
     }
   }
 
-  function attachPrereqCode(code: string, depth: number, targetId: string): void {
+  function buildSoftEdge(
+    sourceId: string,
+    targetId: string,
+    ctx: SoftContext,
+  ): Edge {
+    const data: SoftEdgeData = {
+      softKey: ctx.key,
+      disabled: ctx.disabled,
+      onToggle: toggleSoft,
+    }
+    return {
+      // Include softKey in the id so two distinct soft branches feeding
+      // into the same target don't collide on a shared edge id (two
+      // dashed lines with the same source/target pair is rare but the
+      // id needs to stay unique either way).
+      id: `soft:${ctx.key}:${sourceId}->${targetId}`,
+      source: sourceId,
+      target: targetId,
+      ...SOFT_EDGE_STYLE,
+      data,
+    }
+  }
+
+  function attachPrereqCode(
+    code: string,
+    depth: number,
+    targetId: string,
+    softContext: SoftContext | null = null,
+  ): void {
     // Resolve through codeAliases so that if `code` has been absorbed into
     // a dropdown elsewhere, this edge points at that dropdown's group id
     // (not a phantom course node that doesn't exist).
     const sourceId = codeAliases.get(code) ?? code
     if (sourceId === targetId) return
-    edges.push({
-      id: `prereq:${sourceId}->${targetId}`,
-      source: sourceId,
-      target: targetId,
-      ...PREREQ_EDGE_STYLE,
-    })
+    edges.push(
+      softContext
+        ? buildSoftEdge(sourceId, targetId, softContext)
+        : {
+            id: `prereq:${sourceId}->${targetId}`,
+            source: sourceId,
+            target: targetId,
+            ...PREREQ_EDGE_STYLE,
+          },
+    )
     if (codeAliases.has(code)) return
-    if (enqueued.has(code)) return
-    enqueued.add(code)
+
+    const isFadedAttach = softContext?.disabled === true
+
+    if (byId.has(code)) {
+      // Already in the graph. If we previously added it via a disabled
+      // soft path (faded, no upstream walk) and we're now hitting it via
+      // a non-faded path, promote: clear the faded flag and walk its
+      // prereqs after all. Without this, a course that happens to be
+      // both an optional recommendation for X and a hard prereq for Y
+      // would lose its upstream chain whenever the optional toggle is
+      // off.
+      if (!isFadedAttach && fadedOnly.has(code)) {
+        fadedOnly.delete(code)
+        const existing = byId.get(code)
+        if (existing && existing.kind === 'course') {
+          byId.set(code, { ...existing, faded: false })
+          enqueued.add(code)
+          if (existing.parsed) {
+            queue.push({ code, parsed: existing.parsed, depth: existing.depth })
+          }
+        }
+      }
+      return
+    }
+
     const chunk = index.get(code)
     const parsed = chunk ? parseCourseChunk(chunk) : null
     byId.set(code, {
@@ -468,7 +706,16 @@ function buildGraph(
       parsed,
       role: 'prereq',
       depth,
+      faded: isFadedAttach,
     })
+    if (isFadedAttach) {
+      // Faded-only attachment: keep the node visible but skip the
+      // transitive prereq walk — that's the "prerequisites of that
+      // block should not be loaded" half of the soft-disabled UX.
+      fadedOnly.add(code)
+      return
+    }
+    enqueued.add(code)
     if (parsed) queue.push({ code, parsed, depth })
   }
 
@@ -482,15 +729,20 @@ function buildGraph(
     depth: number,
     targetId: string,
     isCoreq: boolean,
+    softContext: SoftContext | null = null,
   ): void {
     const sourceId = `note:${key}`
     if (sourceId === targetId) return
-    edges.push({
-      id: `${isCoreq ? 'coreq' : 'prereq'}:${sourceId}->${targetId}`,
-      source: sourceId,
-      target: targetId,
-      ...(isCoreq ? COREQ_EDGE_STYLE : PREREQ_EDGE_STYLE),
-    })
+    edges.push(
+      softContext
+        ? buildSoftEdge(sourceId, targetId, softContext)
+        : {
+            id: `${isCoreq ? 'coreq' : 'prereq'}:${sourceId}->${targetId}`,
+            source: sourceId,
+            target: targetId,
+            ...(isCoreq ? COREQ_EDGE_STYLE : PREREQ_EDGE_STYLE),
+          },
+    )
     if (byId.has(sourceId)) return
     byId.set(sourceId, {
       kind: 'course',
@@ -499,6 +751,7 @@ function buildGraph(
       parsed: null,
       role: 'note',
       depth: isCoreq ? 0 : depth,
+      faded: softContext?.disabled === true,
     })
     if (isCoreq) coreqIds.add(sourceId)
   }
@@ -542,6 +795,7 @@ function buildGraph(
     depth: number,
     isCoreq: boolean,
     detail: DisjunctionDetail,
+    faded: boolean,
   ): void {
     if (isCoreq) coreqIds.add(groupId)
     if (byId.has(groupId)) return
@@ -563,6 +817,7 @@ function buildGraph(
         optionCount: expr.children.length,
         data,
         depth: isCoreq ? 0 : depth,
+        faded,
       })
     } else {
       const data: EitherOrData = {
@@ -580,6 +835,7 @@ function buildGraph(
         optionCount: expr.children.length,
         data,
         depth: isCoreq ? 0 : depth,
+        faded,
       })
     }
   }
@@ -680,11 +936,17 @@ function buildGraph(
       // above the root with one Y_GAP of space, and each item above sits
       // its own height + Y_GAP further up.
       const x = 0
-      let nextBottomY = -COURSE_HEIGHT / 2 - Y_GAP // bottom edge of the next item to place
+      // Coreq stack starts one Y_GAP above the top edge of the root block.
+      // The root is centered at y=0 (only item in column d0), so its top
+      // edge is -heightOf(root)/2.
+      const rootItem = byId.get(rootCode)
+      const rootTop = rootItem ? -heightOf(rootItem) / 2 : 0
+      let nextBottomY = rootTop - Y_GAP // bottom edge of the next item to place
       for (let i = items.length - 1; i >= 0; i--) {
         const item = items[i]
         const h = heightOf(item)
         const positionY = nextBottomY - h
+        const opacityStyle = item.faded ? { opacity: 0.4 } : null
         if (item.kind === 'course') {
           const isNote = item.role === 'note'
           const known = item.parsed !== null
@@ -698,11 +960,10 @@ function buildGraph(
             id: item.id,
             type: 'course',
             position: { x, y: positionY },
-            data: {
-              label: isNote ? item.code : `${item.code}\n${title}`,
-              variant,
-            },
-            style: { width: NODE_WIDTH },
+            data: isNote
+              ? { variant, text: item.code }
+              : { variant, code: item.code, title },
+            style: { width: NODE_WIDTH, ...opacityStyle },
           })
         } else {
           nodes.push({
@@ -710,7 +971,7 @@ function buildGraph(
             type: item.ui === 'stacked' ? 'eitherOr' : 'disjunction',
             position: { x, y: positionY },
             data: item.data,
-            style: { width: NODE_WIDTH },
+            style: { width: NODE_WIDTH, ...opacityStyle },
           })
         }
         yByItem.set(item.id, positionY + h / 2)
@@ -736,11 +997,15 @@ function buildGraph(
       cursor += slot + (i < items.length - 1 ? Y_GAP : 0)
       yByItem.set(item.id, yCenter)
 
+      const opacityStyle = item.faded ? { opacity: 0.4 } : null
       if (item.kind === 'course') {
         const known = item.parsed !== null
         const isRoot = item.role === 'root'
         const isNote = item.role === 'note'
-        const nodeH = isNote ? NOTE_HEIGHT : COURSE_HEIGHT
+        // Use the real estimated height so a multi-line block stays
+        // centered in its slot; falling back to a fixed nominal here
+        // would let tall blocks bleed into the next slot.
+        const nodeH = heightOf(item)
         const title = item.parsed?.title ?? '(not in calendar)'
         const variant: CourseNodeVariant = isRoot
           ? 'root'
@@ -753,11 +1018,10 @@ function buildGraph(
           id: item.id,
           type: 'course',
           position: { x, y: yCenter - nodeH / 2 },
-          data: {
-            label: isNote ? item.code : `${item.code}\n${title}`,
-            variant,
-          },
-          style: { width: NODE_WIDTH },
+          data: isNote
+            ? { variant, text: item.code }
+            : { variant, code: item.code, title },
+          style: { width: NODE_WIDTH, ...opacityStyle },
         })
       } else {
         const h = heightOf(item)
@@ -766,7 +1030,7 @@ function buildGraph(
           type: item.ui === 'stacked' ? 'eitherOr' : 'disjunction',
           position: { x, y: yCenter - h / 2 },
           data: item.data,
-          style: { width: NODE_WIDTH },
+          style: { width: NODE_WIDTH, ...opacityStyle },
         })
       }
     })
@@ -832,29 +1096,40 @@ function HorizontalFitOnChange({
   const nodesRef = useRef(nodes)
   nodesRef.current = nodes
   useEffect(() => {
-    const currentNodes = nodesRef.current
-    if (currentNodes.length === 0) return
-    let minX = Infinity
-    let maxX = -Infinity
-    let minY = Infinity
-    let maxY = -Infinity
-    for (const n of currentNodes) {
-      const x = n.position.x
-      const y = n.position.y
-      if (x < minX) minX = x
-      if (x + NODE_WIDTH > maxX) maxX = x + NODE_WIDTH
-      if (y < minY) minY = y
-      if (y > maxY) maxY = y
-    }
-    fitBounds(
-      {
-        x: minX,
-        y: (minY + maxY) / 2,
-        width: maxX - minX,
-        height: 1,
-      },
-      { padding: 0.05, duration: 200 },
-    )
+    // Defer the fit to the next animation frame. When this effect fires
+    // on a tab-switch into the prereq view, ReactFlow's ResizeObserver
+    // hasn't yet propagated the post-`display:none` wrapper size into
+    // its internal store, so width/height are still 0. fitBounds then
+    // computes `height / (bounds.height * (1 + padding)) = 0 / 1.05 = 0`
+    // and clamps to `minZoom`, which manifests as the camera snapping
+    // all the way out instead of in. One rAF is enough for the resize
+    // callback + state update to land before we call fitBounds.
+    const id = requestAnimationFrame(() => {
+      const currentNodes = nodesRef.current
+      if (currentNodes.length === 0) return
+      let minX = Infinity
+      let maxX = -Infinity
+      let minY = Infinity
+      let maxY = -Infinity
+      for (const n of currentNodes) {
+        const x = n.position.x
+        const y = n.position.y
+        if (x < minX) minX = x
+        if (x + NODE_WIDTH > maxX) maxX = x + NODE_WIDTH
+        if (y < minY) minY = y
+        if (y > maxY) maxY = y
+      }
+      fitBounds(
+        {
+          x: minX,
+          y: (minY + maxY) / 2,
+          width: maxX - minX,
+          height: 1,
+        },
+        { padding: 0.05, duration: 200 },
+      )
+    })
+    return () => cancelAnimationFrame(id)
   }, [fitKey, fitBounds])
   return null
 }
@@ -863,6 +1138,10 @@ const NODE_TYPES = {
   disjunction: DisjunctionNode,
   eitherOr: EitherOrNode,
   course: CourseNode,
+} as const
+
+const EDGE_TYPES = {
+  soft: SoftEdge,
 } as const
 
 export function PrereqTree() {
@@ -877,6 +1156,15 @@ export function PrereqTree() {
   const [selections, setSelections] = useState<Map<string, number>>(
     () => new Map(),
   )
+  // Per-soft-branch toggle map. Keys are `${ownerCourseCode}::${path}.soft`
+  // — same shape as the disjunction selection keys, so two soft branches
+  // in the same course (or the same soft branch in two courses) don't
+  // collide. Default-absent means "expanded" (subtree fully loaded);
+  // flipping to true fades the soft block and skips loading its
+  // upstream prereqs.
+  const [softDisabled, setSoftDisabled] = useState<Map<string, boolean>>(
+    () => new Map(),
+  )
 
   const setSelection = useCallback((key: string, idx: number) => {
     setSelections((prev) => {
@@ -886,14 +1174,43 @@ export function PrereqTree() {
     })
   }, [])
 
+  const toggleSoft = useCallback((key: string) => {
+    setSoftDisabled((prev) => {
+      const next = new Map(prev)
+      next.set(key, !(prev.get(key) ?? false))
+      return next
+    })
+  }, [])
+
+  // Re-trigger the horizontal fit every time the user navigates back into
+  // the prereq view. PrereqTree is mounted once at app start (App.tsx
+  // toggles visibility with `display: none` to preserve local state across
+  // tab switches), so the initial HorizontalFitOnChange run happens while
+  // the container is hidden and ReactFlow can't measure its viewport —
+  // the fit silently no-ops. By bumping `viewOpens` on each transition
+  // into the prereq tab and folding it into `fitKey`, the effect re-fires
+  // once the container is actually visible.
+  const view = useConversations((s) => s.view)
+  const [viewOpens, setViewOpens] = useState(0)
+  useEffect(() => {
+    if (view === 'prereq') setViewOpens((c) => c + 1)
+  }, [view])
+
   useEffect(() => {
     void getCourseIndex().then(setIndex)
   }, [])
 
   const graph = useMemo(() => {
     if (!index || !activeCode) return { nodes: [], edges: [], depthCount: 0 }
-    return buildGraph(activeCode, index, selections, setSelection)
-  }, [index, activeCode, selections, setSelection])
+    return buildGraph(
+      activeCode,
+      index,
+      selections,
+      setSelection,
+      softDisabled,
+      toggleSoft,
+    )
+  }, [index, activeCode, selections, setSelection, softDisabled, toggleSoft])
 
   const root = useMemo(() => {
     if (!index || !activeCode) return null
@@ -963,6 +1280,7 @@ export function PrereqTree() {
             nodes={graph.nodes}
             edges={graph.edges}
             nodeTypes={NODE_TYPES}
+            edgeTypes={EDGE_TYPES}
             nodesDraggable={false}
             nodesConnectable={false}
             proOptions={{ hideAttribution: true }}
@@ -971,7 +1289,7 @@ export function PrereqTree() {
             <Controls showInteractive={false} />
             <HorizontalFitOnChange
               nodes={graph.nodes}
-              fitKey={activeCode ?? ''}
+              fitKey={`${activeCode ?? ''}::${viewOpens}`}
             />
           </ReactFlow>
         ) : (

@@ -23,6 +23,15 @@ export type Expr =
   // edges/blocks. Only produced by the labeled-either branch parser
   // when a bare OR appears mid-branch.
   | { kind: 'flattened'; text: string; subExpr: Expr | null }
+  // Soft / "optional" wrapper: the inner subtree was extracted from a
+  // recommendation tail like ". <X> is recommended" / ". <X, Y> are
+  // recommended" / ". <X> strongly recommended". The renderer styles
+  // edges from the wrapped subtree's top-level blocks to their target
+  // as dotted lines with an "optional" label. Children deeper in the
+  // tree (transitive prereqs of an optional course) are NOT marked
+  // soft — once you opt in to taking the recommended course, its own
+  // prereqs become required for that path.
+  | { kind: 'soft'; child: Expr }
 
 // Course-code canonicalization — same shape `extractCourseCodes` in
 // retrieve.ts produces ("CPSC 110", uppercased, no `_V` suffix). Keys built
@@ -35,24 +44,38 @@ function canonicalizeCode(subject: string, number: string): string {
 
 // ---------- Tokenizer ----------
 
-type Token =
-  | { type: 'CODE'; value: string }
+// Tokens carry their start offset in the input so the parser can slice the
+// original text back out (used by the trailing-drain fallback in `parse()`
+// to capture any prose left over after the top-level and_expr exits).
+type TokenBase = { start: number }
+type Token = TokenBase &
+  (
+    | { type: 'CODE'; value: string }
+    | { type: 'ONE_OF' }
+    | { type: 'ALL_OF' }
+    | { type: 'EITHER' }
+    | { type: 'AND' }
+    | { type: 'OR' }
+    | { type: 'LABEL' /* (a), (b), … */ }
+    | { type: 'LPAREN' }
+    | { type: 'RPAREN' }
+    | { type: 'COMMA' }
+    | { type: 'SEMI' /* ; */ }
+    | { type: 'DOT' /* . */ }
+    | { type: 'TEXT'; value: string }
+  )
+
+// Words/symbols the lexer treats as token boundaries. Anything else
+// accumulates into a TEXT token. The `make` factories return the type
+// tag only; the lexer wraps the result with the matched `start` offset
+// before pushing.
+type KwToken =
   | { type: 'ONE_OF' }
   | { type: 'ALL_OF' }
   | { type: 'EITHER' }
   | { type: 'AND' }
   | { type: 'OR' }
-  | { type: 'LABEL' /* (a), (b), … */ }
-  | { type: 'LPAREN' }
-  | { type: 'RPAREN' }
-  | { type: 'COMMA' }
-  | { type: 'SEMI' /* ; */ }
-  | { type: 'DOT' /* . */ }
-  | { type: 'TEXT'; value: string }
-
-// Words/symbols the lexer treats as token boundaries. Anything else
-// accumulates into a TEXT token.
-const KW_PATTERNS: Array<{ re: RegExp; make: () => Token }> = [
+const KW_PATTERNS: Array<{ re: RegExp; make: () => KwToken }> = [
   { re: /^one\s+of\b/i, make: () => ({ type: 'ONE_OF' }) },
   { re: /^all\s+of\b/i, make: () => ({ type: 'ALL_OF' }) },
   { re: /^either\b/i, make: () => ({ type: 'EITHER' }) },
@@ -64,19 +87,103 @@ function tokenize(input: string): Token[] {
   const tokens: Token[] = []
   let i = 0
   let textBuf = ''
+  // Position of the first character in the current text run. -1 when
+  // textBuf is empty. Whitespace inside a run is preserved (so multi-word
+  // text tokens like "Pre-calculus 12" stay intact); leading whitespace
+  // is skipped so textStart always points at a real character.
+  let textStart = -1
+  // Subject of the most recent CODE token, used to expand bare-numeric
+  // continuations like "MATH 100, 110, 120" into CODE MATH 110, CODE MATH
+  // 120. Updated whenever a real CODE is emitted; cleared on DOT
+  // (sentence boundary) so cross-clause numerics don't bleed.
+  let lastCodeSubject: string | null = null
+  // Type of the most recently emitted token. Used to gate the bare-number
+  // expansion to list-context preceding tokens (COMMA / OR / AND) — a
+  // bare number after a SEMI / DOT / RPAREN / start-of-input is more
+  // likely "30 credits" than "CODE 30", so we leave it as text.
+  let lastTokenType: Token['type'] | null = null
+
+  const pushToken = (t: Token) => {
+    tokens.push(t)
+    lastTokenType = t.type
+    if (t.type === 'CODE') {
+      const space = t.value.indexOf(' ')
+      if (space > 0) lastCodeSubject = t.value.slice(0, space)
+    } else if (t.type === 'DOT') {
+      // Sentence boundary — drop the inherited subject so prose like
+      // "Take MATH 100. 30 credits required" doesn't turn "30" into
+      // CODE MATH 30.
+      lastCodeSubject = null
+    }
+  }
 
   const flushText = () => {
-    const trimmed = textBuf.trim()
-    if (trimmed) tokens.push({ type: 'TEXT', value: trimmed })
+    const trimmed = textBuf.replace(/\s+$/, '')
+    if (trimmed) {
+      pushToken({ type: 'TEXT', value: trimmed, start: textStart })
+    }
     textBuf = ''
+    textStart = -1
+  }
+  const beginTextChar = (ch: string) => {
+    if (!textBuf) textStart = i
+    textBuf += ch
   }
 
   while (i < input.length) {
     const ch = input[i]
     if (/\s/.test(ch)) {
-      textBuf += ch
+      // Only retain whitespace inside an in-progress text run; skip
+      // leading whitespace so textStart stays anchored on the first real
+      // character of the run.
+      if (textBuf) textBuf += ch
       i++
       continue
+    }
+    // Context-dependent handling of ":" / "[" / "]":
+    //   - When NO text run is in progress (textBuf empty): treat as a
+    //     structural separator — flush (no-op) and push no token. This
+    //     keeps "All of:" / "One of:" parsing correctly (the colon
+    //     between the keyword and the items doesn't become a literal
+    //     item inside the group), and lets "Required: BIOL 121" still
+    //     emit CODE BIOL 121 after the colon flushes the "Required"
+    //     text run.
+    //   - When a text run IS in progress: append the character verbatim
+    //     so it survives into the literal block. The user wants prose
+    //     like "credit exclusion: https://…" or "list [ https://… ]" to
+    //     show the punctuation in the rendered literal, not silently
+    //     swallow it. The colon-as-content path is the common case for
+    //     mid-clause "X: Y" prose; the colon-as-separator path is only
+    //     hit immediately after a keyword or other structural token
+    //     emitted a flush.
+    if (ch === ':' || ch === '[' || ch === ']') {
+      if (textBuf) {
+        textBuf += ch
+      } else {
+        flushText()
+      }
+      i++
+      continue
+    }
+
+    // URL absorber: when at the start of an "http(s)://…" substring,
+    // consume the entire URL as one text chunk so its internal "." /
+    // "and" / "or" don't fragment it across DOT / AND / OR tokens (UBC's
+    // credit-exclusion-list URLs hit all three). The URL ends at the
+    // first whitespace, bracket, paren, or angle bracket; trailing
+    // punctuation that isn't part of the URL stays for the next loop
+    // iteration to handle. The chunk goes into textBuf (starting a new
+    // run if needed) so it merges naturally with surrounding prose, and
+    // CourseNode / DisjunctionNode pick it back out via the
+    // `renderTextWithLinks` helper to render as a clickable hyperlink.
+    if (ch === 'h' || ch === 'H') {
+      const urlMatch = input.slice(i).match(/^https?:\/\/[^\s<>\]\[)]+/i)
+      if (urlMatch) {
+        beginTextChar(urlMatch[0][0])
+        for (let k = 1; k < urlMatch[0].length; k++) textBuf += urlMatch[0][k]
+        i += urlMatch[0].length
+        continue
+      }
     }
 
     // Branch label: "(a)", "(b)", … — only single ASCII letter inside parens.
@@ -84,7 +191,7 @@ function tokenize(input: string): Token[] {
     const labelMatch = input.slice(i).match(/^\(\s*([a-z])\s*\)/i)
     if (labelMatch) {
       flushText()
-      tokens.push({ type: 'LABEL' })
+      pushToken({ type: 'LABEL', start: i })
       i += labelMatch[0].length
       continue
     }
@@ -98,7 +205,7 @@ function tokenize(input: string): Token[] {
       const looseMatch = input.slice(i).match(/^([a-z])\s*\)/i)
       if (looseMatch) {
         flushText()
-        tokens.push({ type: 'LABEL' })
+        pushToken({ type: 'LABEL', start: i })
         i += looseMatch[0].length
         continue
       }
@@ -106,31 +213,31 @@ function tokenize(input: string): Token[] {
 
     if (ch === '(') {
       flushText()
-      tokens.push({ type: 'LPAREN' })
+      pushToken({ type: 'LPAREN', start: i })
       i++
       continue
     }
     if (ch === ')') {
       flushText()
-      tokens.push({ type: 'RPAREN' })
+      pushToken({ type: 'RPAREN', start: i })
       i++
       continue
     }
     if (ch === ',') {
       flushText()
-      tokens.push({ type: 'COMMA' })
+      pushToken({ type: 'COMMA', start: i })
       i++
       continue
     }
     if (ch === ';') {
       flushText()
-      tokens.push({ type: 'SEMI' })
+      pushToken({ type: 'SEMI', start: i })
       i++
       continue
     }
     if (ch === '.') {
       flushText()
-      tokens.push({ type: 'DOT' })
+      pushToken({ type: 'DOT', start: i })
       i++
       continue
     }
@@ -143,15 +250,57 @@ function tokenize(input: string): Token[] {
 
     if (atWordStart) {
       // Course code (e.g. "CPSC 110", "CPSC_V 110", "MATH 100A").
-      const codeMatch = input.slice(i).match(CODE_RE)
-      if (codeMatch) {
-        flushText()
-        tokens.push({
-          type: 'CODE',
-          value: canonicalizeCode(codeMatch[1], codeMatch[2]),
-        })
-        i += codeMatch[0].length
-        continue
+      // Only recognized when no text run is in progress — i.e. there's
+      // a real structural separator (start-of-input, "(", ",", ";", ".",
+      // ":", "[", "]", or a keyword that flushed text) immediately
+      // before. Mid-prose code-shaped strings like
+      // "any course on the STAT_V 200 credit exclusion" must stay inside
+      // the surrounding literal so the prereq tree doesn't render the
+      // referenced code as an actionable prereq it isn't. The user-
+      // visible regression: a few ~10 prereqs that say things like
+      // "12 credits at CHIN_V 300" or "must be taken … as EPSE 481"
+      // lose CODE detection on the trailing reference; the code still
+      // appears in the literal text. Grade-prefix idioms ("a score of
+      // N% or higher in CODE") are handled by `stripGradePrefix`
+      // upstream so they aren't affected.
+      if (textBuf === '') {
+        const codeMatch = input.slice(i).match(CODE_RE)
+        if (codeMatch) {
+          pushToken({
+            type: 'CODE',
+            value: canonicalizeCode(codeMatch[1], codeMatch[2]),
+            start: i,
+          })
+          i += codeMatch[0].length
+          continue
+        }
+
+        // Bare-numeric implicit subject continuation. UBC writes lists
+        // like "MATH_V 100, 110, 120, 180" or "ECON 101, 102; …" where
+        // the items after the first inherit the leading subject. We only
+        // expand a bare number when it sits right after a list-context
+        // separator (COMMA / OR / AND); after SEMI / DOT / RPAREN /
+        // start-of-input it's more often prose ("30 credits required"),
+        // and DOT clears the inherited subject entirely. Pattern matches
+        // 2-4 digits with optional uppercase suffix — same shape as
+        // CODE_RE's number capture.
+        if (
+          lastCodeSubject &&
+          (lastTokenType === 'COMMA' ||
+            lastTokenType === 'OR' ||
+            lastTokenType === 'AND')
+        ) {
+          const numMatch = input.slice(i).match(/^(\d{2,4}[A-Z]?)\b/i)
+          if (numMatch) {
+            pushToken({
+              type: 'CODE',
+              value: canonicalizeCode(lastCodeSubject, numMatch[1]),
+              start: i,
+            })
+            i += numMatch[0].length
+            continue
+          }
+        }
       }
 
       // Multi-word keywords. We try these before falling through to TEXT
@@ -161,7 +310,8 @@ function tokenize(input: string): Token[] {
         const m = input.slice(i).match(re)
         if (m) {
           flushText()
-          tokens.push(make())
+          const tok = make()
+          pushToken({ ...tok, start: i })
           i += m[0].length
           matchedKw = true
           break
@@ -171,7 +321,7 @@ function tokenize(input: string): Token[] {
     }
 
     // Anything else accumulates into a TEXT token.
-    textBuf += ch
+    beginTextChar(ch)
     i++
   }
 
@@ -184,8 +334,15 @@ function tokenize(input: string): Token[] {
 class Parser {
   private pos = 0
   private tokens: Token[]
-  constructor(tokens: Token[]) {
+  // Original (post-strip) input string. Kept so the trailing-drain
+  // fallback in `parse()` can slice unparsed prose back out cleanly,
+  // preserving its original spacing instead of rebuilding via
+  // `reconstructRange` (which space-joins tokens and butchers
+  // punctuation spacing).
+  private input: string
+  constructor(tokens: Token[], input: string) {
     this.tokens = tokens
+    this.input = input
   }
 
   private peek(offset = 0): Token | undefined {
@@ -201,9 +358,96 @@ class Parser {
     return this.tokens[this.pos++]
   }
 
+  // True when the second LABEL in the stream is preceded by an OR
+  // (with no AND or EITHER appearing afterwards) — i.e. the first two
+  // labeled siblings are OR-connected. Used by `parse()` to decide
+  // whether a bare-labeled top-level prereq dispatches to eitherTail.
+  //
+  // The "last keyword wins" rule rejects false positives like ELEC 371
+  // ("(a) MATH 255 or MATH 256, and either (b) … or (c) …") where an OR
+  // sits inside (a)'s content but the actual inter-branch connector
+  // between (a) and (b) is "and either …". We track the most recent
+  // AND/OR/EITHER keyword between the labels; only a trailing bare OR
+  // signals the top-level pattern eitherTail handles.
+  private hasInterBranchOr(): boolean {
+    let lastKey: 'OR' | 'AND' | 'EITHER' | null = null
+    for (let i = 1; i < this.tokens.length; i++) {
+      const t = this.tokens[i].type
+      if (t === 'LABEL') return lastKey === 'OR'
+      if (t === 'OR' || t === 'AND' || t === 'EITHER') lastKey = t
+    }
+    return false
+  }
+
   parse(): Expr | null {
     if (this.tokens.length === 0) return null
-    const expr = this.andExpr()
+    // Bare top-level labeled disjunction — no leading "Either" keyword.
+    // UBC writes a few prereqs as just "(a) X, or (b) Y, or (c) Z"
+    // (e.g. DSCI 221: "(a) DSCI 220, or (b) CPSC 121 and one of …").
+    // Without dispatching to eitherTail, andExpr only consumes the first
+    // labeled branch's content and the rest gets dropped into a drain
+    // literal that includes the inter-branch "or, " prose. We dispatch
+    // only when an OR + LABEL pattern actually appears in the token
+    // stream; bare-labeled prereqs whose branches are conjunction-
+    // connected (";", " and ") stay on the andExpr path so AND
+    // semantics aren't silently rewritten as OR.
+    const expr =
+      this.tokens[0]?.type === 'LABEL' && this.hasInterBranchOr()
+        ? this.eitherTail()
+        : this.andExpr()
+    // Drain anything left after the top-level and_expr exits into a
+    // single literal so the user still sees the unparsed prose instead
+    // of having it silently dropped. Common cause: a clause whose
+    // leading keyword the grammar doesn't know (e.g. UBC's "two of: …",
+    // "Prerequisite grade requirement: …") — the andExpr loop only
+    // resumes on "and" / ";" / ".", so anything that doesn't bind to
+    // one of those joiners after the first parsed sub-expr falls off
+    // the end. We slice the original input from the first leftover
+    // token's offset so spacing is preserved and stripped noise (":",
+    // "[", "]") stays gone.
+    if (this.pos < this.tokens.length) {
+      const start = this.tokens[this.pos].start
+      this.pos = this.tokens.length
+      const rest = this.input.slice(start).trim()
+      if (rest) {
+        const restLit: Expr = { kind: 'literal', text: rest }
+        if (!expr) return restLit
+        // If the parsed expr ends in literal(s) — a common shape when an
+        // unknown clause keyword like "two of" parses as a TEXT token
+        // first, then bails when the codes after it don't bind — fold
+        // them into the drain literal so the user sees one block instead
+        // of "two of" + "CHEM 12, PHYS 12, …" split across two.
+        if (expr.kind === 'literal') {
+          return { kind: 'literal', text: `${expr.text} ${rest}`.trim() }
+        }
+        if (expr.kind === 'and') {
+          const children = [...expr.children, restLit]
+          while (
+            children.length >= 2 &&
+            children[children.length - 1].kind === 'literal' &&
+            children[children.length - 2].kind === 'literal'
+          ) {
+            const b = children.pop() as Extract<Expr, { kind: 'literal' }>
+            const a = children[children.length - 1] as Extract<
+              Expr,
+              { kind: 'literal' }
+            >
+            // Use no separator when the trailing piece starts with
+            // punctuation that already serves as the separator (a drain
+            // slice often starts at the COMMA / DOT / SEMI that the
+            // parser gave up on). Otherwise insert a single space so
+            // adjacent prose doesn't run together.
+            const sep = /^\s*[,.;:)]/.test(b.text) ? '' : ' '
+            children[children.length - 1] = {
+              kind: 'literal',
+              text: `${a.text}${sep}${b.text}`.trim(),
+            }
+          }
+          return { kind: 'and', children }
+        }
+        return { kind: 'and', children: [expr, restLit] }
+      }
+    }
     return expr
   }
 
@@ -216,13 +460,31 @@ class Parser {
     const children: Expr[] = []
     const first = this.orExpr()
     if (first) children.push(first)
-    while (this.match('AND', 'SEMI', 'DOT')) {
-      while (this.match('AND', 'SEMI', 'DOT')) this.consume()
+    while (this.isAndJoiner()) {
+      while (this.isAndJoiner()) {
+        this.consume()
+        // Optional second connector (e.g. ", and" — first consume eats
+        // the COMMA, second eats the AND in the same iteration).
+        if (this.match('AND', 'SEMI', 'DOT')) this.consume()
+      }
       const next = this.orExpr()
       if (next) children.push(next)
     }
     if (children.length === 0) return null
     return children.length === 1 ? children[0] : { kind: 'and', children }
+  }
+
+  // Top-level conjunction joiner: AND / SEMI / DOT, or COMMA followed by
+  // an AND. The COMMA-AND form catches labeled top-level conjunctions
+  // like ELEC 371's "(a) MATH 255 or MATH 256, and either (b) … or (c) …"
+  // — andExpr would otherwise stop at the bare COMMA and dump everything
+  // after into a drain literal. Plain COMMA without a trailing AND stays
+  // disqualified so non-keyword comma lists don't accidentally bind at
+  // the top level.
+  private isAndJoiner(): boolean {
+    if (this.match('AND', 'SEMI', 'DOT')) return true
+    if (this.match('COMMA') && this.peek(1)?.type === 'AND') return true
+    return false
   }
 
   // or_expr := atom ("or" atom)*
@@ -258,14 +520,37 @@ class Parser {
 
     if (t.type === 'ONE_OF') {
       this.consume()
-      const items = this.codeList()
+      // If the very next token is a branch label, the writer wrote
+      // "One of (a) …, or (b) …, …" — semantically identical to
+      // "Either (a) … or (b) …", and we should render it the same way:
+      // stacked radio branches with each label visible. Without this,
+      // MATH 223's `One of (a) one of MATH 120, … or (b) a score of 80%
+      // … or (c) … or (d) SCIE 001 as a corequisite` collapses into a
+      // single dropdown of opaque option strings; users can't see at a
+      // glance that there are four labeled satisfaction paths.
+      // Comma-listed forms ("One of MATH 100, MATH 110, MATH 120") have
+      // no LABEL after the keyword and stay as a flat dropdown.
+      const isLabeled = this.peek()?.type === 'LABEL'
+      const items = this.codeList(isLabeled)
       if (items.length === 0) return null
-      return items.length === 1 ? items[0] : { kind: 'or', ui: 'dropdown', children: items }
+      if (items.length === 1) return items[0]
+      return {
+        kind: 'or',
+        ui: isLabeled ? 'stacked' : 'dropdown',
+        children: items,
+      }
     }
 
     if (t.type === 'ALL_OF') {
       this.consume()
-      const items = this.codeList()
+      // ALL_OF doesn't have a stacked UI variant (each conjunct renders
+      // as its own block), but the labeled flag still matters for the
+      // codeList — UBC's "All of a) X; b) Y; and c) Z" (DSCI 220) needs
+      // SEMI / OR + LABEL inter-slot separators recognized so all three
+      // labeled branches end up as ALL_OF items rather than just (a)
+      // with a drained literal for (b) and (c).
+      const isLabeled = this.peek()?.type === 'LABEL'
+      const items = this.codeList(isLabeled)
       if (items.length === 0) return null
       return items.length === 1 ? items[0] : { kind: 'and', children: items }
     }
@@ -298,21 +583,63 @@ class Parser {
     return null
   }
 
-  // code_list := code_or_text ("," ("and"|"or")? code_or_text)*
-  // Comma-separated slots inside "one of …" / "all of …". A trailing
-  // "and X" / "or X" inside the list is treated as just another item
-  // ("one of A, B, and C" / "one of A, B, or C" → 3 items). The OR is
-  // only consumed when the next token is NOT a LABEL — `, or (e) …`
-  // signals that "(e)" is an outer labeled branch, so the OR belongs to
-  // the parent disjunction, not this comma list. Without this guard
-  // APBI 210's branch (d) ALL_OF would greedily swallow ", or (e) 7
-  // credits of first-year" into its own item list.
-  private codeList(): Expr[] {
+  // code_list := code_or_text (sep code_or_text)*
+  //
+  // Slot separator forms inside "one of …" / "all of …":
+  //   - COMMA, optionally followed by "and"/"or" coupling
+  //   - SEMI followed by an optional AND/OR run, then a LABEL — UBC
+  //     occasionally writes labeled lists with semicolons between slots
+  //     ("All of a) X; b) Y; and c) Z" — see DSCI 220).
+  //   - Bare OR followed by a LABEL — happens when an inner ONE_OF's
+  //     own codeList already absorbed the trailing COMMA and left the
+  //     inter-branch OR at this level (see MATH 223's
+  //     "One of (a) one of …, or (b) …, or (c) …, or (d) …").
+  //
+  // Inter-slot OR-with-LABEL specifically does NOT count as a comma-
+  // coupling consumed inside the COMMA branch — `, or (e) …` should
+  // leave the OR for the next iteration of this loop to consume as a
+  // bare-OR+LABEL separator. That preserves APBI 210's existing parse
+  // shape (where branch (d)'s ALL_OF doesn't greedily swallow the
+  // ", or (e) 7 credits …" sibling).
+  // `labeled` is true when the calling ONE_OF / ALL_OF has a LABEL right
+  // after its keyword — i.e. this codeList is processing labeled sibling
+  // branches like "(a) X, (b) Y". In that mode SEMI followed by a labeled
+  // branch (with optional AND/OR coupling) and bare OR followed by a
+  // labeled branch are also valid inter-slot separators. For non-labeled
+  // inner contexts (e.g. a nested "all of A, B" inside some labeled
+  // outer branch — APBI 210's "(d) all of SCIE 001, BIOL 140, or (e) …"),
+  // only COMMA separates items so the inner ALL_OF doesn't greedily
+  // swallow `, or (e)` that belongs to the outer ONE_OF.
+  private codeList(labeled: boolean): Expr[] {
     const items: Expr[] = []
     const first = this.codeListItem()
     if (first) items.push(first)
-    while (this.match('COMMA')) {
-      this.consume()
+    while (true) {
+      let consumedSep = false
+      if (this.match('COMMA')) {
+        this.consume()
+        consumedSep = true
+      } else if (labeled && this.match('SEMI')) {
+        let off = 1
+        while (
+          this.peek(off)?.type === 'AND' ||
+          this.peek(off)?.type === 'OR'
+        ) {
+          off++
+        }
+        if (this.peek(off)?.type === 'LABEL') {
+          this.consume()
+          consumedSep = true
+        }
+      } else if (
+        labeled &&
+        this.match('OR') &&
+        this.peek(1)?.type === 'LABEL'
+      ) {
+        this.consume()
+        consumedSep = true
+      }
+      if (!consumedSep) break
       if (this.match('AND')) this.consume()
       else if (this.match('OR') && this.peek(1)?.type !== 'LABEL') {
         this.consume()
@@ -327,7 +654,7 @@ class Parser {
   // branch label ("(a)", "(b)", …), recurses through atom() so the slot
   // can contain nested "one of …", "all of …", "either …", or a parens-
   // grouped sub-expr (not just a bare CODE/TEXT), and — only when the
-  // slot started with a label — absorbs any OR-joined alternatives that
+  // slot started with a label — absorbs intra-slot alternatives that
   // follow as part of the same labeled branch.
   //
   // The label gate matters: in "all of A, B or X", the "or X" is an
@@ -336,9 +663,21 @@ class Parser {
   // produce the wrong tree (And[A, Or[B, X]] instead of leaving "or X"
   // for the outer parser). With the gate, only labeled slots like
   // "(a) X or Y" — where the writer has explicitly delimited the slot
-  // boundary — opt into the OR loop.
+  // boundary — opt into the absorption loop.
   //
-  // The guard at the top prevents atom()'s catch-all consume-and-bail
+  // Intra-slot vs inter-slot is decided by lookahead at each separator:
+  //   - COMMA / OR followed by a LABEL (with optional AND/OR coupling)
+  //     is inter-slot — break and let `codeList` handle it.
+  //   - SEMI / DOT / RPAREN / end always end the slot.
+  //   - Anything else is intra-slot content and gets pulled in.
+  //
+  // UBC's labeled slots are typically implicit disjunctions ("(b) MATH
+  // 100, 110, 120, 180 or SCIE 001" — pick one of these), so absorbed
+  // alternatives wrap as Or-dropdown. Truly intended conjunctions
+  // ("(a) X and Y") are rare; AND inside a slot stops absorption and
+  // falls back to whatever the outer parser does with the residue.
+  //
+  // The guard near the top prevents atom()'s catch-all consume-and-bail
   // from silently swallowing a list-level joiner ("," / "and") or
   // parent-grammar terminator ("or" / ";" / "." / ")") it doesn't own.
   private codeListItem(): Expr | null {
@@ -352,10 +691,28 @@ class Parser {
     }
     const first = this.atom()
     if (!first) return null
-    if (!hadLabel || !this.match('OR')) return first
+    if (!hadLabel) return first
     const children: Expr[] = [first]
-    while (this.match('OR')) {
+    while (true) {
+      // Hard slot boundaries.
+      if (!this.peek()) break
+      if (this.match('SEMI', 'DOT', 'RPAREN', 'AND')) break
+      if (!this.match('COMMA') && !this.match('OR')) break
+      // Look past the separator (and any AND/OR coupling) for a LABEL —
+      // if found, this separator belongs to the outer codeList.
+      let off = 1
+      while (
+        this.peek(off)?.type === 'AND' ||
+        this.peek(off)?.type === 'OR'
+      ) {
+        off++
+      }
+      if (this.peek(off)?.type === 'LABEL') break
       this.consume()
+      if (this.match('AND')) this.consume()
+      else if (this.match('OR') && this.peek(1)?.type !== 'LABEL') {
+        this.consume()
+      }
       if (this.match('AND', 'COMMA', 'SEMI', 'DOT', 'RPAREN')) break
       const next = this.atom()
       if (!next) break
@@ -470,13 +827,22 @@ class Parser {
       return { expr: null, hasLabel }
     }
 
-    if (sawBareOr) {
+    // Promote to a flattened branch (verbatim prose + walked structural
+    // sub-expr) when either:
+    //   - we hit a bare OR inside the branch (existing case), or
+    //   - the branch mixes a structural atom (Code / group) with a
+    //     literal prose atom — e.g. MATH 221 branch (c) "SCIE 001 as a
+    //     corequisite". Without this, And[Code, Literal] flowed through
+    //     normalize/flattenToProse, which joins And-children with the
+    //     English connective "and" — injecting a spurious "and"
+    //     ("SCIE 001 and as a corequisite") that doesn't appear in the
+    //     calendar text. The reconstructed range gives us the source's
+    //     own wording, and the structural sub-expr keeps the upstream
+    //     code walkable.
+    const hasLiteral = children.some((c) => c.kind === 'literal')
+    const hasStructural = children.some((c) => c.kind !== 'literal')
+    if (sawBareOr || (hasLiteral && hasStructural)) {
       const text = this.reconstructRange(branchStart, this.pos).trim()
-      // Preserve any structure the branch's atoms produced (single Code,
-      // Or-dropdown, etc.) so the renderer can still draw a real upstream
-      // block — e.g. "a score of 80% in one of MATH 101, MATH 103" should
-      // render the prose AND a trailing dropdown of the two courses.
-      // Drop pure-text Literal atoms; they're already in `text`.
       const structural = children.filter((c) => c.kind !== 'literal')
       const subExpr: Expr | null =
         structural.length === 0
@@ -550,6 +916,8 @@ function isPureCode(expr: Expr): boolean {
     case 'literal':
     case 'flattened':
       return false
+    case 'soft':
+      return isPureCode(expr.child)
     case 'and':
     case 'or':
       return expr.children.every(isPureCode)
@@ -566,6 +934,8 @@ function flattenToProse(expr: Expr): string {
     case 'literal':
     case 'flattened':
       return expr.text
+    case 'soft':
+      return flattenToProse(expr.child)
     case 'and':
       return expr.children
         .map(flattenToProse)
@@ -610,6 +980,12 @@ function normalize(expr: Expr): Expr {
       text: expr.text,
       subExpr: expr.subExpr ? normalize(expr.subExpr) : null,
     }
+  }
+  if (expr.kind === 'soft') {
+    const inner = normalize(expr.child)
+    // Drop the wrapper if the soft clause normalized away to nothing.
+    if (inner.kind === 'literal' && !inner.text.trim()) return inner
+    return { kind: 'soft', child: inner }
   }
 
   const children = expr.children.map(normalize).flatMap((c) => {
@@ -664,37 +1040,164 @@ function normalize(expr: Expr): Expr {
 // Match runs up to the first ".", ";", or end of string so we don't eat
 // past the items list into trailing constraints ("…; and 3rd-year
 // standing"). The capture is non-greedy with a lookahead that also stops
-// at the next labeled branch boundary — `, b)` / `, or c)` / `, (b)` —
-// so a multi-branch prereq like MATH 121's "Either a) a score of 68%
-// or higher in MATH 120, b) a score of 80% or higher in MATH 100, …"
-// gets two separate rewrites instead of one over-greedy slurp from the
-// first phrase to end-of-string. The 'g' / 'i' flags let multiple grade
-// phrases per prereq each get rewritten and case-fold the whole pattern
-// so "A Grade of 80%…" matches the same as "a grade of 80%…".
+// at the next labeled branch boundary. Two boundary shapes are
+// recognized:
+//   - comma-prefixed: ", b)" / ", or b)" / ", and (b)" / ", (b)" — used
+//     by MATH 121 ("…in MATH 120, b) a score of 80% or higher…").
+//   - bare connector: " or (b)" / " and (b)" — used by MATH 226
+//     ("…in MATH 121 or (b) a score of 80%…"). Without recognizing this
+//     boundary, the non-greedy items capture falls through to `$` and
+//     swallows both labeled branches in one match, collapsing the
+//     Either-stacked structure into a single flat dropdown.
+// The 'g' / 'i' flags let multiple grade phrases per prereq each get
+// rewritten and case-fold the whole pattern so "A Grade of 80%…" matches
+// the same as "a grade of 80%…".
 const GRADE_PREFIX_RE =
-  /\ba\s+(?:grade|score)\s+of\s+\d+\s*%\s+or\s+higher\s+in\s+([^.;]+?)(?=\s*,\s*(?:and\s+|or\s+)?\(?\s*[a-z]\s*\)|;|\.|$)/gi
+  /\ba\s+(?:grade|score)\s+of\s+\d+\s*%\s+or\s+(?:higher|better)\s+in\s+([^.;]+?)(?=\s*(?:,\s*(?:and\s+|or\s+)?|(?:and|or)\s+)\(?\s*[a-z]\s*\)|;|\.|$)/gi
 
 function stripGradePrefix(input: string): string {
   return input.replace(GRADE_PREFIX_RE, (_match, items: string) => {
-    const itemsAsList = items.replace(/\s+or\s+/gi, ', ')
+    // If the source already wrote "in one of …" (e.g. MATH 226 branch
+    // (b): "a score of 80% or higher in one of MATH 101, MATH 103, …"),
+    // emit the items verbatim. Otherwise we'd produce "one of one of …",
+    // which the parser then mis-tokenizes as a single ONE_OF over a
+    // garbled list.
+    const trimmed = items.trim()
+    if (/^one\s+of\b/i.test(trimmed)) return trimmed
+    const itemsAsList = trimmed.replace(/\s+or\s+/gi, ', ')
     return `one of ${itemsAsList}`
   })
+}
+
+// Trailing UBC boilerplate disclaimers that aren't actually prerequisites.
+// These show up at the tail of ~1200 prereq strings in the calendar — if
+// we leave them in, they survive parsing as a literal block (or bleed
+// into the drain fallback) and pollute the prereq tree with policy text.
+//
+// Anchor to end-of-string with an optional sentence separator and trailing
+// period so we strip the lead-in punctuation too ("…BIOL 12). This course
+// is not eligible…" → "…BIOL 12)").
+const TRAILING_NOISE_RES: RegExp[] = [
+  /\s*[.,;]?\s*This course is not eligible for Credit\/D\/Fail grading\.?\s*$/i,
+]
+
+function stripTrailingNoise(input: string): string {
+  let out = input
+  // Loop because some prereqs may end in multiple disclaimers stacked
+  // back-to-back; one pass per regex isn't enough if a future addition
+  // matches what an earlier one exposed.
+  let changed = true
+  while (changed) {
+    changed = false
+    for (const re of TRAILING_NOISE_RES) {
+      const next = out.replace(re, '')
+      if (next !== out) {
+        out = next
+        changed = true
+      }
+    }
+  }
+  return out
+}
+
+// Trailing recommendation suffix at the very end of a prereq string. UBC
+// uses many near-identical wordings ("X is recommended", "X are
+// recommended", "X strongly recommended", "X is also recommended", "X is
+// recommended in these courses", "X is recommended as either a
+// prerequisite or corequisite", "X is recommended for others", …). The
+// `.*$` after `recommended\b` greedily eats any qualifier prose up to
+// end of string. Anchored to `$` so mid-sentence "recommended" doesn't
+// false-trigger; `stripTrailingNoise` runs first and removes the
+// Credit/D/Fail disclaimer that often follows, so by the time this runs
+// the recommendation phrase really is at the tail.
+const RECOMMEND_TAIL_RE =
+  /\s+(?:(?:is|are)\s+)?(?:(?:strongly|highly|also)\s+)?recommended\b.*$/i
+
+// Split a prereq string into a hard clause (mandatory) and a soft clause
+// (the recommended-but-not-required tail). When the recommendation
+// suffix matches, we strip it and split the remaining text on the LAST
+// "." — anything after the period is the soft clause, anything before
+// is the mandatory prereq.
+//
+// Examples (disclaimer already stripped upstream):
+//   "BIOL 351. BIOL 406 or 407 are recommended"
+//     → hard "BIOL 351", soft "BIOL 406 or 407"
+//   "AMNE 200 is recommended"
+//     → hard "", soft "AMNE 200"   (whole thing is a recommendation)
+//   "Third-year standing or higher. APBI 314 and APBI 315 are recommended"
+//     → hard "Third-year standing or higher",
+//       soft "APBI 314 and APBI 315"
+//
+// Cases where the recommendation suffix is followed by extra prose
+// ("recommended for students with …", "recommended as either a prereq
+// or coreq") don't match the regex and fall through unchanged.
+function splitRecommended(input: string): {
+  hard: string
+  soft: string | null
+} {
+  const match = input.match(RECOMMEND_TAIL_RE)
+  if (!match || match.index === undefined) return { hard: input, soft: null }
+  // Don't extract when "recommended" sits inside an unbalanced paren —
+  // mid-clause forms like "KIN 320 (KIN 351 strongly recommended)" or
+  // "MICB_V 212 recommended)" would lose the closing paren if we let
+  // the lenient `recommended\b.*$` swallow past it. Fall through and
+  // let the regular parser handle the prereq with the parenthetical
+  // intact.
+  let depth = 0
+  for (let i = 0; i < match.index; i++) {
+    if (input[i] === '(') depth++
+    else if (input[i] === ')') depth--
+  }
+  if (depth > 0) return { hard: input, soft: null }
+  const stripped = input.slice(0, match.index).trim()
+  const lastDot = stripped.lastIndexOf('.')
+  if (lastDot === -1) return { hard: '', soft: stripped }
+  return {
+    hard: stripped.slice(0, lastDot).trim(),
+    soft: stripped.slice(lastDot + 1).trim(),
+  }
+}
+
+// Parse a single clause (hard or soft) into a normalized AST. Returns
+// null on empty / unparseable input.
+function parseClause(raw: string): Expr | null {
+  const trimmed = stripGradePrefix(raw).trim()
+  if (!trimmed) return null
+  const tokens = tokenize(trimmed)
+  if (tokens.length === 0) return null
+  const ast = new Parser(tokens, trimmed).parse()
+  if (!ast) return null
+  return normalize(ast)
 }
 
 /**
  * Parse a raw prereq string into an AST. Returns null for empty / whitespace
  * input. Anything the grammar can't make sense of becomes a `Literal` and
  * is preserved in the tree (the renderer decides what to do with it).
+ *
+ * If the input ends in a "<X> [is/are] [strongly/highly/also] recommended"
+ * tail, the soft clause is parsed separately and wrapped in `kind: 'soft'`
+ * so the renderer can style it with dotted "optional" edges. The hard
+ * clause (everything before the last "." preceding the recommendation)
+ * parses as a normal prereq tree.
  */
 export function parsePrereq(raw: string | null | undefined): Expr | null {
   if (!raw) return null
-  const trimmed = stripGradePrefix(raw.trim())
-  if (!trimmed) return null
-  const tokens = tokenize(trimmed)
-  if (tokens.length === 0) return null
-  const ast = new Parser(tokens).parse()
-  if (!ast) return null
-  return normalize(ast)
+  const noNoise = stripTrailingNoise(raw.trim())
+  const { hard, soft } = splitRecommended(noNoise)
+  const hardExpr = hard ? parseClause(hard) : null
+  const softExpr = soft ? parseClause(soft) : null
+  if (!hardExpr && !softExpr) return null
+  if (!hardExpr && softExpr) return { kind: 'soft', child: softExpr }
+  if (hardExpr && !softExpr) return hardExpr
+  // Both present — combine as conjunction (the soft wrapper just changes
+  // edge styling, it doesn't alter "you also need …" semantics relative
+  // to the hard clause). Run the combined tree through normalize once
+  // more so same-kind ANDs flatten if hardExpr was itself an `and`.
+  return normalize({
+    kind: 'and',
+    children: [hardExpr!, { kind: 'soft', child: softExpr! }],
+  })
 }
 
 /**
@@ -712,6 +1215,8 @@ export function displayExpr(expr: Expr): string {
       return expr.text || '(empty)'
     case 'flattened':
       return expr.text || '(empty)'
+    case 'soft':
+      return displayExpr(expr.child)
     case 'and':
       return expr.children.map(displayExpr).join(' + ')
     case 'or':

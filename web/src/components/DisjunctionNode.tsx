@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Handle, Position, type NodeProps } from 'reactflow'
+import { renderTextWithLinks } from '../lib/renderText'
 
 // ReactFlow custom node for an `Or-dropdown` group — used when the prereq
 // string says "one of A, B, C" (or a bare "A or B" without a wrapping
@@ -54,13 +55,17 @@ export function DisjunctionNode({ data }: NodeProps<DisjunctionData>) {
   const detailKnown = detail?.kind === 'course' && detail.title !== null
   const detailUnknownCourse =
     detail?.kind === 'course' && detail.title === null
-  const bg = detailUnknownCourse ? '#3f1d1d' : '#27272a'
-  const border = detailUnknownCourse ? '#7f1d1d' : '#3f3f46'
+  // Match CourseNode's dim treatment for unknown-course detail (was
+  // previously a red highlight, which incorrectly flagged externally-valid
+  // prereqs like "CALC 12" as errors). Solid block stays for the dropdown
+  // chrome itself; only the bg + border move to the dim palette.
+  const bg = detailUnknownCourse ? '#1f1f23' : '#27272a'
+  const border = detailUnknownCourse ? '#52525b' : '#3f3f46'
   return (
     <div
       style={{
         background: bg,
-        border: `1px solid ${border}`,
+        border: `1px ${detailUnknownCourse ? 'dashed' : 'solid'} ${border}`,
         borderRadius: 6,
         padding: 6,
         width: 200,
@@ -75,21 +80,11 @@ export function DisjunctionNode({ data }: NodeProps<DisjunctionData>) {
           edges that don't specify one falls through to left-target. */}
       <Handle type="target" id="left-target" position={Position.Left} style={HANDLE_STYLE} />
       <Handle type="target" id="top-target" position={Position.Top} style={HANDLE_STYLE} />
-      <div
-        style={{
-          fontSize: 9,
-          textTransform: 'uppercase',
-          letterSpacing: '0.05em',
-          color: '#a1a1aa',
-          marginBottom: 4,
-        }}
-      >
-        one of
-      </div>
       <DropdownSelect
         options={options}
         selectedIdx={selectedIdx}
         onChange={onChange}
+        selectedIsUnknown={detailUnknownCourse}
       />
       {detail && (
         <div
@@ -100,12 +95,18 @@ export function DisjunctionNode({ data }: NodeProps<DisjunctionData>) {
             fontSize: 11,
             lineHeight: 1.3,
             color: detailKnown ? '#e5e7eb' : '#a1a1aa',
-            fontStyle: detail.kind === 'literal' ? 'italic' : 'normal',
+            // Italicize for both literals and unknown-course detail so
+            // their treatment matches the standalone CourseNode 'unknown'
+            // and 'note' variants.
+            fontStyle:
+              detail.kind === 'literal' || detailUnknownCourse
+                ? 'italic'
+                : 'normal',
           }}
         >
           {detail.kind === 'course'
             ? (detail.title ?? '(not in calendar)')
-            : detail.text}
+            : renderTextWithLinks(detail.text)}
         </div>
       )}
       <Handle type="source" id="right-source" position={Position.Right} style={HANDLE_STYLE} />
@@ -124,10 +125,12 @@ function DropdownSelect({
   options,
   selectedIdx,
   onChange,
+  selectedIsUnknown,
 }: {
   options: DisjunctionOption[]
   selectedIdx: number
   onChange: (idx: number) => void
+  selectedIsUnknown: boolean
 }) {
   const [open, setOpen] = useState(false)
   const wrapperRef = useRef<HTMLDivElement>(null)
@@ -212,6 +215,14 @@ function DropdownSelect({
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
             flex: 1,
+            // Bold the chosen option so the dropdown's selected course
+            // reads with the same weight as a regular CourseNode's code
+            // line. The open-menu options below stay at default weight
+            // so they read as picker choices, not headers. Unknown
+            // courses (not in the calendar) drop the bold to match the
+            // dim/italic treatment of the standalone CourseNode 'unknown'
+            // variant.
+            fontWeight: selectedIsUnknown ? 'normal' : 600,
           }}
         >
           {current}

@@ -1,4 +1,5 @@
 import { Handle, Position, type NodeProps } from 'reactflow'
+import { renderTextWithLinks } from '../lib/renderText'
 
 // Custom course-block node with named handles on all four sides. Used for
 // every course-shaped node in the prereq tree (root, prereqs, coreqs,
@@ -9,8 +10,10 @@ import { Handle, Position, type NodeProps } from 'reactflow'
 // Variants:
 //   - 'root'    blue, larger text, used for the queried course.
 //   - 'known'   default dark — a known UBC course.
-//   - 'unknown' dark red — a course code referenced in someone's prereqs
-//               but not present in the corpus.
+//   - 'unknown' dim dashed border with italic text — a course code
+//               referenced in someone's prereqs but not present in the
+//               corpus (e.g. high-school CALC 12). Same visual treatment
+//               as 'note' since both are non-canonical references.
 //   - 'note'    dashed muted border with italic text — used for class-
 //               standing prose, "credits from" requirements, etc.
 //               (literals that survive normalize and need to be visible).
@@ -18,8 +21,15 @@ import { Handle, Position, type NodeProps } from 'reactflow'
 export type CourseNodeVariant = 'root' | 'known' | 'unknown' | 'note'
 
 export interface CourseNodeData {
-  label: string
   variant: CourseNodeVariant
+  // For variants 'root' / 'known' / 'unknown': `code` is shown on top
+  // and `title` underneath, separated by a thin horizontal divider
+  // (same treatment as DisjunctionNode's selected-detail row).
+  // For variant 'note': only `text` is used; `code` and `title` are
+  // ignored.
+  code?: string
+  title?: string
+  text?: string
 }
 
 const HANDLE_STYLE = {
@@ -32,45 +42,43 @@ const HANDLE_STYLE = {
 }
 
 export function CourseNode({ data }: NodeProps<CourseNodeData>) {
-  const { label, variant } = data
+  const { variant, code, title, text } = data
   const isRoot = variant === 'root'
   const isNote = variant === 'note'
-  const known = variant !== 'unknown'
+  const isUnknown = variant === 'unknown'
+  // Unknown-course blocks share the note variant's dim/dashed/italic look
+  // — both are non-canonical references that shouldn't read as first-class
+  // graph nodes. (Was previously a dark-red highlight, which incorrectly
+  // flagged externally-valid prereqs like "CALC 12" as errors.)
+  const dim = isNote || isUnknown
 
-  const bg = isRoot
-    ? '#1d4ed8'
-    : isNote
-      ? '#1f1f23'
-      : known
-        ? '#27272a'
-        : '#3f1d1d'
-  const border = isRoot
-    ? '#1e40af'
-    : isNote
-      ? '#52525b'
-      : known
-        ? '#3f3f46'
-        : '#7f1d1d'
-  const color = isRoot ? '#fff' : isNote ? '#a1a1aa' : '#e5e7eb'
+  const bg = isRoot ? '#1d4ed8' : dim ? '#1f1f23' : '#27272a'
+  const border = isRoot ? '#1e40af' : dim ? '#52525b' : '#3f3f46'
+  const color = isRoot ? '#fff' : dim ? '#a1a1aa' : '#e5e7eb'
+  // Divider color picks the variant's border so it matches the block's
+  // outline. For root the dark-blue border is too close to the blue bg
+  // to read, so use a lighter blue for that case only.
+  const divider = isRoot ? '#3b82f6' : border
 
   return (
     <div
       style={{
         background: bg,
         color,
-        border: `1px ${isNote ? 'dashed' : 'solid'} ${border}`,
+        border: `1px ${dim ? 'dashed' : 'solid'} ${border}`,
         fontSize: isRoot ? 12 : 11,
-        fontStyle: isNote ? 'italic' : 'normal',
-        whiteSpace: isNote ? 'normal' : 'pre-line',
-        padding: isRoot ? 8 : 6,
+        fontStyle: dim ? 'italic' : 'normal',
+        whiteSpace: 'normal',
+        // Match the dropdown block's effective text padding: its button
+        // adds 3px vertical / 4px horizontal inside the container's 6px,
+        // so dropdown text sits ~9px from the container edge. Mirror
+        // that here so a course block doesn't look cramped next to a
+        // dropdown sibling.
+        padding: isRoot ? '10px 12px' : '9px 10px',
         borderRadius: 6,
         width: 200,
-        // Match the previous look: course nodes are center-aligned (this
-        // was the implicit inherit from ReactFlow's default node style
-        // before non-root nodes started using this custom component).
-        // Only the root carries an explicit line-height bump.
-        textAlign: 'center',
-        ...(isRoot ? { lineHeight: 1.3 } : {}),
+        lineHeight: 1.3,
+        textAlign: isRoot ? 'center' : 'left',
       }}
     >
       {/* Order matters: left-target is rendered first, so edges that
@@ -81,22 +89,24 @@ export function CourseNode({ data }: NodeProps<CourseNodeData>) {
       <Handle type="target" id="top-target" position={Position.Top} style={HANDLE_STYLE} />
       <Handle type="source" id="right-source" position={Position.Right} style={HANDLE_STYLE} />
       <Handle type="source" id="bottom-source" position={Position.Bottom} style={HANDLE_STYLE} />
-      {renderLabel(label, isNote)}
+      {isNote ? (
+        text ? renderTextWithLinks(text) : null
+      ) : (
+        <>
+          <div style={{ fontWeight: isUnknown ? 'normal' : 600 }}>{code}</div>
+          {title && (
+            <div
+              style={{
+                marginTop: 6,
+                paddingTop: 6,
+                borderTop: `1px solid ${divider}`,
+              }}
+            >
+              {title}
+            </div>
+          )}
+        </>
+      )}
     </div>
-  )
-}
-
-// Course-block labels arrive as `${code}\n${title}` (or just text for the
-// note variant). Bold the first line so the course code visually leads
-// the block. Notes have no code, just prose, so they render unstyled.
-function renderLabel(label: string, isNote: boolean) {
-  if (isNote) return label
-  const idx = label.indexOf('\n')
-  if (idx === -1) return <strong>{label}</strong>
-  return (
-    <>
-      <strong>{label.slice(0, idx)}</strong>
-      {label.slice(idx)}
-    </>
   )
 }

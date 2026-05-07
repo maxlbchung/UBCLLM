@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import ReactFlow, {
   Background,
   Controls,
-  Position,
   useReactFlow,
   type Edge,
   type Node,
@@ -25,7 +24,7 @@ import {
   type DisjunctionDetail,
 } from './DisjunctionNode'
 import { EitherOrNode, type EitherOrData } from './EitherOrNode'
-import { CourseNode } from './CourseNode'
+import { CourseNode, type CourseNodeVariant } from './CourseNode'
 
 function normalize(query: string): string {
   const m = query.toUpperCase().match(/^([A-Z]{2,5})(?:_V)?\s*(\d{2,4}[A-Z]?)$/)
@@ -77,11 +76,23 @@ const EITHEROR_ROW = 36
 // the rest of the graph instead of popping out as a white pill — only
 // the stroke + text stay amber, which is enough to flag the edge as a
 // coreq without making the label box feel out of place.
+// Edges always specify both sourceHandle and targetHandle. A prereq edge
+// flows horizontally (source's right handle → target's left handle); a
+// coreq edge flows vertically (source's bottom handle → target's top
+// handle). Every node — root, prereq, coreq, dropdown, either-or, or
+// note — exposes all four handles (CourseNode / DisjunctionNode /
+// EitherOrNode all render four invisible handles), so a coreq node is
+// just a regular node whose left handle happens to receive the prereq
+// chain and whose bottom handle happens to send the coreq edge.
 const PREREQ_EDGE_STYLE = {
+  sourceHandle: 'right-source',
+  targetHandle: 'left-target',
   style: { stroke: '#52525b', strokeWidth: 1.5 },
 } as const
 
 const COREQ_EDGE_STYLE = {
+  sourceHandle: 'bottom-source',
+  targetHandle: 'top-target',
   label: 'co-req',
   style: { stroke: '#f59e0b', strokeWidth: 1.5 },
   labelStyle: { fill: '#f59e0b', fontSize: 10 },
@@ -161,10 +172,10 @@ function computeAbsorptions(
         }
         if (!chosenExpr) return
         if (chosenExpr.kind === 'code') {
-          // Absorbed course's prereqs get walked inline by the main BFS
-          // for the prereq side (coreqs aren't transitive). Recurse here
-          // so deeper absorptions in the chain still get recorded.
-          if (!isCoreq) visit(chosenExpr.code, depth + 1)
+          // Absorbed course's prereqs get walked inline by the main BFS.
+          // Recurse here for both prereqs and coreqs so deeper absorptions
+          // in either chain land in the alias map.
+          visit(chosenExpr.code, depth + 1)
         } else if (chosenExpr.kind === 'and' || chosenExpr.kind === 'or') {
           walkAst(
             chosenExpr,
@@ -177,8 +188,9 @@ function computeAbsorptions(
         return
       }
       case 'code':
-        // Coreq leaves don't expand transitively.
-        if (!isCoreq) visit(expr.code, depth + 1)
+        // A coreq leaf is still a course, so its prereqs need to be
+        // visited for alias discovery just like a prereq leaf.
+        visit(expr.code, depth + 1)
         return
       case 'literal':
         return
@@ -309,29 +321,28 @@ function buildGraph(
           id: `${isCoreq ? 'coreq' : 'prereq'}:${groupId}->${targetId}`,
           source: groupId,
           target: targetId,
-          ...(targetId === rootCode
-            ? { targetHandle: isCoreq ? 'top-target' : 'left-target' }
-            : {}),
           ...(isCoreq ? COREQ_EDGE_STYLE : PREREQ_EDGE_STYLE),
         })
 
         if (!chosenExpr) return
 
-        // Dropdown + course → dropdown IS the course; absorb. For prereqs,
-        // walk the absorbed course's own prereqs inline with target =
-        // groupId. For coreqs the dropdown is also the course (no trailing
-        // node), but coreqs aren't transitive so there's nothing to walk.
+        // Dropdown + course → dropdown IS the course; absorb. Walk the
+        // absorbed course's own prereqs inline with target = groupId —
+        // same logic for prereqs and coreqs. The chosen course (whether
+        // it's a prereq dropdown or a coreq dropdown) is still a course,
+        // and the user expects its upstream chain to be visible. The
+        // edges from those absorbed prereqs are plain prereq edges (gray)
+        // because they're prereqs OF the absorbed course, not coreqs of
+        // the root.
         if (expr.ui === 'dropdown' && chosenExpr.kind === 'code') {
-          if (!isCoreq) {
-            const absorbedChunk = index.get(chosenExpr.code)
-            const absorbedParsed = absorbedChunk
-              ? parseCourseChunk(absorbedChunk)
-              : null
-            if (absorbedParsed && depth + 1 <= MAX_DEPTH) {
-              const absorbedAst = parsePrereq(absorbedParsed.prerequisites)
-              if (absorbedAst) {
-                walkAst(absorbedAst, chosenExpr.code, depth + 1, '', groupId)
-              }
+          const absorbedChunk = index.get(chosenExpr.code)
+          const absorbedParsed = absorbedChunk
+            ? parseCourseChunk(absorbedChunk)
+            : null
+          if (absorbedParsed && depth + 1 <= MAX_DEPTH) {
+            const absorbedAst = parsePrereq(absorbedParsed.prerequisites)
+            if (absorbedAst) {
+              walkAst(absorbedAst, chosenExpr.code, depth + 1, '', groupId)
             }
           }
           return
@@ -443,11 +454,7 @@ function buildGraph(
       id: `prereq:${sourceId}->${targetId}`,
       source: sourceId,
       target: targetId,
-      // Root is a custom CourseNode with multiple target handles; aim
-      // prereq edges at its left handle so they don't fight the coreq
-      // chain landing on the top.
-      ...(targetId === rootCode ? { targetHandle: 'left-target' } : {}),
-      style: { stroke: '#52525b', strokeWidth: 1.5 },
+      ...PREREQ_EDGE_STYLE,
     })
     if (codeAliases.has(code)) return
     if (enqueued.has(code)) return
@@ -482,9 +489,6 @@ function buildGraph(
       id: `${isCoreq ? 'coreq' : 'prereq'}:${sourceId}->${targetId}`,
       source: sourceId,
       target: targetId,
-      ...(targetId === rootCode
-        ? { targetHandle: isCoreq ? 'top-target' : 'left-target' }
-        : {}),
       ...(isCoreq ? COREQ_EDGE_STYLE : PREREQ_EDGE_STYLE),
     })
     if (byId.has(sourceId)) return
@@ -506,7 +510,6 @@ function buildGraph(
       id: `coreq:${sourceId}->${targetId}`,
       source: sourceId,
       target: targetId,
-      ...(targetId === rootCode ? { targetHandle: 'top-target' } : {}),
       ...COREQ_EDGE_STYLE,
     })
     if (codeAliases.has(code)) return
@@ -523,7 +526,12 @@ function buildGraph(
       role: 'coreq',
       depth: 0,
     })
-    // Note: no queue.push — coreqs don't expand transitively.
+    // Enqueue for transitive prereq walking — a coreq is still a course,
+    // and the user expects its upstream chain (prereqs of prereqs of …)
+    // to render like any other course node. The walked prereqs come
+    // back through attachPrereqCode (isCoreq=false implicit), so they
+    // attach as plain prereq edges feeding into the coreq's id.
+    if (parsed) queue.push({ code, parsed, depth: 0 })
   }
 
   function registerGroup(
@@ -681,37 +689,27 @@ function buildGraph(
           const isNote = item.role === 'note'
           const known = item.parsed !== null
           const title = item.parsed?.title ?? '(not in calendar)'
-          const bg = isNote ? '#1f1f23' : known ? '#27272a' : '#3f1d1d'
-          const border = isNote ? '#52525b' : known ? '#3f3f46' : '#7f1d1d'
+          const variant: CourseNodeVariant = isNote
+            ? 'note'
+            : known
+              ? 'known'
+              : 'unknown'
           nodes.push({
             id: item.id,
+            type: 'course',
             position: { x, y: positionY },
-            data: { label: isNote ? item.code : `${item.code}\n${title}` },
-            sourcePosition: Position.Bottom,
-            targetPosition: Position.Top,
-            style: {
-              background: bg,
-              color: isNote ? '#a1a1aa' : '#e5e7eb',
-              border: `1px ${isNote ? 'dashed' : 'solid'} ${border}`,
-              fontSize: 11,
-              fontStyle: isNote ? 'italic' : 'normal',
-              whiteSpace: isNote ? 'normal' : 'pre-line',
-              padding: 6,
-              borderRadius: 6,
-              width: NODE_WIDTH,
+            data: {
+              label: isNote ? item.code : `${item.code}\n${title}`,
+              variant,
             },
+            style: { width: NODE_WIDTH },
           })
         } else {
-          // Group node — pass orientation through `data` so the custom
-          // node renders its handles on top + bottom.
-          const verticalData = { ...item.data, orientation: 'vertical' as const }
           nodes.push({
             id: item.id,
             type: item.ui === 'stacked' ? 'eitherOr' : 'disjunction',
             position: { x, y: positionY },
-            data: verticalData,
-            sourcePosition: Position.Bottom,
-            targetPosition: Position.Top,
+            data: item.data,
             style: { width: NODE_WIDTH },
           })
         }
@@ -744,37 +742,23 @@ function buildGraph(
         const isNote = item.role === 'note'
         const nodeH = isNote ? NOTE_HEIGHT : COURSE_HEIGHT
         const title = item.parsed?.title ?? '(not in calendar)'
-        if (isRoot) {
-          // Custom node so the coreq chain can land on a top handle while
-          // prereqs continue to land on the left.
-          nodes.push({
-            id: item.id,
-            type: 'course',
-            position: { x, y: yCenter - COURSE_HEIGHT / 2 },
-            data: { label: `${item.code}\n${title}`, isRoot: true, known },
-          })
-        } else {
-          const bg = isNote ? '#1f1f23' : known ? '#27272a' : '#3f1d1d'
-          const border = isNote ? '#52525b' : known ? '#3f3f46' : '#7f1d1d'
-          nodes.push({
-            id: item.id,
-            position: { x, y: yCenter - nodeH / 2 },
-            data: { label: isNote ? item.code : `${item.code}\n${title}` },
-            sourcePosition: Position.Right,
-            targetPosition: Position.Left,
-            style: {
-              background: bg,
-              color: isNote ? '#a1a1aa' : '#e5e7eb',
-              border: `1px ${isNote ? 'dashed' : 'solid'} ${border}`,
-              fontSize: 11,
-              fontStyle: isNote ? 'italic' : 'normal',
-              whiteSpace: isNote ? 'normal' : 'pre-line',
-              padding: 6,
-              borderRadius: 6,
-              width: NODE_WIDTH,
-            },
-          })
-        }
+        const variant: CourseNodeVariant = isRoot
+          ? 'root'
+          : isNote
+            ? 'note'
+            : known
+              ? 'known'
+              : 'unknown'
+        nodes.push({
+          id: item.id,
+          type: 'course',
+          position: { x, y: yCenter - nodeH / 2 },
+          data: {
+            label: isNote ? item.code : `${item.code}\n${title}`,
+            variant,
+          },
+          style: { width: NODE_WIDTH },
+        })
       } else {
         const h = heightOf(item)
         nodes.push({
@@ -782,8 +766,6 @@ function buildGraph(
           type: item.ui === 'stacked' ? 'eitherOr' : 'disjunction',
           position: { x, y: yCenter - h / 2 },
           data: item.data,
-          sourcePosition: Position.Right,
-          targetPosition: Position.Left,
           style: { width: NODE_WIDTH },
         })
       }
@@ -812,15 +794,12 @@ function buildGraph(
         const newTarget = targetById.get(edge.source)!
         edge.target = newTarget
         edge.id = `coreq:${edge.source}->${newTarget}`
-        // Targeting another coreq (default node, single target handle)
-        // → drop the explicit handle id so ReactFlow uses the implicit
-        // top handle. Targeting root (custom node) → keep top-target so
-        // it lands on the top handle, not the left one.
-        if (newTarget === rootCode) {
-          edge.targetHandle = 'top-target'
-        } else {
-          delete edge.targetHandle
-        }
+        // Every node in the chain is a CourseNode/DisjunctionNode/
+        // EitherOrNode with a top-target handle, so the chain edge
+        // always lands on top-target regardless of which kind of node
+        // sits at the new target.
+        edge.targetHandle = 'top-target'
+        edge.sourceHandle = 'bottom-source'
       }
     }
   }

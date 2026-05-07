@@ -38,22 +38,24 @@ export interface DisjunctionData {
   selectedIdx: number
   onChange: (idx: number) => void
   detail: DisjunctionDetail
-  // Direction edges flow into / out of this block. 'horizontal' (default)
-  // places target on the left and source on the right — used by the
-  // prereq chain. 'vertical' is used by the coreq stack so blocks chain
-  // top-to-bottom.
-  orientation?: 'horizontal' | 'vertical'
+}
+
+const HANDLE_STYLE = {
+  opacity: 0,
+  width: 8,
+  height: 8,
+  border: 'none',
+  background: 'transparent',
+  pointerEvents: 'none' as const,
 }
 
 export function DisjunctionNode({ data }: NodeProps<DisjunctionData>) {
-  const { options, selectedIdx, onChange, detail, orientation = 'horizontal' } = data
+  const { options, selectedIdx, onChange, detail } = data
   const detailKnown = detail?.kind === 'course' && detail.title !== null
   const detailUnknownCourse =
     detail?.kind === 'course' && detail.title === null
   const bg = detailUnknownCourse ? '#3f1d1d' : '#27272a'
   const border = detailUnknownCourse ? '#7f1d1d' : '#3f3f46'
-  const targetPos = orientation === 'vertical' ? Position.Top : Position.Left
-  const sourcePos = orientation === 'vertical' ? Position.Bottom : Position.Right
   return (
     <div
       style={{
@@ -67,7 +69,12 @@ export function DisjunctionNode({ data }: NodeProps<DisjunctionData>) {
         textAlign: 'left',
       }}
     >
-      <Handle type="target" position={targetPos} />
+      {/* Invisible handles on all four sides so an edge can attach
+          wherever the layout needs (prereq target / source on left/right,
+          coreq target / source on top/bottom). Default targetHandle for
+          edges that don't specify one falls through to left-target. */}
+      <Handle type="target" id="left-target" position={Position.Left} style={HANDLE_STYLE} />
+      <Handle type="target" id="top-target" position={Position.Top} style={HANDLE_STYLE} />
       <div
         style={{
           fontSize: 9,
@@ -101,7 +108,8 @@ export function DisjunctionNode({ data }: NodeProps<DisjunctionData>) {
             : detail.text}
         </div>
       )}
-      <Handle type="source" position={sourcePos} />
+      <Handle type="source" id="right-source" position={Position.Right} style={HANDLE_STYLE} />
+      <Handle type="source" id="bottom-source" position={Position.Bottom} style={HANDLE_STYLE} />
     </div>
   )
 }

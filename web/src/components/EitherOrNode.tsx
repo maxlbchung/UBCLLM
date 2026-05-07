@@ -21,14 +21,19 @@ export interface EitherOrData {
   options: EitherOrOption[]
   selectedIdx: number
   onChange: (idx: number) => void
-  // See DisjunctionNode for the meaning of orientation.
-  orientation?: 'horizontal' | 'vertical'
+}
+
+const HANDLE_STYLE = {
+  opacity: 0,
+  width: 8,
+  height: 8,
+  border: 'none',
+  background: 'transparent',
+  pointerEvents: 'none' as const,
 }
 
 export function EitherOrNode({ data }: NodeProps<EitherOrData>) {
-  const { options, selectedIdx, onChange, orientation = 'horizontal' } = data
-  const targetPos = orientation === 'vertical' ? Position.Top : Position.Left
-  const sourcePos = orientation === 'vertical' ? Position.Bottom : Position.Right
+  const { options, selectedIdx, onChange } = data
   return (
     <div
       style={{
@@ -42,7 +47,10 @@ export function EitherOrNode({ data }: NodeProps<EitherOrData>) {
         textAlign: 'left',
       }}
     >
-      <Handle type="target" position={targetPos} />
+      {/* Invisible handles on all four sides — same pattern as
+          CourseNode / DisjunctionNode. */}
+      <Handle type="target" id="left-target" position={Position.Left} style={HANDLE_STYLE} />
+      <Handle type="target" id="top-target" position={Position.Top} style={HANDLE_STYLE} />
       <div
         style={{
           fontSize: 9,
@@ -99,7 +107,8 @@ export function EitherOrNode({ data }: NodeProps<EitherOrData>) {
           )
         })}
       </div>
-      <Handle type="source" position={sourcePos} />
+      <Handle type="source" id="right-source" position={Position.Right} style={HANDLE_STYLE} />
+      <Handle type="source" id="bottom-source" position={Position.Bottom} style={HANDLE_STYLE} />
     </div>
   )
 }

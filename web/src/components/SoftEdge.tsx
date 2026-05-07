@@ -84,7 +84,7 @@ export function SoftEdge({
               whiteSpace: 'nowrap',
             }}
           >
-            {disabled ? '+ optional' : 'optional'}
+            {disabled ? '+ optional' : '− optional'}
           </button>
         </div>
       </EdgeLabelRenderer>

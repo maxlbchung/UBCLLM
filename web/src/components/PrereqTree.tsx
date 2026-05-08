@@ -1375,7 +1375,7 @@ export function PrereqTree() {
       <form onSubmit={submit} className="flex gap-2 max-w-md">
         <input
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => setQuery(e.target.value.toUpperCase())}
           placeholder="e.g. CPSC 320"
           className="flex-1 rounded bg-zinc-900 border border-zinc-700 px-3 py-2 text-sm focus:outline-none focus:border-zinc-500"
         />

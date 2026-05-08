@@ -68,7 +68,15 @@ function parseQuery(raw: string): ParsedQuery {
     return { kind: 'exact', code: `${exactMatch[1]} ${exactMatch[2]}` }
   }
 
-  const subjectMatch = q.match(/^([A-Z]{2,5})(?:_V)?$/)
+  // Subject regex accepts 1–5 letters so single-letter inputs ("C") route
+  // into the subject branch and ride the loose-prefix fallback there
+  // ("courses starting with C"). Without this, "C" falls through to
+  // parseQuery's `none` branch and — when a keyword filter is active —
+  // gets interpreted as a keyword-only scan, which surfaces every course
+  // whose title or description contains the letter "c" (e.g. BAIT/ECON
+  // courses mentioning "computing"). Routing to subject keeps the code
+  // field anchored to code-prefix matching at all input lengths.
+  const subjectMatch = q.match(/^([A-Z]{1,5})(?:_V)?$/)
   if (subjectMatch) {
     return { kind: 'subject', subject: subjectMatch[1] }
   }
@@ -92,7 +100,7 @@ const ABCD_EASTER_CHUNK: Chunk = {
     'ABCD 123: Introduction to the Alphabet',
     'Credits: 26',
     "A foundational survey of the 26-letter Latin alphabet, taught entirely through song: A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, and Z. Now I know my ABCs — next time won't you sing with me?",
-    'Prerequisites: A nice singing voice.',
+    'Prerequisites: A nice singing voice ;)',
   ].join('\n'),
   url: 'https://en.wikipedia.org/wiki/Alphabet_song',
 }
@@ -104,9 +112,16 @@ function describeFilter(p: Extract<ParsedQuery, { kind: 'filter' }>): string {
   return `${p.subject} courses below the ${lvl} level`
 }
 
+// Cap on keyword-only result sets. The corpus has ~9,450 courses; a generic
+// keyword like "the" would render every chunk into the DOM and freeze the
+// browser. 200 leaves enough room for sharper queries to land their full
+// hit list while preventing pathological cases.
+const KEYWORD_RESULT_CAP = 200
+
 export function CourseLookup() {
   const [index, setIndex] = useState<Map<string, Chunk> | null>(null)
   const [query, setQuery] = useState('')
+  const [keyword, setKeyword] = useState('')
   const [course, setCourse] = useState<ParsedCourse | null>(null)
   const [matches, setMatches] = useState<Chunk[]>([])
   const [matchHeading, setMatchHeading] = useState<string>('')
@@ -115,8 +130,8 @@ export function CourseLookup() {
   // Course codes currently expanded inline in the subject/filter list.
   // Multi-value: opening a new block does not collapse previous ones; the
   // only way to collapse a block is to click it again. Reset to empty on
-  // every new search (in lookup() below) so a fresh subject/filter query
-  // starts collapsed.
+  // every new search so a fresh subject/filter/keyword query starts
+  // collapsed.
   const [expandedCodes, setExpandedCodes] = useState<Set<string>>(new Set())
 
   useEffect(() => {
@@ -128,19 +143,70 @@ export function CourseLookup() {
     [index],
   )
 
-  function lookup(raw: string) {
-    setQuery(raw)
+  // Per-chunk lowercase haystack of (title + description) for the keyword
+  // filter. Built once per index load (~9,450 parseCourseChunk calls, well
+  // under 100 ms) so the keystroke-by-keystroke filter is just substring
+  // match against a Map. Easter chunks are excluded so keyword search
+  // can't surface them as spoilers — they still ride their dedicated
+  // discovery paths.
+  const searchCorpus = useMemo(() => {
+    const out = new Map<string, string>()
+    if (!index) return out
+    for (const chunk of index.values()) {
+      if (chunk.id.startsWith('easter:')) continue
+      const parsed = parseCourseChunk(chunk)
+      out.set(
+        chunk.id,
+        `${parsed.title} ${parsed.description}`.toLowerCase(),
+      )
+    }
+    return out
+  }, [index])
+
+  // Drive the search off both inputs. Either field changing re-runs the
+  // pipeline: code query → candidate set, then keyword filter on top. Empty
+  // code + non-empty keyword scans the entire corpus (capped at
+  // KEYWORD_RESULT_CAP). Both empty clears the view.
+  useEffect(() => {
+    if (!index) return
     setError(null)
     setExpandedCodes(new Set())
-    if (!index) return
 
-    const parsed = parseQuery(raw)
+    const kw = keyword.trim().toLowerCase()
+    const hasKw = kw.length > 0
+    const matchesKw = (chunk: Chunk) => {
+      if (!hasKw) return true
+      return searchCorpus.get(chunk.id)?.includes(kw) ?? false
+    }
+
+    const parsed = parseQuery(query)
 
     if (parsed.kind === 'none') {
+      // No code query. Keyword-only mode scans the full index; otherwise
+      // clear the view entirely.
+      if (!hasKw) {
+        setCourse(null)
+        setMatches([])
+        setMatchHeading('')
+        setSuggestions([])
+        return
+      }
+      const allMatches: Chunk[] = []
+      for (const c of index.values()) {
+        if (c.id.startsWith('easter:')) continue
+        if (matchesKw(c)) allMatches.push(c)
+      }
       setCourse(null)
-      setMatches([])
-      setMatchHeading('')
+      setMatches(allMatches.slice(0, KEYWORD_RESULT_CAP))
+      setMatchHeading(
+        allMatches.length > KEYWORD_RESULT_CAP
+          ? `Keyword "${keyword.trim()}" (showing first ${KEYWORD_RESULT_CAP} of ${allMatches.length.toLocaleString()})`
+          : `Keyword "${keyword.trim()}"`,
+      )
       setSuggestions([])
+      if (allMatches.length === 0) {
+        setError(`No courses match keyword "${keyword.trim()}".`)
+      }
       return
     }
 
@@ -156,6 +222,16 @@ export function CourseLookup() {
     if (parsed.kind === 'exact') {
       const chunk = index.get(parsed.code)
       if (chunk) {
+        if (!matchesKw(chunk)) {
+          setCourse(null)
+          setMatches([])
+          setMatchHeading('')
+          setSuggestions([])
+          setError(
+            `${parsed.code} doesn't mention "${keyword.trim()}" in its title or description.`,
+          )
+          return
+        }
         setCourse(parseCourseChunk(chunk))
         setMatches([])
         setMatchHeading('')
@@ -174,10 +250,26 @@ export function CourseLookup() {
         const prefixChunks = prefixHits
           .map((c) => index.get(c))
           .filter((c): c is Chunk => Boolean(c))
-        setMatches(prefixChunks)
-        setMatchHeading(`${parsed.code} courses`)
-        setSuggestions([])
-        return
+          .filter(matchesKw)
+        if (prefixChunks.length > 0) {
+          setMatches(prefixChunks)
+          setMatchHeading(
+            hasKw
+              ? `${parsed.code} courses matching "${keyword.trim()}"`
+              : `${parsed.code} courses`,
+          )
+          setSuggestions([])
+          return
+        }
+        if (hasKw) {
+          setMatches([])
+          setMatchHeading('')
+          setSuggestions([])
+          setError(
+            `No ${parsed.code} courses mention "${keyword.trim()}".`,
+          )
+          return
+        }
       }
       // Last resort: substring suggestions for typos that prefix
       // matching can't reach (e.g. mistyped subject codes).
@@ -188,13 +280,15 @@ export function CourseLookup() {
         .filter((c) => c.replaceAll(' ', '').includes(codeNoSpace))
         .slice(0, 8)
       setSuggestions(matched)
-      if (matched.length === 0) setError(`No course matches "${raw}".`)
+      if (matched.length === 0) setError(`No course matches "${query}".`)
       return
     }
 
     // Easter egg: typing the pseudo-subject "ABCD" surfaces a single
     // synthetic course block. Intercepts before the real subject/filter
-    // lookup so the "no courses found" path doesn't fire.
+    // lookup so the "no courses found" path doesn't fire. Keyword filter
+    // is intentionally bypassed — the easter chunk itself isn't in
+    // searchCorpus, and "ABCD" is the only path that should reveal it.
     if (parsed.kind === 'subject' && parsed.subject === 'ABCD') {
       setMatches([ABCD_EASTER_CHUNK])
       setMatchHeading('ABCD courses')
@@ -203,9 +297,23 @@ export function CourseLookup() {
       return
     }
 
-    // subject or filter — both produce a list of matching courses
-    const prefix = `${parsed.subject} `
-    let codesForSubject = codes.filter((c) => c.startsWith(prefix))
+    // subject or filter — both produce a list of matching courses.
+    // Strict prefix uses the trailing space so "CPSC" only matches CPSC
+    // courses, not e.g. CPSCY (if it existed). When the strict pass turns
+    // up nothing for a plain subject query, fall back to a loose prefix
+    // so partial codes like "CPS" still expand into CPSC (and any other
+    // subject whose code starts with "CPS") — the same "possible courses"
+    // affordance the exact-branch already gives partial numbers like
+    // "CPSC 22". Filter queries (with the X00 + operator suffix) skip
+    // this fallback because the operator only makes sense once a real
+    // subject is anchored.
+    const strictPrefix = `${parsed.subject} `
+    let codesForSubject = codes.filter((c) => c.startsWith(strictPrefix))
+    let usedLoosePrefix = false
+    if (parsed.kind === 'subject' && codesForSubject.length === 0) {
+      codesForSubject = codes.filter((c) => c.startsWith(parsed.subject))
+      usedLoosePrefix = codesForSubject.length > 0
+    }
     if (parsed.kind === 'filter') {
       const { digit, op } = parsed
       codesForSubject = codesForSubject.filter((c) => {
@@ -222,23 +330,31 @@ export function CourseLookup() {
     const chunks = codesForSubject
       .map((c) => index.get(c))
       .filter((c): c is Chunk => Boolean(c))
+      .filter(matchesKw)
+
+    const baseHeading =
+      parsed.kind === 'filter'
+        ? describeFilter(parsed)
+        : usedLoosePrefix
+          ? `Courses starting with "${parsed.subject}"`
+          : `${parsed.subject} courses`
 
     setMatches(chunks)
     setMatchHeading(
-      parsed.kind === 'filter'
-        ? describeFilter(parsed)
-        : `${parsed.subject} courses`,
+      hasKw ? `${baseHeading} matching "${keyword.trim()}"` : baseHeading,
     )
     setCourse(null)
     setSuggestions([])
     if (chunks.length === 0) {
       setError(
-        parsed.kind === 'filter'
-          ? `No ${describeFilter(parsed)}.`
-          : `No courses found for subject "${parsed.subject}".`,
+        hasKw
+          ? `No ${baseHeading.toLowerCase()} mention "${keyword.trim()}".`
+          : parsed.kind === 'filter'
+            ? `No ${describeFilter(parsed)}.`
+            : `No courses found for subject "${parsed.subject}".`,
       )
     }
-  }
+  }, [query, keyword, index, codes, searchCorpus])
 
   if (!index) {
     return <div className="p-6 text-zinc-500">Loading course index…</div>
@@ -251,23 +367,104 @@ export function CourseLookup() {
         <p className="text-sm text-zinc-400">
           {codes.length.toLocaleString()} courses · UBC Vancouver
         </p>
-        <p className="text-xs text-zinc-500 mt-1">
-          Type <span className="font-mono text-zinc-300">CPSC 110</span> for one course,{' '}
-          <span className="font-mono text-zinc-300">CPSC</span> for the whole
-          subject, or add an operator after an X00 number:{' '}
-          <span className="font-mono text-zinc-300">CPSC 100 =</span> (only 1xx),{' '}
-          <span className="font-mono text-zinc-300">CPSC 200 +</span> (2xx and up),{' '}
-          <span className="font-mono text-zinc-300">CPSC 200 -</span> (below 2xx).
-        </p>
       </header>
 
-      <input
-        autoFocus
-        value={query}
-        onChange={(e) => lookup(e.target.value)}
-        placeholder="e.g. CPSC 110, CPSC, CPSC 200 +"
-        className="rounded bg-zinc-900 border border-zinc-700 px-3 py-2 text-sm focus:outline-none focus:border-zinc-500"
-      />
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <input
+            autoFocus
+            value={query}
+            onChange={(e) => setQuery(e.target.value.toUpperCase())}
+            placeholder="Course Code Search"
+            className="w-full rounded bg-zinc-900 border border-zinc-700 pl-3 pr-9 py-2 text-sm focus:outline-none focus:border-zinc-500"
+          />
+          {/* Help affordance: hovering the `?` reveals the syntax cheat-sheet
+              that previously lived in the header. The wrapper carries the
+              `group` class so the popup is a `group-hover` sibling — the
+              popup is a descendant of the group so moving the cursor onto
+              the popup keeps the parent's :hover state active and prevents
+              flicker. */}
+          <div className="group absolute right-2 top-1/2 -translate-y-1/2 flex items-center">
+            <span
+              aria-label="Course code search syntax"
+              className="cursor-help select-none w-5 h-5 rounded-full border border-zinc-600 text-zinc-400 group-hover:text-zinc-200 group-hover:border-zinc-400 flex items-center justify-center text-xs leading-none"
+            >
+              ?
+            </span>
+            <div
+              role="tooltip"
+              className="hidden group-hover:block absolute right-0 top-full mt-2 w-80 z-20 rounded border border-zinc-700 bg-zinc-900 p-3 text-sm text-zinc-300 leading-relaxed shadow-lg"
+            >
+              <p>
+                Search course codes using this format:{' '}
+                <span className="font-mono text-zinc-100">[CODE] [NUMBER]</span>
+              </p>
+              <p className="mt-2 text-xs text-zinc-500">Ex:</p>
+              <div className="mt-1 flex flex-wrap gap-1">
+                <span className="rounded bg-zinc-800 px-1.5 py-0.5 font-mono text-xs text-zinc-300">
+                  ASTR 101
+                </span>
+                <span className="rounded bg-zinc-800 px-1.5 py-0.5 font-mono text-xs text-zinc-300">
+                  DSCI 100
+                </span>
+                <span className="rounded bg-zinc-800 px-1.5 py-0.5 font-mono text-xs text-zinc-300">
+                  WRDS 150
+                </span>
+              </div>
+              <p className="mt-3">
+                Filter by course level using this format:{' '}
+                <span className="font-mono text-zinc-100">[CODE] [NUMBER] [+/-/=]</span>
+              </p>
+              <p className="mt-2 text-xs text-zinc-500">Ex:</p>
+              <div className="mt-1 flex flex-wrap gap-1">
+                <span className="rounded bg-zinc-800 px-1.5 py-0.5 font-mono text-xs text-zinc-300">
+                  SCIE 100 +
+                </span>
+                <span className="rounded bg-zinc-800 px-1.5 py-0.5 font-mono text-xs text-zinc-300">
+                  PHIL 400 =
+                </span>
+                <span className="rounded bg-zinc-800 px-1.5 py-0.5 font-mono text-xs text-zinc-300">
+                  MATH 200 -
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="relative flex-1">
+          <input
+            value={keyword}
+            onChange={(e) => setKeyword(e.target.value)}
+            placeholder="Keyword Search"
+            className="w-full rounded bg-zinc-900 border border-zinc-700 pl-3 pr-9 py-2 text-sm focus:outline-none focus:border-zinc-500"
+          />
+          <div className="group absolute right-2 top-1/2 -translate-y-1/2 flex items-center">
+            <span
+              aria-label="Keyword search help"
+              className="cursor-help select-none w-5 h-5 rounded-full border border-zinc-600 text-zinc-400 group-hover:text-zinc-200 group-hover:border-zinc-400 flex items-center justify-center text-xs leading-none"
+            >
+              ?
+            </span>
+            <div
+              role="tooltip"
+              className="hidden group-hover:block absolute right-0 top-full mt-2 w-80 z-20 rounded border border-zinc-700 bg-zinc-900 p-3 text-sm text-zinc-300 leading-relaxed shadow-lg"
+            >
+              <p>Search course titles and descriptions using key phrases.</p>
+              <p className="mt-2 text-xs text-zinc-500">Ex:</p>
+              <div className="mt-1 flex flex-wrap gap-1">
+                <span className="rounded bg-zinc-800 px-1.5 py-0.5 font-mono text-xs text-zinc-300">
+                  Linear Algebra
+                </span>
+                <span className="rounded bg-zinc-800 px-1.5 py-0.5 font-mono text-xs text-zinc-300">
+                  Introduction
+                </span>
+                <span className="rounded bg-zinc-800 px-1.5 py-0.5 font-mono text-xs text-zinc-300">
+                  Co-op
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {error && <p className="text-sm text-red-400">{error}</p>}
 
@@ -278,7 +475,7 @@ export function CourseLookup() {
             {suggestions.map((s) => (
               <button
                 key={s}
-                onClick={() => lookup(s)}
+                onClick={() => setQuery(s)}
                 className="rounded bg-zinc-800 hover:bg-zinc-700 px-2 py-1 text-xs"
               >
                 {s}

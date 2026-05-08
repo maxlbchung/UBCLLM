@@ -555,25 +555,25 @@ class Parser {
 
     if (t.type === 'ONE_OF') {
       this.consume()
-      // If the very next token is a branch label, the writer wrote
-      // "One of (a) …, or (b) …, …" — semantically identical to
-      // "Either (a) … or (b) …", and we should render it the same way:
-      // stacked radio branches with each label visible. Without this,
-      // MATH 223's `One of (a) one of MATH 120, … or (b) a score of 80%
-      // … or (c) … or (d) SCIE 001 as a corequisite` collapses into a
-      // single dropdown of opaque option strings; users can't see at a
-      // glance that there are four labeled satisfaction paths.
-      // Comma-listed forms ("One of MATH 100, MATH 110, MATH 120") have
-      // no LABEL after the keyword and stay as a flat dropdown.
-      const isLabeled = this.peek()?.type === 'LABEL'
-      const items = this.codeList(isLabeled)
+      // Labeled "One of (a) … or (b) …" is semantically identical to
+      // "Either (a) … or (b) …" — same labels, same picker semantics.
+      // Dispatch to the same parser so per-branch absorption (TEXT
+      // atoms following a CODE) and the Code+Literal → flattened
+      // promotion in eitherBranch apply uniformly. Without this, a
+      // branch like MATH 223's "(d) SCIE 001 as a corequisite" parses
+      // SCIE 001 as the slot, leaves "as a corequisite" unconsumed,
+      // and the trailing literal drains as an orphan AND-conjunct on
+      // the outer AST instead of being glued to the branch label.
+      // Comma-listed forms ("One of MATH 100, MATH 110, MATH 120")
+      // have no LABEL after the keyword and stay on the comma-list
+      // path — flat Or-dropdown, no per-branch absorption needed.
+      if (this.peek()?.type === 'LABEL') {
+        return this.eitherTail()
+      }
+      const items = this.codeList(false)
       if (items.length === 0) return null
       if (items.length === 1) return items[0]
-      return {
-        kind: 'or',
-        ui: isLabeled ? 'stacked' : 'dropdown',
-        children: items,
-      }
+      return { kind: 'or', ui: 'dropdown', children: items }
     }
 
     if (t.type === 'ALL_OF') {

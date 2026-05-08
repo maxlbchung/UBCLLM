@@ -54,6 +54,12 @@ interface Graph {
   // (FNH 483 with its full 15-node CHEM-12-rooted ladder). Drives the gold
   // root tint + the easter-egg discovery counter.
   isLongestEaster: boolean
+  // True top/left/bottom/right of the placed nodes in layout space. Tracks
+  // each node's full vertical extent (top + estimated height), unlike a
+  // bbox derived from `position.y` alone, which only sees top edges and
+  // would push the auto-fit camera upward by half the bottommost node's
+  // height. Null when no nodes were placed.
+  bbox: { minX: number; maxX: number; minY: number; maxY: number } | null
 }
 
 // Per-column items. `course` is a real course (or unknown course referenced
@@ -343,7 +349,14 @@ function buildGraph(
   toggleSoft: (key: string) => void,
 ): Graph {
   const rootChunk = index.get(rootCode)
-  if (!rootChunk) return { nodes: [], edges: [], depthCount: 0, isLongestEaster: false }
+  if (!rootChunk)
+    return {
+      nodes: [],
+      edges: [],
+      depthCount: 0,
+      isLongestEaster: false,
+      bbox: null,
+    }
   const root = parseCourseChunk(rootChunk)
 
   // BFS over courses we've decided to expand. Nodes (course or group) live
@@ -363,6 +376,23 @@ function buildGraph(
     depth: 0,
   })
   const edges: Edge[] = []
+  // Dedupe edges by id at the push site. Prereq strings like FNH 161's
+  // "FNH 160. FNH 160 and 161 together are credit-excluded with…" produce
+  // a parser AST with duplicate `Code(FNH 160)` children — the literal
+  // tail's "FNH 160" tokenizes as a real course-code reference even
+  // though it's part of a credit-exclusion sentence. Each duplicate
+  // child generated a second edge with the same `prereq:source->target`
+  // id; React's keyed reconciliation then leaves one of the two `<path>`
+  // elements orphaned in the SVG when a sibling selection flip removes
+  // the edge from the next render's array. Filtering at push time keeps
+  // edge ids unique so the reconciler can do its job.
+  const seenEdgeIds = new Set<string>()
+  const pushEdge = (edge: Edge): void => {
+    const id = typeof edge.id === 'string' ? edge.id : ''
+    if (seenEdgeIds.has(id)) return
+    seenEdgeIds.add(id)
+    edges.push(edge)
+  }
   const enqueued = new Set<string>([rootCode])
   const coreqIds = new Set<string>()
   // Courses currently in the graph only because of a soft (optional)
@@ -494,7 +524,7 @@ function buildGraph(
           dropdownDetail,
           /*faded=*/ softContext?.disabled === true,
         )
-        edges.push(
+        pushEdge(
           softContext
             ? buildSoftEdge(groupId, targetId, softContext)
             : {
@@ -681,7 +711,7 @@ function buildGraph(
     // (not a phantom course node that doesn't exist).
     const sourceId = codeAliases.get(code) ?? code
     if (sourceId === targetId) return
-    edges.push(
+    pushEdge(
       softContext
         ? buildSoftEdge(sourceId, targetId, softContext)
         : {
@@ -753,7 +783,7 @@ function buildGraph(
   ): void {
     const sourceId = `note:${key}`
     if (sourceId === targetId) return
-    edges.push(
+    pushEdge(
       softContext
         ? buildSoftEdge(sourceId, targetId, softContext)
         : {
@@ -779,7 +809,7 @@ function buildGraph(
   function attachCoreqCode(code: string, targetId: string): void {
     const sourceId = codeAliases.get(code) ?? code
     if (sourceId === targetId) return
-    edges.push({
+    pushEdge({
       id: `coreq:${sourceId}->${targetId}`,
       source: sourceId,
       target: targetId,
@@ -881,6 +911,24 @@ function buildGraph(
   }
 
   const nodes: Node[] = []
+  // Layout-space bbox accumulator. We can't derive this from the final
+  // `nodes` array because Node only stores `position.y` (the top edge);
+  // computing center as (minTop + maxTop)/2 biases upward by half the
+  // bottommost block's height. Pushing through `pushNode` lets each call
+  // contribute its real top + bottom while we still have the height in
+  // scope. (HorizontalFitOnChange uses this bbox for the vertical center.)
+  let bboxMinX = Infinity
+  let bboxMaxX = -Infinity
+  let bboxMinY = Infinity
+  let bboxMaxY = -Infinity
+  const pushNode = (node: Node, height: number) => {
+    nodes.push(node)
+    const { x, y } = node.position
+    if (x < bboxMinX) bboxMinX = x
+    if (x + NODE_WIDTH > bboxMaxX) bboxMaxX = x + NODE_WIDTH
+    if (y < bboxMinY) bboxMinY = y
+    if (y + height > bboxMaxY) bboxMaxY = y + height
+  }
   // Track top-level coreq item ids in vertical order so we can rewrite
   // their edges into a chain after layout: the topmost coreq's bottom
   // handle connects to the next coreq's top handle, on down to the
@@ -976,23 +1024,29 @@ function buildGraph(
             : known
               ? 'known'
               : 'unknown'
-          nodes.push({
-            id: item.id,
-            type: 'course',
-            position: { x, y: positionY },
-            data: isNote
-              ? { variant, text: item.code }
-              : { variant, code: item.code, title },
-            style: { width: NODE_WIDTH, ...opacityStyle },
-          })
+          pushNode(
+            {
+              id: item.id,
+              type: 'course',
+              position: { x, y: positionY },
+              data: isNote
+                ? { variant, text: item.code }
+                : { variant, code: item.code, title },
+              style: { width: NODE_WIDTH, ...opacityStyle },
+            },
+            h,
+          )
         } else {
-          nodes.push({
-            id: item.id,
-            type: item.ui === 'stacked' ? 'eitherOr' : 'disjunction',
-            position: { x, y: positionY },
-            data: item.data,
-            style: { width: NODE_WIDTH, ...opacityStyle },
-          })
+          pushNode(
+            {
+              id: item.id,
+              type: item.ui === 'stacked' ? 'eitherOr' : 'disjunction',
+              position: { x, y: positionY },
+              data: item.data,
+              style: { width: NODE_WIDTH, ...opacityStyle },
+            },
+            h,
+          )
         }
         yByItem.set(item.id, positionY + h / 2)
         nextBottomY = positionY - Y_GAP
@@ -1034,24 +1088,30 @@ function buildGraph(
             : known
               ? 'known'
               : 'unknown'
-        nodes.push({
-          id: item.id,
-          type: 'course',
-          position: { x, y: yCenter - nodeH / 2 },
-          data: isNote
-            ? { variant, text: item.code }
-            : { variant, code: item.code, title },
-          style: { width: NODE_WIDTH, ...opacityStyle },
-        })
+        pushNode(
+          {
+            id: item.id,
+            type: 'course',
+            position: { x, y: yCenter - nodeH / 2 },
+            data: isNote
+              ? { variant, text: item.code }
+              : { variant, code: item.code, title },
+            style: { width: NODE_WIDTH, ...opacityStyle },
+          },
+          nodeH,
+        )
       } else {
         const h = heightOf(item)
-        nodes.push({
-          id: item.id,
-          type: item.ui === 'stacked' ? 'eitherOr' : 'disjunction',
-          position: { x, y: yCenter - h / 2 },
-          data: item.data,
-          style: { width: NODE_WIDTH, ...opacityStyle },
-        })
+        pushNode(
+          {
+            id: item.id,
+            type: item.ui === 'stacked' ? 'eitherOr' : 'disjunction',
+            position: { x, y: yCenter - h / 2 },
+            data: item.data,
+            style: { width: NODE_WIDTH, ...opacityStyle },
+          },
+          h,
+        )
       }
     })
   }
@@ -1108,7 +1168,16 @@ function buildGraph(
     }
   }
 
-  return { nodes, edges, depthCount, isLongestEaster }
+  const bbox =
+    nodes.length > 0
+      ? {
+          minX: bboxMinX,
+          maxX: bboxMaxX,
+          minY: bboxMinY,
+          maxY: bboxMaxY,
+        }
+      : null
+  return { nodes, edges, depthCount, isLongestEaster, bbox }
 }
 
 // Horizontal-only auto-fit. ReactFlow's built-in `fitView` fits both axes,
@@ -1126,15 +1195,15 @@ function buildGraph(
 // `fitKey` flips (initial mount, root-course lookup), and reads the
 // latest `nodes` via a ref so fitBounds always sees the current bbox.
 function HorizontalFitOnChange({
-  nodes,
+  bbox,
   fitKey,
 }: {
-  nodes: Node[]
+  bbox: Graph['bbox']
   fitKey: string
 }) {
   const { fitBounds } = useReactFlow()
-  const nodesRef = useRef(nodes)
-  nodesRef.current = nodes
+  const bboxRef = useRef(bbox)
+  bboxRef.current = bbox
   useEffect(() => {
     // Defer the fit to the next animation frame. When this effect fires
     // on a tab-switch into the prereq view, ReactFlow's ResizeObserver
@@ -1145,25 +1214,17 @@ function HorizontalFitOnChange({
     // all the way out instead of in. One rAF is enough for the resize
     // callback + state update to land before we call fitBounds.
     const id = requestAnimationFrame(() => {
-      const currentNodes = nodesRef.current
-      if (currentNodes.length === 0) return
-      let minX = Infinity
-      let maxX = -Infinity
-      let minY = Infinity
-      let maxY = -Infinity
-      for (const n of currentNodes) {
-        const x = n.position.x
-        const y = n.position.y
-        if (x < minX) minX = x
-        if (x + NODE_WIDTH > maxX) maxX = x + NODE_WIDTH
-        if (y < minY) minY = y
-        if (y > maxY) maxY = y
-      }
+      const b = bboxRef.current
+      if (!b) return
+      // The bbox already accounts for each node's full vertical extent
+      // (top + estimated height), so (minY + maxY) / 2 is the true visual
+      // center. A 1-pixel-tall bounds keeps the horizontal axis the
+      // limiting factor for the zoom calculation.
       fitBounds(
         {
-          x: minX,
-          y: (minY + maxY) / 2,
-          width: maxX - minX,
+          x: b.minX,
+          y: (b.minY + b.maxY) / 2,
+          width: b.maxX - b.minX,
           height: 1,
         },
         { padding: 0.05, duration: 200 },
@@ -1241,7 +1302,14 @@ export function PrereqTree() {
   }, [])
 
   const graph = useMemo(() => {
-    if (!index || !activeCode) return { nodes: [], edges: [], depthCount: 0, isLongestEaster: false }
+    if (!index || !activeCode)
+      return {
+        nodes: [],
+        edges: [],
+        depthCount: 0,
+        isLongestEaster: false,
+        bbox: null,
+      }
     return buildGraph(
       activeCode,
       index,
@@ -1339,7 +1407,7 @@ export function PrereqTree() {
             <Background color="#27272a" gap={16} />
             <Controls showInteractive={false} />
             <HorizontalFitOnChange
-              nodes={graph.nodes}
+              bbox={graph.bbox}
               fitKey={`${activeCode ?? ''}::${viewOpens}`}
             />
           </ReactFlow>

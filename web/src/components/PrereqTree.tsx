@@ -98,6 +98,18 @@ const Y_STEP = 90 // minimum vertical slot per item — wider groups grow past t
 const Y_GAP = 20 // additional gap between items when a tall item bumps the slot
 const NODE_WIDTH = 200
 
+// Vertical gap between adjacent coreq blocks (and between the topmost
+// coreq's bottom edge and the root's top edge). The coreq edge running
+// between any two stacked blocks carries the "co-req" label pill
+// (`COREQ_EDGE_STYLE`): 10 px text + 4 px vertical labelBgPadding × 2 + 1 px
+// border × 2 ≈ 22 px tall. Using the regular Y_GAP here jams the pill
+// into the surrounding blocks. Add breathing room on both sides so the
+// pill sits cleanly in the gap regardless of which kinds of blocks are
+// stacked.
+const COREQ_LABEL_PILL_HEIGHT = 22
+const COREQ_PILL_BREATHING = 8 // padding between a block edge and the pill
+const COREQ_VERTICAL_GAP = COREQ_LABEL_PILL_HEIGHT + COREQ_PILL_BREATHING * 2
+
 // Per-line text height used by the heightOf estimator below.
 // 11px font × 1.3 line-height, rounded up.
 const TEXT_LINE_HEIGHT = 15
@@ -1001,15 +1013,21 @@ function buildGraph(
       // Coreq column sits in the same x as the root, stacked directly
       // above it. Items closer to root in the array end up closer to root
       // visually; we iterate bottom-up so the bottommost item lands just
-      // above the root with one Y_GAP of space, and each item above sits
-      // its own height + Y_GAP further up.
+      // above the root with COREQ_VERTICAL_GAP of space, and each item
+      // above sits its own height + COREQ_VERTICAL_GAP further up. The
+      // coreq edge between adjacent blocks carries the "co-req" label
+      // pill at its midpoint, so the gap needs to accommodate the pill's
+      // height plus breathing room — Y_GAP alone is too tight.
       const x = 0
-      // Coreq stack starts one Y_GAP above the top edge of the root block.
-      // The root is centered at y=0 (only item in column d0), so its top
-      // edge is -heightOf(root)/2.
+      // Coreq stack starts one COREQ_VERTICAL_GAP above the top edge of
+      // the root block. The root is centered at y=0 (only item in column
+      // d0), so its top edge is -heightOf(root)/2.
       const rootItem = byId.get(rootCode)
       const rootTop = rootItem ? -heightOf(rootItem) / 2 : 0
-      let nextBottomY = rootTop - Y_GAP // bottom edge of the next item to place
+      // Bottom edge of the next item to place. Subtracting
+      // COREQ_VERTICAL_GAP leaves a pill-sized clear band between this
+      // item and root (or the previous coreq item below).
+      let nextBottomY = rootTop - COREQ_VERTICAL_GAP
       for (let i = items.length - 1; i >= 0; i--) {
         const item = items[i]
         const h = heightOf(item)
@@ -1049,7 +1067,7 @@ function buildGraph(
           )
         }
         yByItem.set(item.id, positionY + h / 2)
-        nextBottomY = positionY - Y_GAP
+        nextBottomY = positionY - COREQ_VERTICAL_GAP
       }
       // Record the chain in top-to-bottom order.
       for (const it of items) coreqChain.push(it.id)

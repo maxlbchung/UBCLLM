@@ -452,20 +452,55 @@ class Parser {
   }
 
   // and_expr := or_expr (("and" | ";" | ".")+ or_expr)*
+  //           | and_expr ("." | ";") "or" and_expr   -> Or-stacked
   // Consecutive joiners are absorbed as a single bridge so a sequence
   // like ". And " (DOT then AND, common in UBC prereq prose like
   // "…361. And 3rd year standing") doesn't lose its right-hand side
   // through atom()'s catch-all consume-and-bail eating the AND.
+  //
+  // Sentence-boundary OR (the second production above) catches UBC's
+  // "<sentence>. Or <sentence>" pattern (e.g. POLI 329:
+  // "All of POLI 100, POLI 101, POLI 240. Or third-year standing or
+  // higher"). Without it, the OR after the DOT lands at atom()
+  // position, gets consumed by the catch-all bail, and the right-hand
+  // sentence drains into a literal that's then folded back into the
+  // outer AND — turning a disjunction into a spurious extra conjunct.
+  // The rule fires only when the joiner sequence actually contained a
+  // DOT/SEMI; mid-clause "X and Y or Z" stays on the existing
+  // OR-binds-tighter-than-AND path.
   private andExpr(): Expr | null {
     const children: Expr[] = []
     const first = this.orExpr()
     if (first) children.push(first)
     while (this.isAndJoiner()) {
+      let sawSentenceBoundary = false
       while (this.isAndJoiner()) {
-        this.consume()
+        const j1 = this.consume()
+        if (j1?.type === 'DOT' || j1?.type === 'SEMI') {
+          sawSentenceBoundary = true
+        }
         // Optional second connector (e.g. ", and" — first consume eats
         // the COMMA, second eats the AND in the same iteration).
-        if (this.match('AND', 'SEMI', 'DOT')) this.consume()
+        if (this.match('AND', 'SEMI', 'DOT')) {
+          const j2 = this.consume()
+          if (j2?.type === 'DOT' || j2?.type === 'SEMI') {
+            sawSentenceBoundary = true
+          }
+        }
+      }
+      if (sawSentenceBoundary && this.match('OR')) {
+        this.consume()
+        const lhs: Expr | null =
+          children.length === 0
+            ? null
+            : children.length === 1
+              ? children[0]
+              : { kind: 'and', children }
+        const rhs = this.andExpr()
+        if (!lhs && !rhs) return null
+        if (!lhs) return rhs
+        if (!rhs) return lhs
+        return { kind: 'or', ui: 'stacked', children: [lhs, rhs] }
       }
       const next = this.orExpr()
       if (next) children.push(next)

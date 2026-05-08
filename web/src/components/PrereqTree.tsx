@@ -27,6 +27,18 @@ import { EitherOrNode, type EitherOrData } from './EitherOrNode'
 import { CourseNode, type CourseNodeVariant } from './CourseNode'
 import { SoftEdge, type SoftEdgeData } from './SoftEdge'
 import { useConversations } from '../store/conversations'
+import {
+  LONGEST_PREREQ_TREE_EASTER_ID,
+  useEasterEggs,
+} from '../store/easterEggs'
+
+// The corpus's deepest-possible prereq chain: FNH 483 has 15 nodes from
+// CHEM 12 → … → FNH 483. With root at depth 0 the longest visible depth
+// column is 14, so the easter only fires when the BFS reaches that floor
+// (i.e. MAX_DEPTH didn't truncate the trail). See `longest_prereq.py` in
+// the repo root for the offline computation that picks the winner.
+const LONGEST_TREE_ROOT_CODE = 'FNH 483'
+const LONGEST_TREE_DEPTH_COLUMN = 14
 
 function normalize(query: string): string {
   const m = query.toUpperCase().match(/^([A-Z]{2,5})(?:_V)?\s*(\d{2,4}[A-Z]?)$/)
@@ -38,6 +50,10 @@ interface Graph {
   nodes: Node[]
   edges: Edge[]
   depthCount: number
+  // True when the rendered tree is the corpus's deepest possible chain
+  // (FNH 483 with its full 15-node CHEM-12-rooted ladder). Drives the gold
+  // root tint + the easter-egg discovery counter.
+  isLongestEaster: boolean
 }
 
 // Per-column items. `course` is a real course (or unknown course referenced
@@ -65,7 +81,11 @@ type ColumnItem =
       faded?: boolean
     }
 
-const MAX_DEPTH = 12 // safety cap; UBC chains rarely exceed 4–5
+// Safety cap for prereq BFS expansion. Corpus-wide the deepest known chain
+// is FNH 483's 15-node ladder (CHEM 12 → … → FNH 483 — see the easter-egg
+// trigger constants above), so 15 is high enough to render every existing
+// chain in full without truncation.
+const MAX_DEPTH = 15
 
 const X_STEP = 280
 const Y_STEP = 90 // minimum vertical slot per item — wider groups grow past this
@@ -323,7 +343,7 @@ function buildGraph(
   toggleSoft: (key: string) => void,
 ): Graph {
   const rootChunk = index.get(rootCode)
-  if (!rootChunk) return { nodes: [], edges: [], depthCount: 0 }
+  if (!rootChunk) return { nodes: [], edges: [], depthCount: 0, isLongestEaster: false }
   const root = parseCourseChunk(rootChunk)
 
   // BFS over courses we've decided to expand. Nodes (course or group) live
@@ -1068,7 +1088,27 @@ function buildGraph(
     }
   }
 
-  return { nodes, edges, depthCount }
+  // Easter-egg gilding: when the user lands on the deepest possible chain
+  // in the corpus AND the BFS reached the full depth (depth column 14 with
+  // root at column 0 = 15 nodes, FNH 483 ← … ← CHEM 12), tag the root's
+  // data with `easter: true` so CourseNode swaps to the signature gold
+  // styling. The discovery counter increment is fired separately from a
+  // useEffect in the component so buildGraph stays a pure function.
+  const isLongestEaster =
+    rootCode === LONGEST_TREE_ROOT_CODE &&
+    depthCount === LONGEST_TREE_DEPTH_COLUMN
+  if (isLongestEaster) {
+    for (const node of nodes) {
+      if (node.id !== rootCode) continue
+      const data = node.data as { variant?: CourseNodeVariant }
+      if (data.variant === 'root') {
+        node.data = { ...node.data, easter: true }
+      }
+      break
+    }
+  }
+
+  return { nodes, edges, depthCount, isLongestEaster }
 }
 
 // Horizontal-only auto-fit. ReactFlow's built-in `fitView` fits both axes,
@@ -1201,7 +1241,7 @@ export function PrereqTree() {
   }, [])
 
   const graph = useMemo(() => {
-    if (!index || !activeCode) return { nodes: [], edges: [], depthCount: 0 }
+    if (!index || !activeCode) return { nodes: [], edges: [], depthCount: 0, isLongestEaster: false }
     return buildGraph(
       activeCode,
       index,
@@ -1217,6 +1257,17 @@ export function PrereqTree() {
     const chunk = index.get(activeCode)
     return chunk ? parseCourseChunk(chunk) : null
   }, [index, activeCode])
+
+  // Easter-egg discovery: fire markDiscovered when the user's lookup hits
+  // FNH 483 and the tree expanded all the way out (depthCount = 14 = 15
+  // nodes). markDiscovered is idempotent in the store, so re-rendering the
+  // same tree on a re-mount or a soft-toggle won't double-count — but
+  // gating on the raw flag keeps the call out of the dependency graph
+  // entirely until the condition flips true.
+  useEffect(() => {
+    if (!graph.isLongestEaster) return
+    useEasterEggs.getState().markDiscovered(LONGEST_PREREQ_TREE_EASTER_ID)
+  }, [graph.isLongestEaster])
 
   function submit(e: React.FormEvent) {
     e.preventDefault()

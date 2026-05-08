@@ -17,7 +17,15 @@ import { loadCorpus } from '../lib/retrieve'
 // counter never moves. Single source of truth for the ID; whichever
 // component owns the easter imports the constant so the strings can't drift.
 export const ABCD_EASTER_ID = 'easter:abcd-song'
-const SYNTHETIC_EASTER_IDS: string[] = [ABCD_EASTER_ID]
+// Surfaced when the user lands on the deepest possible prereq tree in the
+// corpus — FNH 483 with its full 15-node CHEM-12-rooted chain expanded.
+// PrereqTree.tsx triggers it after buildGraph reports the full depth so we
+// don't fire on partial / truncated traversals.
+export const LONGEST_PREREQ_TREE_EASTER_ID = 'easter:longest-prereq-tree'
+const SYNTHETIC_EASTER_IDS: string[] = [
+  ABCD_EASTER_ID,
+  LONGEST_PREREQ_TREE_EASTER_ID,
+]
 
 interface State {
   // Raw discovered chunk IDs (e.g. "easter:best-astr-prof"). Persisted.

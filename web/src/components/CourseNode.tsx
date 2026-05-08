@@ -30,6 +30,10 @@ export interface CourseNodeData {
   code?: string
   title?: string
   text?: string
+  // Set on the root node when PrereqTree detects the corpus's deepest
+  // possible chain (FNH 483 → … → CHEM 12). Triggers the signature gold
+  // tint shared with the easter-egg counter / chat citation chips.
+  easter?: boolean
 }
 
 const HANDLE_STYLE = {
@@ -42,23 +46,51 @@ const HANDLE_STYLE = {
 }
 
 export function CourseNode({ data }: NodeProps<CourseNodeData>) {
-  const { variant, code, title, text } = data
+  const { variant, code, title, text, easter } = data
   const isRoot = variant === 'root'
   const isNote = variant === 'note'
   const isUnknown = variant === 'unknown'
+  const isEasterRoot = isRoot && easter === true
   // Unknown-course blocks share the note variant's dim/dashed/italic look
   // — both are non-canonical references that shouldn't read as first-class
   // graph nodes. (Was previously a dark-red highlight, which incorrectly
   // flagged externally-valid prereqs like "CALC 12" as errors.)
   const dim = isNote || isUnknown
 
-  const bg = isRoot ? '#1d4ed8' : dim ? '#1f1f23' : '#27272a'
-  const border = isRoot ? '#1e40af' : dim ? '#52525b' : '#3f3f46'
-  const color = isRoot ? '#fff' : dim ? '#a1a1aa' : '#e5e7eb'
+  // Signature gold easter-egg palette (amber-300/500/600) — the same hue
+  // used by the sidebar discovery counter rings and chat citation chips
+  // for found easters. Dark text on the gold bg keeps the code legible
+  // and matches the rest of the dark-themed graph by inversion.
+  const bg = isEasterRoot
+    ? '#fcd34d'
+    : isRoot
+      ? '#1d4ed8'
+      : dim
+        ? '#1f1f23'
+        : '#27272a'
+  const border = isEasterRoot
+    ? '#f59e0b'
+    : isRoot
+      ? '#1e40af'
+      : dim
+        ? '#52525b'
+        : '#3f3f46'
+  const color = isEasterRoot
+    ? '#18181b'
+    : isRoot
+      ? '#fff'
+      : dim
+        ? '#a1a1aa'
+        : '#e5e7eb'
   // Divider color picks the variant's border so it matches the block's
   // outline. For root the dark-blue border is too close to the blue bg
-  // to read, so use a lighter blue for that case only.
-  const divider = isRoot ? '#3b82f6' : border
+  // to read, so use a lighter blue for that case only; the easter-gold
+  // root uses amber-600 so the divider stays visible against amber-300.
+  const divider = isEasterRoot
+    ? '#d97706'
+    : isRoot
+      ? '#3b82f6'
+      : border
 
   return (
     <div

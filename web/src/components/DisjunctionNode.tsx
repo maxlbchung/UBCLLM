@@ -231,6 +231,13 @@ function DropdownSelect({
       </button>
       {open && (
         <div
+          // `nowheel` is ReactFlow's built-in opt-out for wheel handling on
+          // a descendant — without it the menu's `overflowY: auto` never
+          // gets to consume the wheel event because ReactFlow's pane
+          // listener at the canvas level fires first and turns it into a
+          // zoom. With the class set, ReactFlow ignores wheels that
+          // originate inside this element.
+          className="nowheel"
           onPointerDown={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
           style={{

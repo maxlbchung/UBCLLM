@@ -19,7 +19,9 @@ The data files derived from the UBC Vancouver Academic Calendar
   - web/public/data/chunks.json
 
 are derivative works of content copyrighted by The University of British
-Columbia. They are used here for educational and informational purposes only.
+Columbia. They are used here to power academic advising and reference
+features for UBC students. Rights to the underlying calendar content
+belong to UBC.
 
 The PolyForm Noncommercial license in the LICENSE file applies to the
 original software in this repository. It does NOT grant any rights to the

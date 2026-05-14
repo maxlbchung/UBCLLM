@@ -248,9 +248,12 @@ export function OtherPage() {
           >
             UBC Vancouver Academic Calendar
           </a>
-          {' '}and is © The University of British Columbia. It's reproduced
-          here for educational use only; the license above does not extend
-          to it.
+          {' '}and is © The University of British Columbia, used here to
+          power academic advising and reference features for UBC students.
+          The license above covers this site's source code only; rights to
+          the calendar content belong to UBC. If you're a UBC representative
+          with concerns about this use, please reach out and I'll respond
+          promptly.
         </p>
       </section>
     </div>

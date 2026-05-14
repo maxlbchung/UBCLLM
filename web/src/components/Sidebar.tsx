@@ -21,6 +21,7 @@ export function Sidebar() {
   const newConversation = useConversations((s) => s.newConversation)
   const setActive = useConversations((s) => s.setActive)
   const deleteConversation = useConversations((s) => s.deleteConversation)
+  const renameConversation = useConversations((s) => s.renameConversation)
   const setView = useConversations((s) => s.setView)
   const toggleSidebar = useConversations((s) => s.toggleSidebar)
 
@@ -152,6 +153,39 @@ export function Sidebar() {
   )
   const popupRef = useRef<HTMLDivElement | null>(null)
 
+  // Inline-rename state. We keep the draft separate from the persisted title
+  // so an Escape cancels cleanly without rewriting the store.
+  const [renamingId, setRenamingId] = useState<string | null>(null)
+  const [renameDraft, setRenameDraft] = useState('')
+  const renameInputRef = useRef<HTMLInputElement | null>(null)
+
+  function startRename(e: MouseEvent<HTMLButtonElement>, id: string) {
+    e.stopPropagation()
+    closeDeletePrompt()
+    const conv = conversations[id]
+    if (!conv) return
+    setRenamingId(id)
+    setRenameDraft(conv.title)
+  }
+
+  function commitRename() {
+    if (renamingId) renameConversation(renamingId, renameDraft)
+    setRenamingId(null)
+    setRenameDraft('')
+  }
+
+  function cancelRename() {
+    setRenamingId(null)
+    setRenameDraft('')
+  }
+
+  useEffect(() => {
+    if (renamingId && renameInputRef.current) {
+      renameInputRef.current.focus()
+      renameInputRef.current.select()
+    }
+  }, [renamingId])
+
   function openDeletePrompt(e: MouseEvent<HTMLButtonElement>, id: string) {
     e.stopPropagation()
     const row = e.currentTarget.closest<HTMLElement>('[data-conv-row]')
@@ -265,7 +299,7 @@ export function Sidebar() {
         </div>
 
         <div className="border-t border-zinc-800 pt-2 text-[0.6875rem] uppercase tracking-wider text-zinc-500">
-          History
+          Chat History
         </div>
 
         <div className="flex-1 overflow-y-auto -mx-1 px-1 space-y-1">
@@ -277,21 +311,60 @@ export function Sidebar() {
             if (!conv) return null
             const isActive = id === activeId && view === 'chat'
             const isPendingDelete = id === pendingDeleteId
+            const isRenaming = id === renamingId
             return (
               <div
                 key={id}
                 data-conv-row
                 className={
-                  'group flex items-center gap-1 rounded px-2 py-1.5 text-sm cursor-pointer ' +
+                  'group flex items-center gap-1 rounded px-2 py-1.5 text-sm ' +
+                  (isRenaming ? '' : 'cursor-pointer ') +
                   (isActive
                     ? 'bg-zinc-800 text-zinc-100'
                     : isPendingDelete
                       ? 'bg-zinc-900 text-zinc-200 ring-1 ring-red-500/40'
                       : 'text-zinc-300 hover:bg-zinc-900')
                 }
-                onClick={() => setActive(id)}
+                onClick={() => {
+                  if (isRenaming) return
+                  setActive(id)
+                }}
               >
-                <span className="flex-1 truncate">{conv.title}</span>
+                {isRenaming ? (
+                  <input
+                    ref={renameInputRef}
+                    value={renameDraft}
+                    onChange={(e) => setRenameDraft(e.target.value)}
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        commitRename()
+                      } else if (e.key === 'Escape') {
+                        e.preventDefault()
+                        cancelRename()
+                      }
+                    }}
+                    onBlur={commitRename}
+                    maxLength={120}
+                    className="flex-1 min-w-0 bg-zinc-950 border border-zinc-700 rounded px-1.5 py-0.5 text-sm text-zinc-100 focus:outline-none focus:border-blue-500"
+                  />
+                ) : (
+                  <span className="flex-1 truncate">{conv.title}</span>
+                )}
+                <button
+                  onClick={(e) => startRename(e, id)}
+                  className={
+                    'text-zinc-500 hover:text-zinc-100 text-xs ' +
+                    (isRenaming
+                      ? 'opacity-100 text-zinc-100'
+                      : 'opacity-0 group-hover:opacity-100')
+                  }
+                  aria-label="Rename conversation"
+                  title="Rename"
+                >
+                  ✎
+                </button>
                 <button
                   onClick={(e) => openDeletePrompt(e, id)}
                   className={

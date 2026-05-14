@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
   getCourseIndex,
   parseCourseChunk,
@@ -6,6 +6,38 @@ import {
   type ParsedCourse,
 } from '../lib/retrieve'
 import { ABCD_EASTER_ID, useEasterEggs } from '../store/easterEggs'
+
+// Wrap every (case-insensitive) occurrence of `keyword` inside `text` with a
+// <mark> so the keyword filter's match site is visible in the title /
+// description. Only title + description are highlighted because those are
+// the only fields the filter actually scans (see `searchCorpus`); marking
+// hits in Credits / Prerequisites would imply they drove the match when
+// they didn't.
+function highlightKeyword(text: string, keyword: string): ReactNode {
+  const kw = keyword.trim()
+  if (!kw) return text
+  const lower = text.toLowerCase()
+  const target = kw.toLowerCase()
+  const parts: ReactNode[] = []
+  let cursor = 0
+  let hit = lower.indexOf(target, cursor)
+  let key = 0
+  while (hit !== -1) {
+    if (hit > cursor) parts.push(text.slice(cursor, hit))
+    parts.push(
+      <mark
+        key={key++}
+        className="bg-yellow-400/30 text-yellow-50 rounded-sm px-0.5"
+      >
+        {text.slice(hit, hit + target.length)}
+      </mark>,
+    )
+    cursor = hit + target.length
+    hit = lower.indexOf(target, cursor)
+  }
+  if (cursor < text.length) parts.push(text.slice(cursor))
+  return <Fragment>{parts}</Fragment>
+}
 
 type ParsedQuery =
   | { kind: 'none' }
@@ -341,7 +373,7 @@ export function CourseLookup() {
 
     setMatches(chunks)
     setMatchHeading(
-      hasKw ? `${baseHeading} matching "${keyword.trim()}"` : baseHeading,
+      hasKw ? `${baseHeading} containing "${keyword.trim()}"` : baseHeading,
     )
     setCourse(null)
     setSuggestions([])
@@ -489,7 +521,7 @@ export function CourseLookup() {
         {matches.length > 0 && (
           <section className="flex flex-col gap-1.5">
             <p className="text-xs text-zinc-500">
-              {matches.length.toLocaleString()} {matchHeading} ({matches.length === 1 ? 'match' : 'matches'})
+              {matches.length.toLocaleString()} {matchHeading}
             </p>
             <ul className="flex flex-col gap-1">
               {matches.map((c) => {
@@ -532,9 +564,18 @@ export function CourseLookup() {
                       className={`w-full text-left rounded border px-3 py-2 text-sm transition-colors ${buttonStateClass}`}
                     >
                       <span className="font-mono text-zinc-100">{c.code}</span>
-                      <span className="text-zinc-400"> — {c.title}</span>
+                      <span className="text-zinc-400">
+                        {' — '}
+                        {highlightKeyword(c.title, keyword)}
+                      </span>
                     </button>
-                    {expanded && <CourseCard course={parseCourseChunk(c)} />}
+                    {expanded && (
+                      <CourseCard
+                        course={parseCourseChunk(c)}
+                        keyword={keyword}
+                        hideHeader
+                      />
+                    )}
                   </li>
                 )
               })}
@@ -545,13 +586,27 @@ export function CourseLookup() {
         {/* Standalone card for exact-match queries (e.g. "CPSC 110"). The
             subject/filter flow now expands inline above and never reaches
             here — `course` is only set by the exact branch in lookup(). */}
-        {course && matches.length === 0 && <CourseCard course={course} />}
+        {course && matches.length === 0 && (
+          <CourseCard course={course} keyword={keyword} />
+        )}
       </div>
     </div>
   )
 }
 
-function CourseCard({ course }: { course: ParsedCourse }) {
+function CourseCard({
+  course,
+  keyword = '',
+  hideHeader = false,
+}: {
+  course: ParsedCourse
+  keyword?: string
+  // When the card sits directly below a list button (the inline-expand
+  // flow), that button already shows the code + title at heading size, so
+  // repeating them here would just duplicate the row. Standalone exact-
+  // match cards keep the header since nothing else identifies them.
+  hideHeader?: boolean
+}) {
   const fields: { label: string; value: string | undefined }[] = [
     { label: 'Credits', value: course.credits },
     { label: 'Prerequisites', value: course.prerequisites },
@@ -561,23 +616,29 @@ function CourseCard({ course }: { course: ParsedCourse }) {
   ]
   return (
     <article className="rounded border border-zinc-800 bg-zinc-900/60 p-4 space-y-3">
-      <header>
+      {!hideHeader && (
         <h3 className="text-lg font-semibold">
-          {course.code} <span className="text-zinc-400">— {course.title}</span>
+          {course.code}{' '}
+          <span className="text-zinc-400">
+            — {highlightKeyword(course.title, keyword)}
+          </span>
         </h3>
-        <a
-          href={course.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-xs text-blue-400 hover:underline"
-        >
-          UBC calendar ↗
-        </a>
-      </header>
+      )}
 
       {course.description && (
-        <p className="text-sm text-zinc-200 leading-relaxed">{course.description}</p>
+        <p className="text-sm text-zinc-200 leading-relaxed">
+          {highlightKeyword(course.description, keyword)}
+        </p>
       )}
+
+      <a
+        href={course.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-block text-xs text-blue-400 hover:underline"
+      >
+        UBC calendar ↗
+      </a>
 
       <dl className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1.5 text-sm">
         {fields

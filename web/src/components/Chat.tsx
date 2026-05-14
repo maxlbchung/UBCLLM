@@ -130,7 +130,9 @@ export function Chat() {
         ? 'bareSubject'
         : easterMode
           ? 'easter'
-          : 'default'
+          : sources.length === 0
+            ? 'noSources'
+            : 'default'
 
       llmMessages = [
         { role: 'system', content: buildSystemPrompt(mode) },

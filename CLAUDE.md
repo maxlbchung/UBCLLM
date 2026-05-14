@@ -76,7 +76,7 @@ The full v1 stack from the original plan is shipped and live. Highlights:
 The app version is shown in the bottom-left of the screen on the main page (Sidebar) and on the model-loading screen (ModelLoader badge). Format: `MAJOR.MINOR.PATCH`.
 
 - **MAJOR** — only bump when the user explicitly tells you to.
-- **SIGNIFICANT** — A significant architectural shift, new feature added, model change, etc.
+- **SIGNIFICANT** — A significant architectural shift, new feature added, model change, etc. 
 - **PATCH** — everything else, and this is what you should default to. UX polish, prompt tweaks, layout refinements, error-handling improvements, bug fixes, dependency bumps, deploy/CI fixes, doc updates, small new affordances. When in doubt, PATCH.
 
 Single source of truth: `web/src/version.ts` (`APP_VERSION`). Mirror it in `web/package.json` so npm tooling stays in sync.

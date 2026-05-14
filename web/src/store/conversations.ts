@@ -26,6 +26,7 @@ interface State {
   newConversation: () => string
   setActive: (id: string) => void
   deleteConversation: (id: string) => void
+  renameConversation: (id: string, title: string) => void
   setView: (v: View) => void
   saveCurrent: () => void
   ensureActive: () => string
@@ -101,6 +102,22 @@ export const useConversations = create<State>()(
           conversations: next,
           order: nextOrder,
           activeId: nextActive,
+        })
+      },
+
+      renameConversation: (id, title) => {
+        const trimmed = title.replace(/\s+/g, ' ').trim()
+        if (!trimmed) return
+        const next = trimmed.length > 60 ? trimmed.slice(0, 57) + '…' : trimmed
+        set((s) => {
+          const conv = s.conversations[id]
+          if (!conv) return s
+          return {
+            conversations: {
+              ...s.conversations,
+              [id]: { ...conv, title: next, updatedAt: Date.now() },
+            },
+          }
         })
       },
 

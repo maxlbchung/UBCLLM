@@ -223,37 +223,25 @@ export function OtherPage() {
           2026/27.
         </p>
         <p className="mt-3 text-xs text-fg-muted leading-relaxed">
-          © 2026 Max Libo Chung. The source code for this site is released
-          under the{' '}
+          © 2026 Max Libo Chung. Source code under{' '}
           <a
             href="https://github.com/maxlbchung/UBCLLM/blob/master/LICENSE"
             target="_blank"
             rel="noopener noreferrer"
             className="text-link hover:underline"
           >
-            PolyForm Noncommercial License 1.0.0
+            PolyForm Noncommercial 1.0.0
           </a>
-          . You're welcome to read, fork, and learn from it for any
-          non-commercial purpose. Commercial use — including running an
-          ad-supported, sponsored, or paid clone of this site — is not
-          permitted without written permission.
-        </p>
-        <p className="mt-2 text-xs text-fg-muted leading-relaxed">
-          Course and program content is sourced from the{' '}
+          {' '}— no commercial use without permission. Course content ©{' '}
           <a
             href="https://vancouver.calendar.ubc.ca/"
             target="_blank"
             rel="noopener noreferrer"
             className="text-link hover:underline"
           >
-            UBC Vancouver Academic Calendar
+            UBC
           </a>
-          {' '}and is © The University of British Columbia, used here to
-          power academic advising and reference features for UBC students.
-          The license above covers this site's source code only; rights to
-          the calendar content belong to UBC. If you're a UBC representative
-          with concerns about this use, please reach out and I'll respond
-          promptly.
+          .
         </p>
       </section>
     </div>

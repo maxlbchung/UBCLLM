@@ -10,11 +10,25 @@ written permission from the copyright holder.
 
 For commercial-use inquiries, contact: reodite@libo.dev
 
-NOTE ON DATA: The data files derived from the UBC Vancouver Academic Calendar
-(including scraper/output/*.json and web/public/data/chunks.json) are
-derivative works of content copyrighted by The University of British Columbia.
-This license governs only the original software in this repository; it does
-not grant any rights to UBC's calendar content. See the NOTICE file.
+SCOPE OF THIS LICENSE: This license covers ONLY the original source code in
+this repository written by the copyright holder. It does NOT cover:
+
+  - UBC Vancouver Academic Calendar content used to build the data corpus
+    (scraper/output/*.json, web/public/data/chunks.json). That content is
+    copyrighted by The University of British Columbia.
+
+  - The Qwen3.5 inference model, the all-MiniLM-L6-v2 embedding model, or
+    any other third-party model loaded at runtime. Those remain subject to
+    their own respective licenses.
+
+  - Third-party open-source packages declared in web/package.json and
+    redistributed in node_modules. Those remain subject to their own
+    respective licenses.
+
+The original "idea" (browser-native UBC academic advisor over RAG) is not
+licensed as such — ideas are not copyrightable. This license protects the
+expression of that idea in code. See the NOTICE file for details on
+third-party content.
 
 ================================================================================
 

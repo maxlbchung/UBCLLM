@@ -267,13 +267,13 @@ export function Sidebar() {
 
   if (collapsed) {
     return (
-      <aside className="w-12 shrink-0 flex flex-col items-center bg-zinc-950 border-r border-zinc-800 py-3 gap-2 h-screen">
+      <aside className="w-12 shrink-0 flex flex-col items-center bg-canvas border-r border-line py-3 gap-2 h-screen">
         <button
           onClick={() => {
             playSfx('expand')
             toggleSidebar()
           }}
-          className="text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900 rounded p-1.5 text-base leading-none"
+          className="text-fg-muted hover:text-fg hover:bg-surface rounded p-1.5 text-base leading-none"
           aria-label="Expand sidebar"
           title="Expand sidebar"
         >
@@ -287,7 +287,7 @@ export function Sidebar() {
 
   return (
     <>
-      <aside className="w-72 shrink-0 flex flex-col bg-zinc-950 border-r border-zinc-800 p-3 gap-3 h-screen">
+      <aside className="w-72 shrink-0 flex flex-col bg-canvas border-r border-line p-3 gap-3 h-screen">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 min-w-0">
             <img
@@ -296,14 +296,14 @@ export function Sidebar() {
               className="h-5 w-5 shrink-0"
             />
             <h1 className="text-sm font-semibold tracking-wide">Reodite</h1>
-            <span className="text-[0.625rem] text-zinc-500">AI Academic Assistance</span>
+            <span className="text-[0.625rem] text-fg-faint">AI Academic Assistance</span>
           </div>
           <button
             onClick={() => {
               playSfx('collapse')
               toggleSidebar()
             }}
-            className="text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900 rounded p-1 text-base leading-none shrink-0"
+            className="text-fg-muted hover:text-fg hover:bg-surface rounded p-1 text-base leading-none shrink-0"
             aria-label="Collapse sidebar"
             title="Collapse sidebar"
           >
@@ -316,7 +316,7 @@ export function Sidebar() {
             playSfx('click')
             newConversation()
           }}
-          className="rounded bg-blue-600 hover:bg-blue-500 text-sm font-medium py-2"
+          className="rounded bg-accent hover:bg-accent-hover text-accent-fg text-sm font-medium py-2"
         >
           + New chat
         </button>
@@ -332,8 +332,8 @@ export function Sidebar() {
               className={
                 'flex items-center gap-2 rounded px-2 py-1.5 text-sm text-left ' +
                 (view === t.view
-                  ? 'bg-zinc-800 text-zinc-100'
-                  : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200')
+                  ? 'bg-surface-raised text-fg'
+                  : 'text-fg-muted hover:bg-surface hover:text-fg')
               }
             >
               <span aria-hidden>{t.icon}</span>
@@ -342,13 +342,13 @@ export function Sidebar() {
           ))}
         </div>
 
-        <div className="border-t border-zinc-800 pt-2 text-[0.6875rem] uppercase tracking-wider text-zinc-500">
+        <div className="border-t border-line pt-2 text-[0.6875rem] uppercase tracking-wider text-fg-faint">
           Chat History
         </div>
 
         <div className="flex-1 overflow-y-auto -mx-1 px-1 space-y-1">
           {order.length === 0 && (
-            <p className="text-xs text-zinc-500 px-2">No conversations yet.</p>
+            <p className="text-xs text-fg-faint px-2">No conversations yet.</p>
           )}
           {order.map((id) => {
             const conv = conversations[id]
@@ -364,14 +364,21 @@ export function Sidebar() {
                   'group flex items-center gap-1 rounded px-2 py-1.5 text-sm ' +
                   (isRenaming ? '' : 'cursor-pointer ') +
                   (isActive
-                    ? 'bg-zinc-800 text-zinc-100'
+                    ? 'bg-surface-raised text-fg'
                     : isPendingDelete
-                      ? 'bg-zinc-900 text-zinc-200 ring-1 ring-red-500/40'
-                      : 'text-zinc-300 hover:bg-zinc-900')
+                      ? 'bg-surface text-fg ring-1 ring-danger/40'
+                      : 'text-fg-muted hover:bg-surface')
                 }
                 onClick={() => {
                   if (isRenaming) return
-                  if (id !== activeId) playSfx('click')
+                  // setActive switches to the chat view even when the
+                  // clicked id is already the activeId, so the click
+                  // SFX has to fire whenever EITHER the active chat is
+                  // changing OR the view is leaving a non-chat tool to
+                  // come back to chat. Without the view check, clicking
+                  // back into the previously-open conversation from
+                  // Lookup / Prereq / Other plays silently.
+                  if (id !== activeId || view !== 'chat') playSfx('click')
                   setActive(id)
                 }}
               >
@@ -392,7 +399,7 @@ export function Sidebar() {
                     }}
                     onBlur={commitRename}
                     maxLength={120}
-                    className="flex-1 min-w-0 bg-zinc-950 border border-zinc-700 rounded px-1.5 py-0.5 text-sm text-zinc-100 focus:outline-none focus:border-blue-500"
+                    className="flex-1 min-w-0 bg-canvas border border-line-soft rounded px-1.5 py-0.5 text-sm text-fg focus:outline-none focus:border-accent-hover"
                   />
                 ) : (
                   <span className="flex-1 truncate">{conv.title}</span>
@@ -400,9 +407,9 @@ export function Sidebar() {
                 <button
                   onClick={(e) => startRename(e, id)}
                   className={
-                    'text-zinc-500 hover:text-zinc-100 text-xs ' +
+                    'text-fg-faint hover:text-fg text-xs ' +
                     (isRenaming
-                      ? 'opacity-100 text-zinc-100'
+                      ? 'opacity-100 text-fg'
                       : 'opacity-0 group-hover:opacity-100')
                   }
                   aria-label="Rename conversation"
@@ -413,9 +420,9 @@ export function Sidebar() {
                 <button
                   onClick={(e) => openDeletePrompt(e, id)}
                   className={
-                    'text-zinc-500 hover:text-red-400 text-xs ' +
+                    'text-fg-faint hover:text-danger-fg text-xs ' +
                     (isPendingDelete
-                      ? 'opacity-100 text-red-400'
+                      ? 'opacity-100 text-danger-fg'
                       : 'opacity-0 group-hover:opacity-100')
                   }
                   aria-label="Delete conversation"
@@ -433,7 +440,7 @@ export function Sidebar() {
             (settings + version) from the scrollable chat history above.
             `-mx-3` cancels the sidebar's `p-3` so the rule spans edge to
             edge. */}
-        <div className="-mx-3 border-t border-zinc-800" />
+        <div className="-mx-3 border-t border-line" />
         <button
           type="button"
           onClick={() => {
@@ -443,17 +450,17 @@ export function Sidebar() {
           className={
             'flex items-center gap-2 rounded px-2 py-1.5 text-sm text-left w-full ' +
             (view === 'other'
-              ? 'bg-zinc-800 text-zinc-100'
-              : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200')
+              ? 'bg-surface-raised text-fg'
+              : 'text-fg-muted hover:bg-surface hover:text-fg')
           }
         >
           <span aria-hidden>⚙</span>
           <span>Other</span>
         </button>
         <div className="flex items-center justify-between text-[0.625rem] font-mono">
-          <span className="text-zinc-500">v{APP_VERSION}</span>
+          <span className="text-fg-faint">v{APP_VERSION}</span>
           <span
-            className="text-amber-300"
+            className="text-highlight-fg"
             title={
               eggTotal > 0
                 ? `${discoveredCount} of ${eggTotal} easter eggs discovered`
@@ -478,7 +485,9 @@ export function Sidebar() {
               {/* Anticipation rings — three same-size circles staggered by
                   100ms / 150ms so they pulse out one after another rather
                   than animating concentrically. Sized in rem so they scale
-                  with the rem-base setting in index.css. */}
+                  with the rem-base setting in index.css. The glow color
+                  is derived from --highlight-fg via color-mix so it tints
+                  per theme without needing a separate token. */}
               {ringBursts.map((burst) => (
                 <span
                   key={burst.id}
@@ -488,11 +497,12 @@ export function Sidebar() {
                   {[0, 100, 150].map((delayMs, i) => (
                     <span
                       key={i}
-                      className="absolute left-0 top-0 rounded-full border-2 border-amber-300"
+                      className="absolute left-0 top-0 rounded-full border-2 border-highlight-fg"
                       style={{
                         width: '4.2rem',
                         height: '4.2rem',
-                        boxShadow: '0 0 6px 1px rgba(252, 211, 77, 0.5)',
+                        boxShadow:
+                          '0 0 6px 1px color-mix(in oklab, var(--highlight-fg) 50%, transparent)',
                         animation: 'egg-ring 1150ms linear forwards',
                         animationDelay: `${delayMs}ms`,
                       }}
@@ -509,11 +519,13 @@ export function Sidebar() {
                   {burst.particles.map((p) => (
                     <span
                       key={p.id}
-                      className="absolute left-1/2 top-1/2 h-2 w-2 rounded-full bg-amber-300 shadow-[0_0_8px_2px_rgba(252,211,77,0.8)]"
+                      className="absolute left-1/2 top-1/2 h-2 w-2 rounded-full bg-highlight-fg"
                       style={
                         {
                           '--dx': `${p.dx}px`,
                           '--dy': `${p.dy}px`,
+                          boxShadow:
+                            '0 0 8px 2px color-mix(in oklab, var(--highlight-fg) 80%, transparent)',
                           animation:
                             'egg-spark 2500ms cubic-bezier(0.16, 1, 0.3, 1) forwards',
                         } as React.CSSProperties
@@ -526,6 +538,22 @@ export function Sidebar() {
             <span> Easter Eggs Found</span>
           </span>
         </div>
+        {/* Copyright + license link. PolyForm-NC is source-available but
+            forbids commercial use; surfaced here so visitors don't have to
+            dig through the repo to find the terms. Link points to the
+            LICENSE on GitHub since this is a static deploy with no
+            local route. */}
+        <div className="text-[0.625rem] text-fg-faint font-mono leading-relaxed">
+          © 2026 Max Chung ·{' '}
+          <a
+            href="https://github.com/maxlbchung/UBCLLM/blob/master/LICENSE"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-link hover:underline"
+          >
+            License
+          </a>
+        </div>
       </aside>
 
       {pendingConv &&
@@ -536,11 +564,11 @@ export function Sidebar() {
             role="dialog"
             aria-label="Delete conversation"
             style={{ top: popupPos.top, left: popupPos.left, width: POPUP_WIDTH }}
-            className="fixed z-50 bg-zinc-900 border border-zinc-700 rounded-md shadow-lg shadow-black/40 p-2.5 flex flex-col gap-2"
+            className="fixed z-50 bg-surface border border-line-soft rounded-md shadow-lg shadow-black/40 p-2.5 flex flex-col gap-2"
           >
-            <p className="text-xs text-zinc-300 leading-snug">
+            <p className="text-xs text-fg-muted leading-snug">
               Delete{' '}
-              <span className="font-semibold text-zinc-100">
+              <span className="font-semibold text-fg">
                 "{pendingConv.title}"
               </span>
               ?
@@ -551,14 +579,14 @@ export function Sidebar() {
                   playSfx('click')
                   closeDeletePrompt()
                 }}
-                className="text-xs px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200"
+                className="text-xs px-2 py-1 rounded bg-surface-raised hover:bg-line-soft text-fg"
                 autoFocus
               >
                 Cancel
               </button>
               <button
                 onClick={confirmDelete}
-                className="text-xs px-2 py-1 rounded bg-red-600 hover:bg-red-500 text-white font-medium"
+                className="text-xs px-2 py-1 rounded bg-danger hover:bg-danger-hover text-accent-fg font-medium"
               >
                 Delete
               </button>

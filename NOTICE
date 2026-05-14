@@ -1,0 +1,47 @@
+UBCLLM
+Copyright (c) 2026 Max Libo Chung
+
+This product is licensed under the PolyForm Noncommercial License 1.0.0.
+See the LICENSE file for full terms.
+
+================================================================================
+
+Third-party content and notices
+================================================================================
+
+UBC Vancouver Academic Calendar content
+---------------------------------------
+The data files derived from the UBC Vancouver Academic Calendar
+(https://vancouver.calendar.ubc.ca/), including but not limited to:
+
+  - scraper/output/courses.json
+  - scraper/output/programs.json
+  - web/public/data/chunks.json
+
+are derivative works of content copyrighted by The University of British
+Columbia. They are used here for educational and informational purposes only.
+
+The PolyForm Noncommercial license in the LICENSE file applies to the
+original software in this repository. It does NOT grant any rights to the
+UBC calendar content itself. Use of the UBC calendar content is subject to
+UBC's own terms and copyright policies.
+
+If you are a representative of The University of British Columbia and have
+concerns about the use of this content, please contact maxlbchung@gmail.com
+and the content will be removed promptly.
+
+Models
+------
+The application loads inference and embedding models at runtime from the
+user's browser. Those models are not redistributed by this repository and
+remain subject to their own licenses:
+
+  - Qwen / Qwen3.5 family models (Apache-2.0 or Qwen-specific terms,
+    depending on the variant the WebLLM build resolves at runtime)
+  - sentence-transformers/all-MiniLM-L6-v2 (Apache-2.0)
+
+Open-source dependencies
+------------------------
+This project depends on numerous open-source packages whose licenses are
+distributed with their respective node_modules. See web/package.json and
+the installed package metadata for the authoritative list.

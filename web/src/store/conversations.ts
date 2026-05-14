@@ -6,7 +6,7 @@ import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { useChat, type Message } from './chat'
 
-export type View = 'chat' | 'lookup' | 'prereq'
+export type View = 'chat' | 'lookup' | 'prereq' | 'other'
 
 export interface Conversation {
   id: string

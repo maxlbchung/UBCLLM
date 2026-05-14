@@ -3,6 +3,7 @@ import { Sidebar } from './components/Sidebar'
 import { Chat } from './components/Chat'
 import { CourseLookup } from './components/CourseLookup'
 import { PrereqTree } from './components/PrereqTree'
+import { OtherPage } from './components/OtherPage'
 import { useConversations } from './store/conversations'
 
 export default function App() {
@@ -30,6 +31,9 @@ function Shell() {
         </div>
         <div className={view === 'prereq' ? 'flex-1 min-h-0 flex flex-col' : 'hidden'}>
           <PrereqTree />
+        </div>
+        <div className={view === 'other' ? 'flex-1 min-h-0 flex flex-col' : 'hidden'}>
+          <OtherPage />
         </div>
       </main>
     </div>

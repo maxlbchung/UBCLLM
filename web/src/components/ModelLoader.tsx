@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { getLLM } from '../lib/llm'
+import { playSfx } from '../lib/sfx'
 import type { ChatError } from '../store/chat'
 import { APP_VERSION } from '../version'
 import { ErrorDetails } from './ErrorDetails'
@@ -109,10 +110,18 @@ export function ModelLoader({ children }: { children: ReactNode }) {
             mode: prev.mode === 'unknown' && detected ? detected : prev.mode,
           }))
         })
-        if (!cancelled) setS((prev) => ({ ...prev, ready: true, progress: 1 }))
+        if (!cancelled) {
+          setS((prev) => ({ ...prev, ready: true, progress: 1 }))
+          // Chime once the model finishes loading. May no-op if AudioContext
+          // is still suspended (no user gesture yet), but that's expected —
+          // the load typically straddles enough user activity that the
+          // context is live by the time this fires.
+          playSfx('success')
+        }
       } catch (err) {
         if (!cancelled) {
           console.error('model load failed', err)
+          playSfx('error')
           setS((prev) => ({ ...prev, error: toChatError(err) }))
         }
       }
@@ -148,14 +157,20 @@ export function ModelLoader({ children }: { children: ReactNode }) {
               <div className="flex flex-col items-center gap-2 mt-2">
                 <button
                   type="button"
-                  onClick={() => void clearCacheAndRetry()}
+                  onClick={() => {
+                    playSfx('click')
+                    void clearCacheAndRetry()
+                  }}
                   className="px-4 py-2 rounded-md bg-blue-500 hover:bg-blue-400 text-white text-sm font-medium transition-colors"
                 >
                   Clear cache and try again
                 </button>
                 <button
                   type="button"
-                  onClick={retry}
+                  onClick={() => {
+                    playSfx('click')
+                    retry()
+                  }}
                   className="text-sm text-zinc-400 hover:text-zinc-200 hover:underline underline-offset-2"
                 >
                   Try again
@@ -167,7 +182,7 @@ export function ModelLoader({ children }: { children: ReactNode }) {
             </>
           ) : (
             <p className="text-xs text-zinc-500 max-w-md">
-              UBCLLM needs WebGPU and ~2.5 GB of GPU memory. Try Chrome 113+ or Edge 113+ on a desktop with a recent GPU.
+              Reodite needs WebGPU and ~2.5 GB of GPU memory. Try Chrome 113+ or Edge 113+ on a desktop with a recent GPU.
             </p>
           )}
         </div>

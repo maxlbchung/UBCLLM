@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Handle, Position, type NodeProps } from 'reactflow'
 import { renderTextWithLinks } from '../lib/renderText'
+import { playSfx } from '../lib/sfx'
 
 // ReactFlow custom node for an `Or-dropdown` group — used when the prereq
 // string says "one of A, B, C" (or a bare "A or B" without a wrapping
@@ -190,6 +191,11 @@ function DropdownSelect({
         onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => {
           e.stopPropagation()
+          // Only the open transition gets the chirp — closing happens
+          // implicitly when the user picks an option (dropdownPick fires)
+          // or clicks outside (no SFX needed), so playing on every toggle
+          // would double-up with those flows.
+          if (!open) playSfx('dropdownOpen')
           setOpen((o) => !o)
         }}
         style={{

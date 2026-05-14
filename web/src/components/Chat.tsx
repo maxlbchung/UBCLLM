@@ -7,6 +7,8 @@ import {
   type Chunk,
 } from '../lib/retrieve'
 import { getDiagSnapshot, streamChat } from '../lib/llm'
+import { playSfx, startBotThinking, stopBotThinking } from '../lib/sfx'
+import { useSettings } from '../store/settings'
 import {
   buildSystemPrompt,
   userPromptWithContext,
@@ -68,6 +70,7 @@ export function Chat() {
     const q = input.trim()
     if (!q || streaming) return
     setInput('')
+    playSfx('send')
 
     useConversations.getState().ensureActive()
 
@@ -75,6 +78,15 @@ export function Chat() {
     addMessage(makeMessage('assistant', ''))
     setStreaming(true)
     useConversations.getState().saveCurrent()
+
+    // Bot-noise lifecycle: a low pulse plays while we wait for the first
+    // streamed token ("thinking"), then switches to per-token typing
+    // ticks once the stream starts. Gate read once at the top of the
+    // turn so a mid-stream settings flip doesn't half-engage / half-
+    // disengage the audio — the user-experienced "this turn" stays
+    // consistent.
+    const botSfxOn = useSettings.getState().botNoisesEnabled
+    if (botSfxOn) startBotThinking()
 
     // Hoisted so the catch block can attach a request snapshot to the
     // ChatError. They start empty/undefined and get filled inside the try.
@@ -146,13 +158,29 @@ export function Chat() {
       // generator's return value (the recovery flag from streamChat).
       const it = streamChat(llmMessages)
       let result = await it.next()
+      let firstToken = true
       while (!result.done) {
+        if (botSfxOn) {
+          if (firstToken) {
+            // Hand off from the thinking pulse to typing ticks the moment
+            // a real token appears, so the two never overlap.
+            stopBotThinking()
+            firstToken = false
+          }
+          // Throttle to ~100 ms so a fast token stream doesn't produce a
+          // continuous buzz; the result reads as a steady "typing" rhythm
+          // rather than a literal tick-per-token.
+          playSfx('botTyping', 100)
+        }
         appendToLast(result.value)
         result = await it.next()
       }
       // result.value is { recovered }; we don't surface a UI hint when
       // recovery happened transparently, only when an error is thrown.
+      stopBotThinking()
     } catch (err) {
+      stopBotThinking()
+      playSfx('error')
       const requestSnapshot = {
         sourceCount: sources.length,
         query: q,
@@ -187,6 +215,11 @@ export function Chat() {
       console.groupEnd()
       setErrorOnLast(chatError)
     } finally {
+      // Belt-and-suspenders: both the success and catch branches already
+      // call stopBotThinking, but if a throw bubbles up before either is
+      // reached the timer would otherwise leak. stopBotThinking is a
+      // no-op when the timer isn't running, so this is always safe.
+      stopBotThinking()
       setStreaming(false)
       useConversations.getState().saveCurrent()
     }
@@ -200,9 +233,9 @@ export function Chat() {
     <div className="flex flex-col h-screen flex-1 py-4 min-h-0 gap-4">
       <div className="mx-auto w-full max-w-[1200px] px-4">
         <header className="flex items-baseline justify-between border-b border-zinc-800 pb-2">
-          <h1 className="text-lg font-semibold">Advisor</h1>
+          <h1 className="text-lg font-semibold">AI Chatbot</h1>
           <span className="text-xs text-zinc-500">
-            UBC Vancouver · runs in your browser
+            Reodite can make mistakes · Make sure to verify important information
           </span>
         </header>
       </div>
@@ -256,11 +289,10 @@ export function Chat() {
         </form>
         {input.length >= MAX_INPUT_LENGTH * 0.8 && (
           <div
-            className={`mt-1 text-right text-xs ${
-              input.length >= MAX_INPUT_LENGTH
-                ? 'text-amber-400'
-                : 'text-zinc-500'
-            }`}
+            className={`mt-1 text-right text-xs ${input.length >= MAX_INPUT_LENGTH
+              ? 'text-amber-400'
+              : 'text-zinc-500'
+              }`}
           >
             {input.length} / {MAX_INPUT_LENGTH}
           </div>

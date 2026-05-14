@@ -31,6 +31,7 @@ import {
   LONGEST_PREREQ_TREE_EASTER_ID,
   useEasterEggs,
 } from '../store/easterEggs'
+import { playSfx } from '../lib/sfx'
 
 // The corpus's deepest-possible prereq chain: FNH 483 has 15 nodes from
 // CHEM 12 → … → FNH 483. With root at depth 0 the longest visible depth
@@ -356,7 +357,8 @@ function buildGraph(
   rootCode: string,
   index: Map<string, Chunk>,
   selections: Map<string, number>,
-  setSelection: (key: string, idx: number) => void,
+  setDropdownSelection: (key: string, idx: number) => void,
+  setEitherSelection: (key: string, idx: number) => void,
   softDisabled: Map<string, boolean>,
   toggleSoft: (key: string) => void,
 ): Graph {
@@ -861,7 +863,14 @@ function buildGraph(
   ): void {
     if (isCoreq) coreqIds.add(groupId)
     if (byId.has(groupId)) return
-    const onChange = (idx: number) => setSelection(key, idx)
+    // Pick the SFX-flavored selector that matches the rendered block —
+    // dropdown blocks call dropdownPick, stacked either-or blocks call
+    // eitherPick. The split lives at the parent (PrereqTree) so node
+    // components don't have to know about audio.
+    const onChange =
+      expr.ui === 'dropdown'
+        ? (idx: number) => setDropdownSelection(key, idx)
+        : (idx: number) => setEitherSelection(key, idx)
     if (expr.ui === 'dropdown') {
       const data: DisjunctionData = {
         options: expr.children.map((child) => ({
@@ -1285,7 +1294,12 @@ export function PrereqTree() {
     () => new Map(),
   )
 
-  const setSelection = useCallback((key: string, idx: number) => {
+  // Single core mutator. Each surface (dropdown / either-or) has its own
+  // outer callback that plays its own SFX before delegating here — that
+  // way the buildGraph layout doesn't need to know which kind of block
+  // emitted the change, and the sound differentiation lives at the call
+  // site instead of being threaded through node props.
+  const applySelection = useCallback((key: string, idx: number) => {
     setSelections((prev) => {
       const next = new Map(prev)
       next.set(key, idx)
@@ -1293,7 +1307,28 @@ export function PrereqTree() {
     })
   }, [])
 
+  const setDropdownSelection = useCallback(
+    (key: string, idx: number) => {
+      // Match the theme-select pick sound in OtherPage so all "picked an
+      // option from a dropdown" surfaces feel consistent. Either-or
+      // blocks keep their distinct `eitherPick` since they're not
+      // dropdowns (radio-style stacked picker).
+      playSfx('click')
+      applySelection(key, idx)
+    },
+    [applySelection],
+  )
+
+  const setEitherSelection = useCallback(
+    (key: string, idx: number) => {
+      playSfx('eitherPick')
+      applySelection(key, idx)
+    },
+    [applySelection],
+  )
+
   const toggleSoft = useCallback((key: string) => {
+    playSfx('toggle')
     setSoftDisabled((prev) => {
       const next = new Map(prev)
       next.set(key, !(prev.get(key) ?? false))
@@ -1332,11 +1367,20 @@ export function PrereqTree() {
       activeCode,
       index,
       selections,
-      setSelection,
+      setDropdownSelection,
+      setEitherSelection,
       softDisabled,
       toggleSoft,
     )
-  }, [index, activeCode, selections, setSelection, softDisabled, toggleSoft])
+  }, [
+    index,
+    activeCode,
+    selections,
+    setDropdownSelection,
+    setEitherSelection,
+    softDisabled,
+    toggleSoft,
+  ])
 
   const root = useMemo(() => {
     if (!index || !activeCode) return null
@@ -1358,6 +1402,11 @@ export function PrereqTree() {
   function submit(e: React.FormEvent) {
     e.preventDefault()
     if (!index) return
+    // Mirror the chat composer's one-shot `send` chime so the two
+    // submit-by-Enter surfaces feel like the same gesture. The lookup
+    // result is synchronous, so we deliberately don't tack on a
+    // success/error follow-up.
+    playSfx('send')
     const code = normalize(query)
     if (index.has(code)) setActiveCode(code)
     else setActiveCode(null)

@@ -6,6 +6,7 @@ import {
   type ParsedCourse,
 } from '../lib/retrieve'
 import { ABCD_EASTER_ID, useEasterEggs } from '../store/easterEggs'
+import { playSfx } from '../lib/sfx'
 
 // Wrap every (case-insensitive) occurrence of `keyword` inside `text` with a
 // <mark> so the keyword filter's match site is visible in the title /
@@ -507,7 +508,10 @@ export function CourseLookup() {
             {suggestions.map((s) => (
               <button
                 key={s}
-                onClick={() => setQuery(s)}
+                onClick={() => {
+                  playSfx('click')
+                  setQuery(s)
+                }}
                 className="rounded bg-zinc-800 hover:bg-zinc-700 px-2 py-1 text-xs"
               >
                 {s}
@@ -545,6 +549,7 @@ export function CourseLookup() {
                         const code = c.code
                         if (code === null) return
                         const willExpand = !expandedCodes.has(code)
+                        playSfx(willExpand ? 'courseExpand' : 'courseCollapse')
                         setExpandedCodes((prev) => {
                           const next = new Set(prev)
                           if (next.has(code)) next.delete(code)

@@ -2,10 +2,11 @@ import { useEffect, useRef, useState, type MouseEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { useConversations, type View } from '../store/conversations'
 import { useEasterEggs } from '../store/easterEggs'
+import { playSfx } from '../lib/sfx'
 import { APP_VERSION } from '../version'
 
 const TOOLS: { view: View; label: string; icon: string }[] = [
-  { view: 'chat', label: 'Chat', icon: '💬' },
+  { view: 'chat', label: 'AI Chatbot', icon: '💬' },
   { view: 'lookup', label: 'Course Lookup', icon: '🔎' },
   { view: 'prereq', label: 'Prerequisite Tree', icon: '🌳' },
 ]
@@ -93,6 +94,18 @@ export function Sidebar() {
     const burstId = Date.now()
     const targetCount = discoveredCount
 
+    // Sound timeline runs in lockstep with the visual animation:
+    //   t=0     eggFound  — quick rising sine as the rings fade in
+    //   t=0     eggWind   — slow-attack pad that swells through the
+    //                       rings-hold + rings-zoom phases
+    //   t=1100  eggVictory — triumphant chord on impact (fired inside
+    //                        the existing impactTimer below)
+    // Found + wind start together: the wind has a 400 ms attack so its
+    // volume is still near silence while the found chirp is at its
+    // bright peak, then takes over as the found tails off.
+    playSfx('eggFound')
+    playSfx('eggWind')
+
     // Phase 1: rings appear
     setRingBursts((b) => [...b, { id: burstId }])
 
@@ -112,6 +125,10 @@ export function Sidebar() {
       setDisplayedCount(targetCount)
       setPopKey((k) => k + 1)
       setSparkBursts((b) => [...b, { id: burstId, particles }])
+      // Synced to the visual impact: number snap + sparks + chord all
+      // land on the same frame, so the chord reads as the cause rather
+      // than a follow-up beat.
+      playSfx('eggVictory')
     }, 1100)
 
     // Phase 3: ring cleanup just after they vanish.
@@ -159,22 +176,28 @@ export function Sidebar() {
   const [renameDraft, setRenameDraft] = useState('')
   const renameInputRef = useRef<HTMLInputElement | null>(null)
 
+
   function startRename(e: MouseEvent<HTMLButtonElement>, id: string) {
     e.stopPropagation()
     closeDeletePrompt()
     const conv = conversations[id]
     if (!conv) return
+    playSfx('click')
     setRenamingId(id)
     setRenameDraft(conv.title)
   }
 
   function commitRename() {
-    if (renamingId) renameConversation(renamingId, renameDraft)
+    if (renamingId) {
+      renameConversation(renamingId, renameDraft)
+      playSfx('success')
+    }
     setRenamingId(null)
     setRenameDraft('')
   }
 
   function cancelRename() {
+    if (renamingId) playSfx('click')
     setRenamingId(null)
     setRenameDraft('')
   }
@@ -198,6 +221,7 @@ export function Sidebar() {
       left: Math.min(rect.right + 8, window.innerWidth - POPUP_WIDTH - 8),
     })
     setPendingDeleteId(id)
+    playSfx('click')
   }
 
   function closeDeletePrompt() {
@@ -206,7 +230,10 @@ export function Sidebar() {
   }
 
   function confirmDelete() {
-    if (pendingDeleteId) deleteConversation(pendingDeleteId)
+    if (pendingDeleteId) {
+      playSfx('delete')
+      deleteConversation(pendingDeleteId)
+    }
     closeDeletePrompt()
   }
 
@@ -242,7 +269,10 @@ export function Sidebar() {
     return (
       <aside className="w-12 shrink-0 flex flex-col items-center bg-zinc-950 border-r border-zinc-800 py-3 gap-2 h-screen">
         <button
-          onClick={toggleSidebar}
+          onClick={() => {
+            playSfx('expand')
+            toggleSidebar()
+          }}
           className="text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900 rounded p-1.5 text-base leading-none"
           aria-label="Expand sidebar"
           title="Expand sidebar"
@@ -259,12 +289,20 @@ export function Sidebar() {
     <>
       <aside className="w-72 shrink-0 flex flex-col bg-zinc-950 border-r border-zinc-800 p-3 gap-3 h-screen">
         <div className="flex items-center justify-between">
-          <div className="flex items-baseline gap-2 min-w-0">
-            <h1 className="text-sm font-semibold tracking-wide">UBCLLM</h1>
-            <span className="text-[0.625rem] text-zinc-500">in-browser</span>
+          <div className="flex items-center gap-2 min-w-0">
+            <img
+              src={`${import.meta.env.BASE_URL}logo.png`}
+              alt="Reodite"
+              className="h-5 w-5 shrink-0"
+            />
+            <h1 className="text-sm font-semibold tracking-wide">Reodite</h1>
+            <span className="text-[0.625rem] text-zinc-500">AI Academic Assistance</span>
           </div>
           <button
-            onClick={toggleSidebar}
+            onClick={() => {
+              playSfx('collapse')
+              toggleSidebar()
+            }}
             className="text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900 rounded p-1 text-base leading-none shrink-0"
             aria-label="Collapse sidebar"
             title="Collapse sidebar"
@@ -274,7 +312,10 @@ export function Sidebar() {
         </div>
 
         <button
-          onClick={() => newConversation()}
+          onClick={() => {
+            playSfx('click')
+            newConversation()
+          }}
           className="rounded bg-blue-600 hover:bg-blue-500 text-sm font-medium py-2"
         >
           + New chat
@@ -284,7 +325,10 @@ export function Sidebar() {
           {TOOLS.map((t) => (
             <button
               key={t.view}
-              onClick={() => setView(t.view)}
+              onClick={() => {
+                if (view !== t.view) playSfx('tab')
+                setView(t.view)
+              }}
               className={
                 'flex items-center gap-2 rounded px-2 py-1.5 text-sm text-left ' +
                 (view === t.view
@@ -327,6 +371,7 @@ export function Sidebar() {
                 }
                 onClick={() => {
                   if (isRenaming) return
+                  if (id !== activeId) playSfx('click')
                   setActive(id)
                 }}
               >
@@ -384,9 +429,27 @@ export function Sidebar() {
           })}
         </div>
 
-        <div className="text-[0.625rem] text-zinc-600 leading-tight">
-          Qwen3.5 2B · WebGPU · MiniLM embeddings · UBC Vancouver calendar 2026/27.
-        </div>
+        {/* Divider line above the settings row, separating the footer cluster
+            (settings + version) from the scrollable chat history above.
+            `-mx-3` cancels the sidebar's `p-3` so the rule spans edge to
+            edge. */}
+        <div className="-mx-3 border-t border-zinc-800" />
+        <button
+          type="button"
+          onClick={() => {
+            if (view !== 'other') playSfx('tab')
+            setView('other')
+          }}
+          className={
+            'flex items-center gap-2 rounded px-2 py-1.5 text-sm text-left w-full ' +
+            (view === 'other'
+              ? 'bg-zinc-800 text-zinc-100'
+              : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200')
+          }
+        >
+          <span aria-hidden>⚙</span>
+          <span>Other</span>
+        </button>
         <div className="flex items-center justify-between text-[0.625rem] font-mono">
           <span className="text-zinc-500">v{APP_VERSION}</span>
           <span
@@ -484,7 +547,10 @@ export function Sidebar() {
             </p>
             <div className="flex gap-1.5 justify-end">
               <button
-                onClick={closeDeletePrompt}
+                onClick={() => {
+                  playSfx('click')
+                  closeDeletePrompt()
+                }}
                 className="text-xs px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200"
                 autoFocus
               >

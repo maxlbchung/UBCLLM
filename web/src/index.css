@@ -121,3 +121,90 @@ body {
   0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
   30%           { opacity: 1;   transform: translateY(-0.2rem); }
 }
+
+/* Themed range slider (.range-themed) — the track is a tall rounded pill
+   that fully *contains* the thumb (the thumb is smaller than the track
+   height and is centered inside it). Track: zinc-800 base with the
+   filled portion painted via a linear-gradient stop at the inline
+   `--range-fill` CSS var (set from the bound value in OtherPage.tsx).
+   Thumb: small zinc-100 disc with a soft drop shadow so it reads as a
+   marker sliding inside the pill. WebKit and Gecko need separate
+   pseudo-element blocks; Firefox draws the fill via
+   ::-moz-range-progress, so the gradient var is WebKit-only. Sizes are
+   in px on purpose so the slider stays physically consistent
+   regardless of the rem base in index.css. */
+.range-themed {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 22px;
+  /* No padding here. The wrapping <div> in OtherPage.tsx provides the
+     11 px inset by carrying the visible bar background at full width
+     while leaving 11 px of horizontal padding so the input (sized w-full
+     of the wrapper's content box) is 22 px narrower than the bar. That
+     makes the thumb travel range [11, W-11] in wrapper coords, which is
+     exactly where the tick overlay lands its 11 ticks via justify-between
+     + px-[11px]. Don't try to do this with padding on the input — the
+     thumb position isn't always inset by the input's padding (it depends
+     on the browser), which is what caused the v1.5.13 "handle touches
+     the end" regression. */
+  background: transparent;
+  cursor: pointer;
+  outline: none;
+}
+.range-themed::-webkit-slider-runnable-track {
+  height: 22px;
+  border-radius: 9999px;
+  /* Track is transparent — the visible bar (including the blue fill) is
+     painted by the wrapping <div> in OtherPage.tsx, sized to the full
+     wrapper width so the thumb's outer edge can land *inside* the bar
+     with a 4 px gap at value 0/100. If the track painted its own
+     gradient, the gradient would shrink with the input's padding and
+     the thumb would still extend past the visible end. */
+  background: transparent;
+}
+.range-themed::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  background: #f4f4f5;
+  border: none;
+  margin-top: 4px; /* (track 22 − thumb 14) / 2 — centers thumb inside track */
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+  transition: background-color 150ms, box-shadow 150ms;
+}
+.range-themed:hover::-webkit-slider-thumb {
+  background: #ffffff;
+}
+.range-themed:focus-visible::-webkit-slider-thumb {
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.18);
+}
+.range-themed::-moz-range-track {
+  height: 22px;
+  border-radius: 9999px;
+  background: transparent; /* painted by wrapping div; see WebKit note above */
+}
+.range-themed::-moz-range-progress {
+  height: 22px;
+  border-radius: 9999px;
+  background: transparent; /* same — Firefox would otherwise draw the fill itself */
+}
+.range-themed::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  background: #f4f4f5;
+  border: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+  transition: background-color 150ms, box-shadow 150ms;
+}
+.range-themed:hover::-moz-range-thumb {
+  background: #ffffff;
+}
+.range-themed:focus-visible::-moz-range-thumb {
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.18);
+}

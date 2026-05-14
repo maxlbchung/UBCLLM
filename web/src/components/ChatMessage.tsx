@@ -4,6 +4,7 @@ import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { Message } from '../store/chat'
 import type { Chunk } from '../lib/retrieve'
+import { playSfx } from '../lib/sfx'
 import { ErrorDetails } from './ErrorDetails'
 
 const CITATION_RE = /\[(\d+)\]/g
@@ -67,7 +68,8 @@ function citationChip(idx: number, sources: Chunk[], key: string | number): Reac
       <span
         key={key}
         title={src.code ?? src.title}
-        className={`${baseClasses} ${chipClasses}`}
+        onClick={() => playSfx('click')}
+        className={`${baseClasses} ${chipClasses} cursor-pointer`}
       >
         {idx}
       </span>
@@ -80,6 +82,7 @@ function citationChip(idx: number, sources: Chunk[], key: string | number): Reac
       target="_blank"
       rel="noopener noreferrer"
       title={src.code ?? src.title}
+      onClick={() => playSfx('click')}
       className={`${baseClasses} ${chipClasses}`}
     >
       {idx}
@@ -321,8 +324,24 @@ export function ChatMessage({ message }: { message: Message }) {
         )}
 
         {!isUser && sources.length > 0 && (
-          <details className="mt-2 text-xs text-zinc-400" open={cited1Indexed.length > 0}>
-            <summary className="cursor-pointer select-none">
+          <details
+            className="mt-2 text-xs text-zinc-400"
+            onToggle={(e) => {
+              if (!e.currentTarget.open) return
+              const el = e.currentTarget
+              // Defer one frame so the expanded content has laid out before
+              // we measure. scrollIntoView with block:'nearest' is a no-op
+              // when the element is already fully visible — it only scrolls
+              // the minimum needed to bring the bottom (or top) into view.
+              requestAnimationFrame(() => {
+                el.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+              })
+            }}
+          >
+            <summary
+              className="cursor-pointer select-none"
+              onClick={() => playSfx('toggle')}
+            >
               {cited1Indexed.length > 0
                 ? `Sources used (${cited1Indexed.length} of ${sources.length})`
                 : `Sources retrieved (${sources.length})`}

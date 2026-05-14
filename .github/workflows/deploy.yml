@@ -1,16 +1,21 @@
-name: Deploy to Cloudflare Pages
+name: Deploy to GitHub Pages
 
 on:
   push:
     branches: [master, main]
   workflow_dispatch:
 
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
 concurrency:
-  group: cloudflare-pages
+  group: pages
   cancel-in-progress: true
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -54,14 +59,24 @@ jobs:
         working-directory: web
         run: npm run build
         env:
-          # Cloudflare Pages serves at the domain root (no /UBCLLM/ subpath
-          # like GitHub Pages had), so base must be `/`.
-          VITE_BASE_PATH: /
+          VITE_BASE_PATH: /${{ github.event.repository.name }}/
 
-      # ---- Deploy to Cloudflare Pages ----
-      - name: Deploy to Cloudflare Pages
-        uses: cloudflare/wrangler-action@v3
+      - uses: actions/configure-pages@v5
         with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy web/dist --project-name=ubcllm --branch=master
+          # Auto-enable Pages with GitHub Actions as the source if it ever
+          # gets disabled in repo settings (otherwise this step 404s with
+          # "Get Pages site failed" and the whole deploy aborts).
+          enablement: true
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

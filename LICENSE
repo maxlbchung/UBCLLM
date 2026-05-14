@@ -1,34 +1,15 @@
 Copyright (c) 2026 Max Libo Chung. All rights reserved.
 
 This software is provided under the PolyForm Noncommercial License 1.0.0
-(text below). You may use, modify, and share this software for any purpose
-that is not a "commercial purpose" as defined by the license. Operating a
-commercial service, monetizing access (including via advertising, sponsorship,
-paid placement, or paywalls), or otherwise using this software primarily for
-commercial advantage or monetary compensation is NOT permitted without prior
-written permission from the copyright holder.
+(text below). Commercial use — including running an ad-supported, sponsored,
+or paid clone of this site — is not permitted without prior written
+permission from the copyright holder.
 
 For commercial-use inquiries, contact: reodite@libo.dev
 
-SCOPE OF THIS LICENSE: This license covers ONLY the original source code in
-this repository written by the copyright holder. It does NOT cover:
-
-  - UBC Vancouver Academic Calendar content used to build the data corpus
-    (scraper/output/*.json, web/public/data/chunks.json). That content is
-    copyrighted by The University of British Columbia.
-
-  - The Qwen3.5 inference model, the all-MiniLM-L6-v2 embedding model, or
-    any other third-party model loaded at runtime. Those remain subject to
-    their own respective licenses.
-
-  - Third-party open-source packages declared in web/package.json and
-    redistributed in node_modules. Those remain subject to their own
-    respective licenses.
-
-The original "idea" (browser-native UBC academic advisor over RAG) is not
-licensed as such — ideas are not copyrightable. This license protects the
-expression of that idea in code. See the NOTICE file for details on
-third-party content.
+Third-party content (UBC calendar data, AI models loaded at runtime, npm
+dependencies) is not covered by this license and is credited separately in
+the NOTICE file.
 
 ================================================================================
 

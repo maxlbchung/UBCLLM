@@ -1,107 +1,45 @@
 UBCLLM (Reodite)
-Copyright (c) 2026 Max Libo Chung
+Copyright (c) 2026 Max Libo Chung — PolyForm Noncommercial 1.0.0 (see LICENSE).
 
-This product is licensed under the PolyForm Noncommercial License 1.0.0.
-See the LICENSE file for full terms.
 
+Third-party credits
 ================================================================================
 
-Third-party content and notices
-
-This product depends on, redistributes, or makes use of the following
-third-party software, models, and content. Each remains subject to its
-own license; nothing in this NOTICE grants additional rights.
-
-================================================================================
+The PolyForm license covers only the original source code in this repository.
+The components below remain subject to their own respective licenses.
 
 
-1. Qwen3.5 (inference model)
-================================================================================
-Copyright (c) 2024 Alibaba Cloud / Qwen Team.
-Licensed under the Apache License, Version 2.0.
-Source: https://github.com/QwenLM/Qwen3
-Distribution: https://huggingface.co/Qwen
+AI models (loaded at runtime, not redistributed by this repo)
+--------------------------------------------------------------------------------
 
-The Qwen3.5 2B chat-tuned model is loaded at runtime from the MLC.ai /
-Hugging Face CDN by the user's browser. It is not redistributed by this
-repository.
+  Qwen3.5 — © Alibaba Cloud / Qwen Team, Apache-2.0
+            https://github.com/QwenLM/Qwen3
 
-A copy of the Apache License 2.0 is available at:
-https://www.apache.org/licenses/LICENSE-2.0
+  all-MiniLM-L6-v2 — © Microsoft Research and the Sentence-Transformers
+            contributors (Reimers et al.), Apache-2.0
+            https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2
 
 
-2. all-MiniLM-L6-v2 (sentence-embedding model)
-================================================================================
-Copyright (c) Microsoft Corporation (original MiniLM architecture,
-Wang et al., 2020) and the Sentence-Transformers / UKP-TUDA contributors
-(fine-tuned all-MiniLM-L6-v2 release, Reimers et al.).
-Licensed under the Apache License, Version 2.0.
-Source: https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2
-Original paper: https://arxiv.org/abs/2002.10957
+Bundled libraries (compiled into web/dist)
+--------------------------------------------------------------------------------
 
-The model is loaded at runtime from the Hugging Face CDN by the user's
-browser via @xenova/transformers. It is not redistributed by this
-repository.
+  @mlc-ai/web-llm — © MLC.ai Team, Apache-2.0
+            https://github.com/mlc-ai/web-llm
 
+  @xenova/transformers — © Joshua Lochner and Hugging Face contributors,
+            Apache-2.0
+            https://github.com/huggingface/transformers.js
 
-3. @mlc-ai/web-llm (WebGPU LLM runtime)
-================================================================================
-Copyright (c) The MLC.ai Team.
-Licensed under the Apache License, Version 2.0.
-Source: https://github.com/mlc-ai/web-llm
+  Other npm dependencies: see LICENSE files installed under node_modules.
 
-This library is bundled into the compiled web/dist output of this project
-under the terms of the Apache License 2.0.
+  Apache License 2.0 full text: https://www.apache.org/licenses/LICENSE-2.0
 
 
-4. @xenova/transformers (transformers.js)
-================================================================================
-Copyright (c) Joshua Lochner (Xenova) and Hugging Face contributors.
-Licensed under the Apache License, Version 2.0.
-Source: https://github.com/huggingface/transformers.js
+UBC Vancouver Academic Calendar content
+--------------------------------------------------------------------------------
 
-This library is bundled into the compiled web/dist output of this project
-under the terms of the Apache License 2.0.
-
-
-5. Other open-source dependencies
-================================================================================
-This project depends on numerous open-source packages declared in
-web/package.json (React, Vite, Tailwind, Zustand, ReactFlow, and many
-transitive dependencies). Each is distributed under its own license — see
-the LICENSE / NOTICE files installed with each package under node_modules
-for the authoritative text.
-
-
-6. UBC Vancouver Academic Calendar content
-================================================================================
-The data files derived from the UBC Vancouver Academic Calendar
-(https://vancouver.calendar.ubc.ca/), including but not limited to:
-
-  - scraper/output/courses.json
-  - scraper/output/programs.json
-  - web/public/data/chunks.json
-
-are derivative works of content copyrighted by The University of British
-Columbia. They are used here to power academic advising and reference
-features for UBC students. Rights to the underlying calendar content
-belong to UBC. The PolyForm Noncommercial license in the LICENSE file
-covers only the original software in this repository; it does not grant
-any rights to the UBC calendar content.
-
-If you are a representative of The University of British Columbia and have
-concerns about the use of this content, please contact reodite@libo.dev
-and the content will be removed promptly.
-
-================================================================================
-
-Apache License 2.0 reference
-================================================================================
-The full text of the Apache License, Version 2.0 is available at:
-https://www.apache.org/licenses/LICENSE-2.0
-
-A summary of the obligations: when redistributing covered work, you must
-preserve copyright notices, include a copy of the license, mark any
-modifications you made, and propagate any included NOTICE files. This
-NOTICE file is the propagation point for the Apache-2.0-licensed
-components listed above.
+  Course and program data scraped from https://vancouver.calendar.ubc.ca/
+  is © The University of British Columbia. Used here to provide an academic-
+  advising and reference tool for UBC students. Rights to the underlying
+  content belong to UBC. If you are a UBC representative with concerns,
+  contact reodite@libo.dev for prompt removal.

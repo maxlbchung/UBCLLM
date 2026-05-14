@@ -33,7 +33,7 @@ function formatDiagOffset(eventTs: number, anchorTs: number): string {
 function DiagTimeline({ events }: { events: DiagEvent[] }) {
   if (events.length === 0) {
     return (
-      <p className="mt-1 text-[0.6875rem] text-red-300/60">
+      <p className="mt-1 text-[0.6875rem] text-danger-soft-fg/60">
         (no diagnostic events recorded)
       </p>
     )
@@ -42,7 +42,7 @@ function DiagTimeline({ events }: { events: DiagEvent[] }) {
   // error was attached). All other events display as relative offsets.
   const anchor = events[events.length - 1].timestamp
   return (
-    <ul className="mt-1 space-y-0.5 font-mono text-[0.6875rem] leading-snug text-red-200/90">
+    <ul className="mt-1 space-y-0.5 font-mono text-[0.6875rem] leading-snug text-danger-soft-fg/90">
       {events.map((e, i) => {
         const offset = formatDiagOffset(e.timestamp, anchor)
         const detail =
@@ -51,10 +51,10 @@ function DiagTimeline({ events }: { events: DiagEvent[] }) {
             : ''
         return (
           <li key={i}>
-            <span className="text-red-300/60">{offset.padStart(7)}</span>{' '}
-            <span className="text-red-300/80">{e.source}</span>{' '}
-            <span className="text-red-100">{e.event}</span>
-            <span className="text-red-200/70">{detail}</span>
+            <span className="text-danger-soft-fg/60">{offset.padStart(7)}</span>{' '}
+            <span className="text-danger-soft-fg/80">{e.source}</span>{' '}
+            <span className="text-danger-soft-fg">{e.event}</span>
+            <span className="text-danger-soft-fg/70">{detail}</span>
           </li>
         )
       })}
@@ -88,25 +88,25 @@ export function ErrorDetails({ error }: { error: ChatError }) {
       : error.message
 
   return (
-    <div className="mt-2 rounded-md border border-red-900/60 bg-red-950/20 px-3 py-2 text-xs text-red-200">
+    <div className="mt-2 rounded-md border border-danger-fg/40 bg-danger-soft px-3 py-2 text-xs text-danger-soft-fg">
       <div className="font-medium break-words">{headline}</div>
       {error.recovered && (
-        <p className="mt-1 text-red-300/80">
+        <p className="mt-1 text-danger-soft-fg/80">
           Engine was rebuilt — your next message should work.
         </p>
       )}
 
       <details className="mt-2">
-        <summary className="cursor-pointer select-none text-red-300/80 hover:text-red-200">
+        <summary className="cursor-pointer select-none text-danger-soft-fg/80 hover:text-danger-soft-fg">
           Debug details
         </summary>
 
         {error.request && (
           <div className="mt-2">
-            <p className="text-[0.625rem] uppercase tracking-wider text-red-300/60">
+            <p className="text-[0.625rem] uppercase tracking-wider text-danger-soft-fg/60">
               Request
             </p>
-            <ul className="mt-1 space-y-0.5 font-mono text-[0.6875rem] text-red-200/90">
+            <ul className="mt-1 space-y-0.5 font-mono text-[0.6875rem] text-danger-soft-fg/90">
               <li>query: {JSON.stringify(error.request.query)}</li>
               <li>sourceCount: {error.request.sourceCount}</li>
             </ul>
@@ -115,10 +115,10 @@ export function ErrorDetails({ error }: { error: ChatError }) {
 
         {error.stack && (
           <div className="mt-2">
-            <p className="text-[0.625rem] uppercase tracking-wider text-red-300/60">
+            <p className="text-[0.625rem] uppercase tracking-wider text-danger-soft-fg/60">
               Stack
             </p>
-            <pre className="mt-1 overflow-x-auto whitespace-pre-wrap break-words rounded bg-black/30 p-2 font-mono text-[0.6875rem] leading-snug text-red-100/90">
+            <pre className="mt-1 overflow-x-auto whitespace-pre-wrap break-words rounded bg-surface p-2 font-mono text-[0.6875rem] leading-snug text-danger-soft-fg/90">
               {truncateStack(error.stack)}
             </pre>
           </div>
@@ -126,7 +126,7 @@ export function ErrorDetails({ error }: { error: ChatError }) {
 
         {error.diag && (
           <div className="mt-2">
-            <p className="text-[0.625rem] uppercase tracking-wider text-red-300/60">
+            <p className="text-[0.625rem] uppercase tracking-wider text-danger-soft-fg/60">
               Recent events (timeline)
             </p>
             <DiagTimeline events={error.diag} />
@@ -136,7 +136,7 @@ export function ErrorDetails({ error }: { error: ChatError }) {
         <button
           type="button"
           onClick={() => void copy()}
-          className="mt-2 rounded border border-red-800/60 bg-red-900/30 px-2 py-1 text-[0.6875rem] font-medium text-red-100 hover:bg-red-900/60"
+          className="mt-2 rounded border border-danger-fg/40 bg-danger-soft px-2 py-1 text-[0.6875rem] font-medium text-danger-soft-fg hover:bg-danger-soft/80"
         >
           {copied ? 'Copied' : 'Copy details'}
         </button>

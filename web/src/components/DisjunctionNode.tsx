@@ -60,8 +60,8 @@ export function DisjunctionNode({ data }: NodeProps<DisjunctionData>) {
   // previously a red highlight, which incorrectly flagged externally-valid
   // prereqs like "CALC 12" as errors). Solid block stays for the dropdown
   // chrome itself; only the bg + border move to the dim palette.
-  const bg = detailUnknownCourse ? '#1f1f23' : '#27272a'
-  const border = detailUnknownCourse ? '#52525b' : '#3f3f46'
+  const bg = detailUnknownCourse ? 'var(--surface)' : 'var(--node-bg)'
+  const border = detailUnknownCourse ? 'var(--fg-faint)' : 'var(--node-border)'
   return (
     <div
       style={{
@@ -70,7 +70,7 @@ export function DisjunctionNode({ data }: NodeProps<DisjunctionData>) {
         borderRadius: 6,
         padding: 6,
         width: 200,
-        color: '#e5e7eb',
+        color: 'var(--fg)',
         fontSize: 11,
         textAlign: 'left',
       }}
@@ -92,10 +92,10 @@ export function DisjunctionNode({ data }: NodeProps<DisjunctionData>) {
           style={{
             marginTop: 6,
             paddingTop: 6,
-            borderTop: '1px solid #3f3f46',
+            borderTop: '1px solid var(--node-border)',
             fontSize: 11,
             lineHeight: 1.3,
-            color: detailKnown ? '#e5e7eb' : '#a1a1aa',
+            color: detailKnown ? 'var(--fg)' : 'var(--fg-muted)',
             // Italicize for both literals and unknown-course detail so
             // their treatment matches the standalone CourseNode 'unknown'
             // and 'note' variants.
@@ -200,9 +200,9 @@ function DropdownSelect({
         }}
         style={{
           width: '100%',
-          background: '#18181b',
-          border: '1px solid #3f3f46',
-          color: '#e5e7eb',
+          background: 'var(--input)',
+          border: '1px solid var(--line-soft)',
+          color: 'var(--fg)',
           padding: '3px 4px',
           borderRadius: 4,
           fontSize: 11,
@@ -233,7 +233,7 @@ function DropdownSelect({
         >
           {current}
         </span>
-        <span style={{ color: '#71717a', fontSize: 9 }}>▾</span>
+        <span style={{ color: 'var(--fg-faint)', fontSize: 9 }}>▾</span>
       </button>
       {open && (
         <div
@@ -252,8 +252,8 @@ function DropdownSelect({
             left: 0,
             right: 0,
             marginTop: 2,
-            background: '#18181b',
-            border: '1px solid #52525b',
+            background: 'var(--input)',
+            border: '1px solid var(--fg-faint)',
             borderRadius: 4,
             // High z-index so the menu paints over adjacent / next-row
             // nodes that the menu might extend into vertically. ReactFlow
@@ -279,7 +279,7 @@ function DropdownSelect({
                 onMouseEnter={(e) => {
                   if (!isSelected) {
                     ;(e.currentTarget as HTMLDivElement).style.background =
-                      '#1f1f22'
+                      'var(--surface)'
                   }
                 }}
                 onMouseLeave={(e) => {
@@ -292,8 +292,8 @@ function DropdownSelect({
                   padding: '4px 6px',
                   fontSize: 11,
                   lineHeight: 1.3,
-                  color: '#e5e7eb',
-                  background: isSelected ? '#27272a' : 'transparent',
+                  color: 'var(--fg)',
+                  background: isSelected ? 'var(--surface-raised)' : 'transparent',
                   cursor: 'pointer',
                   whiteSpace: 'normal',
                 }}

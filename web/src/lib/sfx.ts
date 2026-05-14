@@ -189,6 +189,15 @@ export type SfxName = keyof typeof PRESETS
 const lastPlayTimes = new Map<string, number>()
 
 export function playSfx(name: SfxName, minSpacingMs?: number): void {
+  // Gate against the persisted Audio toggles before doing anything else —
+  // no AudioContext spin-up, no throttle bookkeeping, no oscillator setup.
+  // `botThinking` / `botTyping` ride the separate "High-tech bot noises"
+  // toggle; everything else is general SFX.
+  const { sfxEnabled, botNoisesEnabled, volume: settingsVolume } =
+    useSettings.getState()
+  const isBotNoise = name === 'botThinking' || name === 'botTyping'
+  if (isBotNoise ? !botNoisesEnabled : !sfxEnabled) return
+
   if (minSpacingMs && minSpacingMs > 0) {
     const last = lastPlayTimes.get(name) ?? 0
     const now =
@@ -199,7 +208,7 @@ export function playSfx(name: SfxName, minSpacingMs?: number): void {
 
   const context = ctx()
   if (!context) return
-  const volume = useSettings.getState().volume / 100
+  const volume = settingsVolume / 100
   const baseGain = volume * MASTER_GAIN
   if (baseGain <= 0) return
   const tones = PRESETS[name]

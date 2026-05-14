@@ -57,39 +57,43 @@ export function CourseNode({ data }: NodeProps<CourseNodeData>) {
   // flagged externally-valid prereqs like "CALC 12" as errors.)
   const dim = isNote || isUnknown
 
-  // Signature gold easter-egg palette (amber-300/500/600) — the same hue
-  // used by the sidebar discovery counter rings and chat citation chips
-  // for found easters. Dark text on the gold bg keeps the code legible
-  // and matches the rest of the dark-themed graph by inversion.
+  // Signature gold easter palette pulls from --highlight-* — the same
+  // tokens the sidebar counter rings and chat citation chips use, so
+  // discovered easters read consistently across the app in both themes.
+  // --canvas as the text color is "the contrast pair to --highlight-fg"
+  // — near-black on light-gold (dark theme), near-white on dark-amber
+  // (light theme). The non-easter branches use accent / surface tokens
+  // so the blue root, dim unknowns, and default course blocks all
+  // repaint with the theme.
   const bg = isEasterRoot
-    ? '#fcd34d'
+    ? 'var(--highlight-fg)'
     : isRoot
-      ? '#1d4ed8'
+      ? 'var(--accent)'
       : dim
-        ? '#1f1f23'
-        : '#27272a'
+        ? 'var(--surface)'
+        : 'var(--node-bg)'
   const border = isEasterRoot
-    ? '#f59e0b'
+    ? 'var(--highlight)'
     : isRoot
-      ? '#1e40af'
+      ? 'var(--accent)'
       : dim
-        ? '#52525b'
-        : '#3f3f46'
+        ? 'var(--fg-faint)'
+        : 'var(--node-border)'
   const color = isEasterRoot
-    ? '#18181b'
+    ? 'var(--canvas)'
     : isRoot
-      ? '#fff'
+      ? 'var(--accent-fg)'
       : dim
-        ? '#a1a1aa'
-        : '#e5e7eb'
-  // Divider color picks the variant's border so it matches the block's
-  // outline. For root the dark-blue border is too close to the blue bg
-  // to read, so use a lighter blue for that case only; the easter-gold
-  // root uses amber-600 so the divider stays visible against amber-300.
+        ? 'var(--fg-muted)'
+        : 'var(--fg)'
+  // Divider color picks a slightly contrasting tone within the block.
+  // For root the accent-hover (blue-500) reads against the accent
+  // (blue-600) bg; the easter-gold root uses --highlight (a touch more
+  // saturated than --highlight-fg) so the line stays visible.
   const divider = isEasterRoot
-    ? '#d97706'
+    ? 'var(--highlight)'
     : isRoot
-      ? '#3b82f6'
+      ? 'var(--accent-hover)'
       : border
 
   return (

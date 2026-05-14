@@ -7,7 +7,7 @@ import { ErrorDetails } from './ErrorDetails'
 
 function VersionBadge() {
   return (
-    <div className="fixed bottom-2 left-3 text-[0.6875rem] text-zinc-500 font-mono pointer-events-none select-none">
+    <div className="fixed bottom-2 left-3 text-[0.6875rem] text-fg-faint font-mono pointer-events-none select-none">
       v{APP_VERSION}
     </div>
   )
@@ -148,7 +148,7 @@ export function ModelLoader({ children }: { children: ReactNode }) {
     return (
       <>
         <div className="flex flex-col items-center justify-center h-screen p-8 gap-3 text-center">
-          <h2 className="text-xl font-semibold text-red-400">Couldn't load the model</h2>
+          <h2 className="text-xl font-semibold text-danger-fg">Couldn't load the model</h2>
           <div className="max-w-xl w-full text-left">
             <ErrorDetails error={s.error} />
           </div>
@@ -161,7 +161,7 @@ export function ModelLoader({ children }: { children: ReactNode }) {
                     playSfx('click')
                     void clearCacheAndRetry()
                   }}
-                  className="px-4 py-2 rounded-md bg-blue-500 hover:bg-blue-400 text-white text-sm font-medium transition-colors"
+                  className="px-4 py-2 rounded-md bg-accent hover:bg-accent-hover text-accent-fg text-sm font-medium transition-colors"
                 >
                   Clear cache and try again
                 </button>
@@ -171,17 +171,17 @@ export function ModelLoader({ children }: { children: ReactNode }) {
                     playSfx('click')
                     retry()
                   }}
-                  className="text-sm text-zinc-400 hover:text-zinc-200 hover:underline underline-offset-2"
+                  className="text-sm text-fg-muted hover:text-fg hover:underline underline-offset-2"
                 >
                   Try again
                 </button>
               </div>
-              <p className="text-[0.6875rem] text-zinc-500 max-w-md mt-2">
+              <p className="text-[0.6875rem] text-fg-faint max-w-md mt-2">
                 A persistent failure usually means a corrupted cached shard from an earlier interrupted download. Clearing the cache forces a clean re-download.
               </p>
             </>
           ) : (
-            <p className="text-xs text-zinc-500 max-w-md">
+            <p className="text-xs text-fg-faint max-w-md">
               Reodite needs WebGPU and ~2.5 GB of GPU memory. Try Chrome 113+ or Edge 113+ on a desktop with a recent GPU.
             </p>
           )}
@@ -207,14 +207,14 @@ export function ModelLoader({ children }: { children: ReactNode }) {
       <>
         <div className="flex flex-col items-center justify-center h-screen p-8 gap-4">
           <h2 className="text-xl font-semibold">{heading}</h2>
-          <div className="w-full max-w-md h-2 bg-zinc-800 rounded-full overflow-hidden">
+          <div className="w-full max-w-md h-2 bg-surface-raised rounded-full overflow-hidden">
             <div
-              className="h-full bg-blue-500 transition-all"
+              className="h-full bg-accent transition-all"
               style={{ width: `${Math.round(s.progress * 100)}%` }}
             />
           </div>
-          <p className="text-xs text-zinc-400 max-w-md text-center">{s.text}</p>
-          <p className="text-[0.6875rem] text-zinc-500 max-w-md text-center">{caption}</p>
+          <p className="text-xs text-fg-muted max-w-md text-center">{s.text}</p>
+          <p className="text-[0.6875rem] text-fg-faint max-w-md text-center">{caption}</p>
         </div>
         <VersionBadge />
       </>

@@ -28,7 +28,7 @@ function highlightKeyword(text: string, keyword: string): ReactNode {
     parts.push(
       <mark
         key={key++}
-        className="bg-yellow-400/30 text-yellow-50 rounded-sm px-0.5"
+        className="bg-highlight-soft text-fg rounded-sm px-0.5"
       >
         {text.slice(hit, hit + target.length)}
       </mark>,
@@ -390,14 +390,14 @@ export function CourseLookup() {
   }, [query, keyword, index, codes, searchCorpus])
 
   if (!index) {
-    return <div className="p-6 text-zinc-500">Loading course index…</div>
+    return <div className="p-6 text-fg-faint">Loading course index…</div>
   }
 
   return (
     <div className="flex flex-col h-screen p-6 gap-4 max-w-3xl mx-auto w-full min-h-0">
       <header>
         <h2 className="text-xl font-semibold">Course Lookup</h2>
-        <p className="text-sm text-zinc-400">
+        <p className="text-sm text-fg-muted">
           {codes.length.toLocaleString()} courses · UBC Vancouver
         </p>
       </header>
@@ -409,7 +409,7 @@ export function CourseLookup() {
             value={query}
             onChange={(e) => setQuery(e.target.value.toUpperCase())}
             placeholder="Course Code Search"
-            className="w-full rounded bg-zinc-900 border border-zinc-700 pl-3 pr-9 py-2 text-sm focus:outline-none focus:border-zinc-500"
+            className="w-full rounded bg-input border border-line-soft text-fg pl-3 pr-9 py-2 text-sm focus:outline-none focus:border-fg-faint"
           />
           {/* Help affordance: hovering the `?` reveals the syntax cheat-sheet
               that previously lived in the header. The wrapper carries the
@@ -420,43 +420,43 @@ export function CourseLookup() {
           <div className="group absolute right-2 top-1/2 -translate-y-1/2 flex items-center">
             <span
               aria-label="Course code search syntax"
-              className="cursor-help select-none w-5 h-5 rounded-full border border-zinc-600 text-zinc-400 group-hover:text-zinc-200 group-hover:border-zinc-400 flex items-center justify-center text-xs leading-none"
+              className="cursor-help select-none w-5 h-5 rounded-full border border-fg-faint text-fg-muted group-hover:text-fg group-hover:border-fg-muted flex items-center justify-center text-xs leading-none"
             >
               ?
             </span>
             <div
               role="tooltip"
-              className="hidden group-hover:block absolute right-0 top-full mt-2 w-80 z-20 rounded border border-zinc-700 bg-zinc-900 p-3 text-sm text-zinc-300 leading-relaxed shadow-lg"
+              className="hidden group-hover:block absolute right-0 top-full mt-2 w-80 z-20 rounded border border-line-soft bg-surface p-3 text-sm text-fg-muted leading-relaxed shadow-lg"
             >
               <p>
                 Search course codes using this format:{' '}
-                <span className="font-mono text-zinc-100">[CODE] [NUMBER]</span>
+                <span className="font-mono text-fg">[CODE] [NUMBER]</span>
               </p>
-              <p className="mt-2 text-xs text-zinc-500">Ex:</p>
+              <p className="mt-2 text-xs text-fg-faint">Ex:</p>
               <div className="mt-1 flex flex-wrap gap-1">
-                <span className="rounded bg-zinc-800 px-1.5 py-0.5 font-mono text-xs text-zinc-300">
+                <span className="rounded bg-surface-raised px-1.5 py-0.5 font-mono text-xs text-fg-muted">
                   ASTR 101
                 </span>
-                <span className="rounded bg-zinc-800 px-1.5 py-0.5 font-mono text-xs text-zinc-300">
+                <span className="rounded bg-surface-raised px-1.5 py-0.5 font-mono text-xs text-fg-muted">
                   DSCI 100
                 </span>
-                <span className="rounded bg-zinc-800 px-1.5 py-0.5 font-mono text-xs text-zinc-300">
+                <span className="rounded bg-surface-raised px-1.5 py-0.5 font-mono text-xs text-fg-muted">
                   WRDS 150
                 </span>
               </div>
               <p className="mt-3">
                 Filter by course level using this format:{' '}
-                <span className="font-mono text-zinc-100">[CODE] [NUMBER] [+/-/=]</span>
+                <span className="font-mono text-fg">[CODE] [NUMBER] [+/-/=]</span>
               </p>
-              <p className="mt-2 text-xs text-zinc-500">Ex:</p>
+              <p className="mt-2 text-xs text-fg-faint">Ex:</p>
               <div className="mt-1 flex flex-wrap gap-1">
-                <span className="rounded bg-zinc-800 px-1.5 py-0.5 font-mono text-xs text-zinc-300">
+                <span className="rounded bg-surface-raised px-1.5 py-0.5 font-mono text-xs text-fg-muted">
                   SCIE 100 +
                 </span>
-                <span className="rounded bg-zinc-800 px-1.5 py-0.5 font-mono text-xs text-zinc-300">
+                <span className="rounded bg-surface-raised px-1.5 py-0.5 font-mono text-xs text-fg-muted">
                   PHIL 400 =
                 </span>
-                <span className="rounded bg-zinc-800 px-1.5 py-0.5 font-mono text-xs text-zinc-300">
+                <span className="rounded bg-surface-raised px-1.5 py-0.5 font-mono text-xs text-fg-muted">
                   MATH 200 -
                 </span>
               </div>
@@ -468,29 +468,29 @@ export function CourseLookup() {
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
             placeholder="Keyword Search"
-            className="w-full rounded bg-zinc-900 border border-zinc-700 pl-3 pr-9 py-2 text-sm focus:outline-none focus:border-zinc-500"
+            className="w-full rounded bg-input border border-line-soft text-fg pl-3 pr-9 py-2 text-sm focus:outline-none focus:border-fg-faint"
           />
           <div className="group absolute right-2 top-1/2 -translate-y-1/2 flex items-center">
             <span
               aria-label="Keyword search help"
-              className="cursor-help select-none w-5 h-5 rounded-full border border-zinc-600 text-zinc-400 group-hover:text-zinc-200 group-hover:border-zinc-400 flex items-center justify-center text-xs leading-none"
+              className="cursor-help select-none w-5 h-5 rounded-full border border-fg-faint text-fg-muted group-hover:text-fg group-hover:border-fg-muted flex items-center justify-center text-xs leading-none"
             >
               ?
             </span>
             <div
               role="tooltip"
-              className="hidden group-hover:block absolute right-0 top-full mt-2 w-80 z-20 rounded border border-zinc-700 bg-zinc-900 p-3 text-sm text-zinc-300 leading-relaxed shadow-lg"
+              className="hidden group-hover:block absolute right-0 top-full mt-2 w-80 z-20 rounded border border-line-soft bg-surface p-3 text-sm text-fg-muted leading-relaxed shadow-lg"
             >
               <p>Search course titles and descriptions using key phrases.</p>
-              <p className="mt-2 text-xs text-zinc-500">Ex:</p>
+              <p className="mt-2 text-xs text-fg-faint">Ex:</p>
               <div className="mt-1 flex flex-wrap gap-1">
-                <span className="rounded bg-zinc-800 px-1.5 py-0.5 font-mono text-xs text-zinc-300">
+                <span className="rounded bg-surface-raised px-1.5 py-0.5 font-mono text-xs text-fg-muted">
                   Linear Algebra
                 </span>
-                <span className="rounded bg-zinc-800 px-1.5 py-0.5 font-mono text-xs text-zinc-300">
+                <span className="rounded bg-surface-raised px-1.5 py-0.5 font-mono text-xs text-fg-muted">
                   Introduction
                 </span>
-                <span className="rounded bg-zinc-800 px-1.5 py-0.5 font-mono text-xs text-zinc-300">
+                <span className="rounded bg-surface-raised px-1.5 py-0.5 font-mono text-xs text-fg-muted">
                   Co-op
                 </span>
               </div>
@@ -499,10 +499,10 @@ export function CourseLookup() {
         </div>
       </div>
 
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      {error && <p className="text-sm text-danger-fg">{error}</p>}
 
       {suggestions.length > 0 && (
-        <div className="text-sm text-zinc-400">
+        <div className="text-sm text-fg-muted">
           <p className="mb-1">Did you mean:</p>
           <div className="flex flex-wrap gap-2">
             {suggestions.map((s) => (
@@ -512,7 +512,7 @@ export function CourseLookup() {
                   playSfx('click')
                   setQuery(s)
                 }}
-                className="rounded bg-zinc-800 hover:bg-zinc-700 px-2 py-1 text-xs"
+                className="rounded bg-surface-raised hover:bg-line-soft text-fg px-2 py-1 text-xs"
               >
                 {s}
               </button>
@@ -524,24 +524,24 @@ export function CourseLookup() {
       <div className="flex-1 overflow-y-auto flex flex-col gap-3 min-h-0">
         {matches.length > 0 && (
           <section className="flex flex-col gap-1.5">
-            <p className="text-xs text-zinc-500">
+            <p className="text-xs text-fg-faint">
               {matches.length.toLocaleString()} {matchHeading}
             </p>
             <ul className="flex flex-col gap-1">
               {matches.map((c) => {
                 const expanded = c.code !== null && expandedCodes.has(c.code)
                 // Easter chunks get a gold-tinted border so they read as
-                // "found something special" without screaming. Same amber-300
+                // "found something special" without screaming. Same highlight
                 // shade used by the sidebar counter + chat ring/spark, scaled
                 // back to /60 opacity so it's a hint rather than a banner.
                 const isEaster = c.id.startsWith('easter:')
                 const buttonStateClass = isEaster
                   ? expanded
-                    ? 'border-amber-300 bg-zinc-800'
-                    : 'border-amber-300/60 bg-zinc-900/60 hover:bg-zinc-800 hover:border-amber-300/80'
+                    ? 'border-highlight-fg bg-surface-raised'
+                    : 'border-highlight-fg/60 bg-surface-soft hover:bg-surface-raised hover:border-highlight-fg/80'
                   : expanded
-                    ? 'border-zinc-600 bg-zinc-800'
-                    : 'border-zinc-800 bg-zinc-900/60 hover:bg-zinc-800 hover:border-zinc-700'
+                    ? 'border-fg-faint bg-surface-raised'
+                    : 'border-line bg-surface-soft hover:bg-surface-raised hover:border-line-soft'
                 return (
                   <li key={c.id} className="flex flex-col gap-1.5">
                     <button
@@ -568,8 +568,8 @@ export function CourseLookup() {
                       aria-expanded={expanded}
                       className={`w-full text-left rounded border px-3 py-2 text-sm transition-colors ${buttonStateClass}`}
                     >
-                      <span className="font-mono text-zinc-100">{c.code}</span>
-                      <span className="text-zinc-400">
+                      <span className="font-mono text-fg">{c.code}</span>
+                      <span className="text-fg-muted">
                         {' — '}
                         {highlightKeyword(c.title, keyword)}
                       </span>
@@ -620,18 +620,18 @@ function CourseCard({
     { label: 'Recommended', value: course.recommended },
   ]
   return (
-    <article className="rounded border border-zinc-800 bg-zinc-900/60 p-4 space-y-3">
+    <article className="rounded border border-line bg-surface-soft p-4 space-y-3">
       {!hideHeader && (
         <h3 className="text-lg font-semibold">
           {course.code}{' '}
-          <span className="text-zinc-400">
+          <span className="text-fg-muted">
             — {highlightKeyword(course.title, keyword)}
           </span>
         </h3>
       )}
 
       {course.description && (
-        <p className="text-sm text-zinc-200 leading-relaxed">
+        <p className="text-sm text-fg leading-relaxed">
           {highlightKeyword(course.description, keyword)}
         </p>
       )}
@@ -640,7 +640,7 @@ function CourseCard({
         href={course.url}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-block text-xs text-blue-400 hover:underline"
+        className="inline-block text-xs text-link hover:underline"
       >
         UBC calendar ↗
       </a>
@@ -650,8 +650,8 @@ function CourseCard({
           .filter((f) => f.value)
           .map((f) => (
             <div key={f.label} className="contents">
-              <dt className="text-zinc-500">{f.label}</dt>
-              <dd className="text-zinc-200">{f.value}</dd>
+              <dt className="text-fg-faint">{f.label}</dt>
+              <dd className="text-fg">{f.value}</dd>
             </div>
           ))}
       </dl>

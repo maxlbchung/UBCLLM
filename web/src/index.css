@@ -1,6 +1,275 @@
 @import "tailwindcss";
 
-html, body, #root {
+/* ============================================================
+   Theme tokens
+   ------------------------------------------------------------
+   Two-stage indirection so themes can swap at runtime:
+   1. @theme inline registers Tailwind tokens that REFERENCE
+      plain CSS vars instead of inlining values, so utility
+      classes like bg-surface, text-fg, border-line resolve
+      via var() and pick up overrides at runtime.
+   2. :root holds the dark palette (default); the
+      [data-theme="light"] block redefines every var.
+      App.tsx writes data-theme onto <html> from
+      useSettings.theme.
+   The /40 /30 /20 translucent surfaces from the v1.5 zinc
+   palette can't ride Tailwind's <color>/<opacity> shorthand
+   here because the token's value is already rgba, so we
+   define separate pre-mixed tokens (surface-soft,
+   accent-soft, highlight-soft, danger-soft) instead of
+   exposing alpha modulation.
+   ============================================================ */
+
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-soft: var(--surface-soft);
+  --color-surface-raised: var(--surface-raised);
+  --color-input: var(--input);
+  --color-line: var(--line);
+  --color-line-soft: var(--line-soft);
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-faint: var(--fg-faint);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-soft-fg: var(--accent-soft-fg);
+  --color-link: var(--link);
+  --color-highlight: var(--highlight);
+  --color-highlight-fg: var(--highlight-fg);
+  --color-highlight-soft: var(--highlight-soft);
+  --color-highlight-soft-fg: var(--highlight-soft-fg);
+  --color-danger: var(--danger);
+  --color-danger-hover: var(--danger-hover);
+  --color-danger-fg: var(--danger-fg);
+  --color-danger-soft: var(--danger-soft);
+  --color-danger-soft-fg: var(--danger-soft-fg);
+  --color-node-bg: var(--node-bg);
+  --color-node-border: var(--node-border);
+}
+
+:root {
+  /* Dark palette — the v1.5 look */
+  --canvas: #0b0d12;
+  --surface: #18181b;
+  /* zinc-900 */
+  --surface-soft: rgba(24, 24, 27, 0.4);
+  /* zinc-900/40 */
+  --surface-raised: #27272a;
+  /* zinc-800 */
+  --input: #18181b;
+  --line: #27272a;
+  /* zinc-800 */
+  --line-soft: #3f3f46;
+  /* zinc-700 */
+  --fg: #f4f4f5;
+  /* zinc-100 */
+  --fg-muted: #a1a1aa;
+  /* zinc-400 */
+  --fg-faint: #71717a;
+  /* zinc-500 */
+  --accent: #2563eb;
+  /* blue-600 */
+  --accent-hover: #3b82f6;
+  /* blue-500 */
+  --accent-fg: #ffffff;
+  --accent-soft: rgba(59, 130, 246, 0.30);
+  /* blue-500/30 */
+  --accent-soft-fg: #bfdbfe;
+  /* blue-200 */
+  --link: var(--accent);
+  /* inline links share the accent color */
+  --highlight: #fbbf24;
+  /* amber-400 */
+  --highlight-fg: #fcd34d;
+  /* amber-300 */
+  --highlight-soft: rgba(250, 204, 21, 0.30);
+  /* yellow-400/30 */
+  --highlight-soft-fg: #fde68a;
+  /* amber-200 */
+  --danger: #dc2626;
+  /* red-600 */
+  --danger-hover: #ef4444;
+  /* red-500 */
+  --danger-fg: #f87171;
+  /* red-400 */
+  --danger-soft: rgba(127, 29, 29, 0.20);
+  /* red-900/60-ish */
+  --danger-soft-fg: #fecaca;
+  /* red-200 */
+
+  /* Plain CSS vars (not Tailwind tokens) for low-level styles in this
+     file — scrollbar, ReactFlow controls, range thumb. */
+  --scrollbar-thumb: #3f3f46;
+  --scrollbar-thumb-hover: #52525b;
+  --control-bg: #18181b;
+  --control-bg-hover: #27272a;
+  --range-thumb: #f4f4f5;
+  --range-thumb-hover: #ffffff;
+
+  /* Default prereq-tree node chrome (regular course/disjunction blocks).
+     Per-theme override lets Terminal flip these to black/green without
+     also repainting toggles, chat bubbles, the volume track, etc. */
+  --node-bg: var(--surface-raised);
+  --node-border: var(--line-soft);
+}
+
+[data-theme="light"] {
+  --canvas: #fafafa;
+  /* zinc-50 */
+  --surface: #ffffff;
+  --surface-soft: rgba(255, 255, 255, 0.6);
+  --surface-raised: #f4f4f5;
+  /* zinc-100 */
+  --input: #ffffff;
+  --line: #e4e4e7;
+  /* zinc-200 */
+  --line-soft: #d4d4d8;
+  /* zinc-300 */
+  --fg: #18181b;
+  /* zinc-900 */
+  --fg-muted: #52525b;
+  /* zinc-600 */
+  --fg-faint: #71717a;
+  /* zinc-500 */
+  --accent: #4779e3;
+  --accent-hover: #3b82f6;
+  --accent-fg: #ffffff;
+  --accent-soft: rgba(37, 99, 235, 0.18);
+  --accent-soft-fg: #1e3a8a;
+  /* blue-900 */
+  --link: var(--accent);
+  /* inline links share the accent color */
+  /* Yellow-toned gold lifted from the Royal theme's --accent (#eab308)
+     so the easter-egg pop reads as the same heraldic gold across
+     themes. yellow-600 (#ca8a04) for text keeps the counter readable
+     against white; yellow-900 darkens for legibility on the soft
+     yellow wash. */
+  --highlight: #eab308;
+  /* yellow-500 — matches royal --accent */
+  --highlight-fg: #ca8a04;
+  /* yellow-600 — darker for counter-text contrast on white */
+  --highlight-soft: rgba(234, 179, 8, 0.22);
+  --highlight-soft-fg: #713f12;
+  /* yellow-900 — readable on the soft yellow wash */
+  --danger: #dc2626;
+  --danger-hover: #ef4444;
+  --danger-fg: #b91c1c;
+  /* red-700 */
+  --danger-soft: rgba(254, 226, 226, 0.7);
+  /* red-100 tint */
+  --danger-soft-fg: #7f1d1d;
+  /* red-900 */
+
+  --scrollbar-thumb: #d4d4d8;
+  --scrollbar-thumb-hover: #a1a1aa;
+  --control-bg: #ffffff;
+  --control-bg-hover: #f4f4f5;
+  --range-thumb: #f4f4f5;
+  /* white-ish marker, matches dark theme */
+  --range-thumb-hover: #ffffff;
+
+  --node-bg: var(--surface-raised);
+  --node-border: var(--line-soft);
+}
+
+[data-theme="royal"] {
+  /* Reodite house palette — canvas is the exact navy sampled from the
+     Reodite logo background (#0B2D50). Surface tones step up the
+     lightness while holding the same hue so cards/hover layers read
+     as "lighter logo blue" rather than a different family. Gold
+     accents + crisp white text echo the logo's smiley + crown. Both
+     --accent and --highlight pull from the gold family; the
+     easter-egg animations (rings, sparks) carry the distinction that
+     color alone provides in the dark/light themes. */
+  --canvas: #0b2d50;                        /* logo background, sampled */
+  --surface: #143e6e;                       /* card / sidebar bg */
+  --surface-soft: rgba(20, 62, 110, 0.55);
+  --surface-raised: #1e5594;                /* hover/active */
+  --input: #0a2845;                         /* slightly deeper than canvas */
+  --line: #1e5594;                          /* separator on royal */
+  --line-soft: #3b82f6;                     /* blue-500 — visible inset border */
+  --fg: #ffffff;
+  --fg-muted: #c7d2fe;                      /* blue-200 */
+  --fg-faint: #94a3b8;                      /* slate-400 */
+  --accent: #b08f5a;                        /* logo brass-gold, sampled */
+  --accent-hover: #c8a86a;                  /* lighter brass on hover */
+  --accent-fg: #ffffff;                     /* white text on brass — matches dark/light themes */
+  --accent-soft: rgba(176, 143, 90, 0.30);
+  --accent-soft-fg: #fef3c7;                /* amber-100 — chip text on brass wash */
+  --link: var(--accent);                    /* inline links share the brass accent */
+  --highlight: #facc15;                     /* yellow-400 — easter accent */
+  --highlight-fg: #fde047;                  /* yellow-300 — easter text */
+  --highlight-soft: rgba(250, 204, 21, 0.28);
+  --highlight-soft-fg: #fef9c3;             /* yellow-100 — chip text */
+  --danger: #dc2626;
+  --danger-hover: #ef4444;
+  --danger-fg: #fca5a5;                     /* red-300 — readable on royal */
+  --danger-soft: rgba(127, 29, 29, 0.35);
+  --danger-soft-fg: #fecaca;                /* red-200 */
+
+  --scrollbar-thumb: #1e5594;
+  --scrollbar-thumb-hover: #3b82f6;
+  --control-bg: #143e6e;
+  --control-bg-hover: #1e5594;
+  --range-thumb: #ffffff;
+  --range-thumb-hover: #ffffff;
+
+  --node-bg: var(--surface-raised);
+  --node-border: var(--line-soft);
+}
+
+[data-theme="terminal"] {
+  /* Old-school monochrome terminal — pure black canvas, dark-grey
+     raised surfaces / highlights, green-on-black text. Primary
+     buttons use the bright accent green with black text, mirroring
+     the terminal's "inverse video" selection block. Errors keep a
+     muted red so the universal warning grammar still reads. */
+  --canvas: #000000;
+  --surface: #0d0d0d;
+  --surface-soft: rgba(26, 26, 26, 0.55);
+  --surface-raised: #1a1a1a;                /* dark-grey hover/active */
+  --input: #000000;
+  --line: #1f1f1f;
+  --line-soft: #2d2d2d;
+  --fg: #22c55e;                            /* terminal green */
+  --fg-muted: #16a34a;
+  --fg-faint: #166534;
+  --accent: #22c55e;                        /* bright green — primary action */
+  --accent-hover: #4ade80;
+  --accent-fg: #000000;                     /* black text on green button */
+  --accent-soft: rgba(34, 197, 94, 0.20);
+  --accent-soft-fg: #86efac;
+  --link: var(--accent);                    /* underlined-green hyperlinks */
+  --highlight: #2d2d2d;                     /* dark-grey easter accent */
+  --highlight-fg: #4ade80;                  /* brighter green for easter pop */
+  --highlight-soft: rgba(74, 222, 128, 0.18);
+  --highlight-soft-fg: #bbf7d0;
+  --danger: #b91c1c;
+  --danger-hover: #dc2626;
+  --danger-fg: #f87171;
+  --danger-soft: rgba(127, 29, 29, 0.30);
+  --danger-soft-fg: #fecaca;
+
+  --scrollbar-thumb: #1f1f1f;
+  --scrollbar-thumb-hover: #2d2d2d;
+  --control-bg: #000000;
+  --control-bg-hover: #1a1a1a;
+  --range-thumb: #ffffff;
+  --range-thumb-hover: #ffffff;
+
+  /* Terminal-only node override: black bg + green border for prereq-tree
+     course blocks so they read as classic terminal frames instead of
+     the muted-grey-on-grey the surface-raised/line-soft pair gives. */
+  --node-bg: #000000;
+  --node-border: var(--fg);
+}
+
+html,
+body,
+#root {
   height: 100%;
 }
 
@@ -14,41 +283,46 @@ html {
 body {
   margin: 0;
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  background: #0b0d12;
-  color: #e5e7eb;
+  background: var(--canvas);
+  color: var(--fg);
   -webkit-font-smoothing: antialiased;
 }
 
-/* Custom scrollbars matching the zinc dark theme. Applied globally so the
+/* Custom scrollbars matching the active theme. Applied globally so the
    chat scroller, sidebar history, and any future scroll area stay
    consistent. The 2px transparent border + padding-box clip gives the
    thumb a slim inset look (≈6px visible) without breaking layout. */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #3f3f46 transparent;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
 }
+
 *::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
+
 *::-webkit-scrollbar-track {
   background: transparent;
 }
+
 *::-webkit-scrollbar-thumb {
-  background-color: #3f3f46;
+  background-color: var(--scrollbar-thumb);
   border-radius: 9999px;
   border: 2px solid transparent;
   background-clip: padding-box;
 }
+
 *::-webkit-scrollbar-thumb:hover {
-  background-color: #52525b;
+  background-color: var(--scrollbar-thumb-hover);
 }
+
 *::-webkit-scrollbar-corner {
   background: transparent;
 }
 
 /* ReactFlow Controls (zoom in / out / fit-view) — repaint the default
-   white control panel to match the zinc dark theme used by every node in
+   white control panel to match the active theme used by every node in
    the prereq tree.
    Specificity note: the library ships these styles in
    reactflow/dist/style.css, which is imported from PrereqTree.tsx — that
@@ -58,26 +332,30 @@ body {
    order. */
 .react-flow .react-flow__controls {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-  border: 1px solid #3f3f46;
+  border: 1px solid var(--line);
   border-radius: 6px;
   overflow: hidden;
 }
+
 .react-flow .react-flow__controls-button {
-  background: #18181b;
+  background: var(--control-bg);
   border: none;
-  border-bottom: 1px solid #3f3f46;
-  color: #e5e7eb;
-  fill: #e5e7eb;
+  border-bottom: 1px solid var(--line);
+  color: var(--fg);
+  fill: var(--fg);
   width: 24px;
   height: 24px;
 }
+
 .react-flow .react-flow__controls-button:last-child {
   border-bottom: none;
 }
+
 .react-flow .react-flow__controls-button:hover {
-  background: #27272a;
-  fill: #fff;
+  background: var(--control-bg-hover);
+  fill: var(--fg);
 }
+
 .react-flow .react-flow__controls-button svg {
   fill: currentColor;
 }
@@ -87,30 +365,59 @@ body {
    sparks fly outward along per-particle --dx/--dy CSS vars and decelerate
    via a long-tail cubic-bezier so they "ease out" rather than hit a wall. */
 @keyframes egg-pop {
-  0%   { transform: scale(1); }
-  35%  { transform: scale(1.7); }
-  70%  { transform: scale(0.92); }
-  100% { transform: scale(1); }
+  0% {
+    transform: scale(1);
+  }
+
+  35% {
+    transform: scale(1.7);
+  }
+
+  70% {
+    transform: scale(0.92);
+  }
+
+  100% {
+    transform: scale(1);
+  }
 }
+
 @keyframes egg-spark {
   0% {
     transform: translate(-50%, -50%) translate(0, 0) scale(1);
     opacity: 1;
   }
+
   100% {
     transform: translate(-50%, -50%) translate(var(--dx), var(--dy)) scale(0.4);
     opacity: 0;
   }
 }
+
 /* Anticipation rings: fade in around the number at full size, hover to draw
    the eye, then zoom into the center and vanish. The pop + spark burst is
    timed to fire just before the rings hit zero (see Sidebar.tsx), so the
    visual reads as "rings collapse → impact → sparks fly out". */
 @keyframes egg-ring {
-  0%   { transform: translate(-50%, -50%) scale(1);    opacity: 0; }
-  14%  { transform: translate(-50%, -50%) scale(1);    opacity: 0.85; }
-  69%  { transform: translate(-50%, -50%) scale(1);    opacity: 0.85; }
-  100% { transform: translate(-50%, -50%) scale(0.12); opacity: 0; }
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0;
+  }
+
+  14% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.85;
+  }
+
+  69% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.85;
+  }
+
+  100% {
+    transform: translate(-50%, -50%) scale(0.12);
+    opacity: 0;
+  }
 }
 
 /* Thinking-dots animation: each dot fades + lifts on a 1.2s loop, with the
@@ -118,17 +425,28 @@ body {
    wave. Used by ChatMessage.tsx as the placeholder while the assistant
    message is still empty (i.e. waiting for the first streamed delta). */
 @keyframes thinking-dot {
-  0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
-  30%           { opacity: 1;   transform: translateY(-0.2rem); }
+
+  0%,
+  60%,
+  100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+
+  30% {
+    opacity: 1;
+    transform: translateY(-0.2rem);
+  }
 }
 
 /* Themed range slider (.range-themed) — the track is a tall rounded pill
    that fully *contains* the thumb (the thumb is smaller than the track
-   height and is centered inside it). Track: zinc-800 base with the
+   height and is centered inside it). Track: surface-raised base with the
    filled portion painted via a linear-gradient stop at the inline
    `--range-fill` CSS var (set from the bound value in OtherPage.tsx).
-   Thumb: small zinc-100 disc with a soft drop shadow so it reads as a
-   marker sliding inside the pill. WebKit and Gecko need separate
+   Thumb: small disc colored via --range-thumb (zinc-100 in dark,
+   zinc-600 in light) with a soft drop shadow so it reads as a marker
+   sliding inside the pill. WebKit and Gecko need separate
    pseudo-element blocks; Firefox draws the fill via
    ::-moz-range-progress, so the gradient var is WebKit-only. Sizes are
    in px on purpose so the slider stays physically consistent
@@ -152,10 +470,11 @@ body {
   cursor: pointer;
   outline: none;
 }
+
 .range-themed::-webkit-slider-runnable-track {
   height: 22px;
   border-radius: 9999px;
-  /* Track is transparent — the visible bar (including the blue fill) is
+  /* Track is transparent — the visible bar (including the accent fill) is
      painted by the wrapping <div> in OtherPage.tsx, sized to the full
      wrapper width so the thumb's outer edge can land *inside* the bar
      with a 4 px gap at value 0/100. If the track painted its own
@@ -163,48 +482,59 @@ body {
      the thumb would still extend past the visible end. */
   background: transparent;
 }
+
 .range-themed::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
   width: 14px;
   height: 14px;
   border-radius: 9999px;
-  background: #f4f4f5;
+  background: var(--range-thumb);
   border: none;
-  margin-top: 4px; /* (track 22 − thumb 14) / 2 — centers thumb inside track */
+  margin-top: 4px;
+  /* (track 22 − thumb 14) / 2 — centers thumb inside track */
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
   transition: background-color 150ms, box-shadow 150ms;
 }
+
 .range-themed:hover::-webkit-slider-thumb {
-  background: #ffffff;
+  background: var(--range-thumb-hover);
 }
+
 .range-themed:focus-visible::-webkit-slider-thumb {
-  background: #ffffff;
+  background: var(--range-thumb-hover);
   box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.18);
 }
+
 .range-themed::-moz-range-track {
   height: 22px;
   border-radius: 9999px;
-  background: transparent; /* painted by wrapping div; see WebKit note above */
+  background: transparent;
+  /* painted by wrapping div; see WebKit note above */
 }
+
 .range-themed::-moz-range-progress {
   height: 22px;
   border-radius: 9999px;
-  background: transparent; /* same — Firefox would otherwise draw the fill itself */
+  background: transparent;
+  /* same — Firefox would otherwise draw the fill itself */
 }
+
 .range-themed::-moz-range-thumb {
   width: 14px;
   height: 14px;
   border-radius: 9999px;
-  background: #f4f4f5;
+  background: var(--range-thumb);
   border: none;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
   transition: background-color 150ms, box-shadow 150ms;
 }
+
 .range-themed:hover::-moz-range-thumb {
-  background: #ffffff;
+  background: var(--range-thumb-hover);
 }
+
 .range-themed:focus-visible::-moz-range-thumb {
-  background: #ffffff;
+  background: var(--range-thumb-hover);
   box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.18);
 }

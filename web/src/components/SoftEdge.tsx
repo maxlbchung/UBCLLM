@@ -67,13 +67,14 @@ export function SoftEdge({
             }}
             style={{
               // Always opaque so the pill masks the dashed edge running
-              // through it. Disabled state uses the graph canvas color
-              // (bg-zinc-950 from the wrapper) so the pill blends into
-              // empty space; enabled state stays at the node-bg shade
-              // so it reads as "filled in" against the dashed line.
-              background: disabled ? '#09090b' : '#27272a',
-              border: '1px dashed #52525b',
-              color: '#a1a1aa',
+              // through it. Disabled state uses --canvas so the pill
+              // blends into the graph background (same fill as the
+              // PrereqTree wrapper); enabled state uses --surface-raised
+              // to match course / disjunction blocks. Both swap palette
+              // with the active theme.
+              background: disabled ? 'var(--canvas)' : 'var(--surface-raised)',
+              border: '1px dashed var(--fg-faint)',
+              color: 'var(--fg-muted)',
               padding: '3px 7px',
               borderRadius: 4,
               fontSize: 10,

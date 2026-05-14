@@ -10,7 +10,7 @@ import { ErrorDetails } from './ErrorDetails'
 const CITATION_RE = /\[(\d+)\]/g
 
 const ICON_CLASS =
-  'shrink-0 w-6 h-6 mt-1 text-zinc-500 [&>svg]:w-full [&>svg]:h-full'
+  'shrink-0 w-6 h-6 mt-1 text-fg-faint [&>svg]:w-full [&>svg]:h-full'
 
 function BotIcon() {
   return (
@@ -53,12 +53,13 @@ function UserIcon() {
 function citationChip(idx: number, sources: Chunk[], key: string | number): ReactNode {
   const src = sources[idx - 1]
   if (!src) return `[${idx}]`
-  // Hand-curated easter-egg chunks (pipeline/easter-eggs.json) get gold
-  // styling so they're visually distinct from scraped course/program chunks.
+  // Hand-curated easter-egg chunks (pipeline/easter-eggs.json) get the
+  // highlight palette so they're visually distinct from scraped
+  // course/program chunks (which use the accent palette).
   const isEaster = src.kind === 'easter'
   const chipClasses = isEaster
-    ? 'bg-amber-400/30 text-amber-200 hover:bg-amber-400/60 hover:text-white'
-    : 'bg-blue-500/30 text-blue-200 hover:bg-blue-500/60 hover:text-white'
+    ? 'bg-highlight-soft text-highlight-soft-fg hover:bg-highlight/60 hover:text-accent-fg'
+    : 'bg-accent-soft text-accent-soft-fg hover:bg-accent-hover/60 hover:text-accent-fg'
   const baseClasses =
     'inline-block align-super text-[0.625rem] font-mono px-1 mx-0.5 rounded no-underline'
   // Easter chunks usually have no source URL — render as a plain span so an
@@ -205,7 +206,7 @@ function buildComponents(sources: Chunk[]): Components {
         href={href}
         target="_blank"
         rel="noopener noreferrer"
-        className="underline text-blue-300 hover:text-blue-200"
+        className="underline text-link hover:text-accent-soft-fg"
         {...rest}
       >
         {children}
@@ -213,7 +214,7 @@ function buildComponents(sources: Chunk[]): Components {
     ),
     code: ({ children, ...rest }: ComponentPropsWithoutRef<'code'>) => (
       <code
-        className="px-1 py-0.5 rounded bg-zinc-900/70 font-mono text-[0.85em]"
+        className="px-1 py-0.5 rounded bg-surface/70 font-mono text-[0.85em]"
         {...rest}
       >
         {children}
@@ -221,7 +222,7 @@ function buildComponents(sources: Chunk[]): Components {
     ),
     pre: ({ children, ...rest }: ComponentPropsWithoutRef<'pre'>) => (
       <pre
-        className="my-2 p-2 rounded bg-zinc-900/70 overflow-x-auto text-xs font-mono"
+        className="my-2 p-2 rounded bg-surface/70 overflow-x-auto text-xs font-mono"
         {...rest}
       >
         {children}
@@ -229,13 +230,13 @@ function buildComponents(sources: Chunk[]): Components {
     ),
     blockquote: ({ children, ...rest }: ComponentPropsWithoutRef<'blockquote'>) => (
       <blockquote
-        className="border-l-2 border-zinc-600 pl-3 my-2 text-zinc-300"
+        className="border-l-2 border-fg-faint pl-3 my-2 text-fg-muted"
         {...rest}
       >
         {children}
       </blockquote>
     ),
-    hr: () => <hr className="my-3 border-zinc-700" />,
+    hr: () => <hr className="my-3 border-line-soft" />,
     table: ({ children, ...rest }: ComponentPropsWithoutRef<'table'>) => (
       <div className="my-2 overflow-x-auto">
         <table className="border-collapse text-xs" {...rest}>
@@ -245,14 +246,14 @@ function buildComponents(sources: Chunk[]): Components {
     ),
     th: ({ children, ...rest }: ComponentPropsWithoutRef<'th'>) => (
       <th
-        className="px-2 py-1 border border-zinc-700 text-left font-semibold bg-zinc-900/40"
+        className="px-2 py-1 border border-line-soft text-left font-semibold bg-surface-soft"
         {...rest}
       >
         {dec(children)}
       </th>
     ),
     td: ({ children, ...rest }: ComponentPropsWithoutRef<'td'>) => (
-      <td className="px-2 py-1 border border-zinc-700 align-top" {...rest}>
+      <td className="px-2 py-1 border border-line-soft align-top" {...rest}>
         {dec(children)}
       </td>
     ),
@@ -282,8 +283,8 @@ export function ChatMessage({ message }: { message: Message }) {
         className={
           'rounded-lg px-3 py-2 max-w-[85%] text-sm leading-relaxed ' +
           (isUser
-            ? 'bg-blue-600 text-white whitespace-pre-wrap'
-            : 'bg-zinc-800 text-zinc-100 border border-zinc-700')
+            ? 'bg-accent text-accent-fg whitespace-pre-wrap'
+            : 'bg-surface-raised text-fg border border-line-soft')
         }
       >
         {message.content ? (
@@ -305,7 +306,7 @@ export function ChatMessage({ message }: { message: Message }) {
           // block reads as if the model is still working.
           !message.error && (
             <span
-              className="inline-flex items-center gap-1 text-zinc-500"
+              className="inline-flex items-center gap-1 text-fg-faint"
               aria-label="Thinking"
               role="status"
             >
@@ -325,7 +326,7 @@ export function ChatMessage({ message }: { message: Message }) {
 
         {!isUser && sources.length > 0 && (
           <details
-            className="mt-2 text-xs text-zinc-400"
+            className="mt-2 text-xs text-fg-muted"
             onToggle={(e) => {
               if (!e.currentTarget.open) return
               const el = e.currentTarget
@@ -352,11 +353,11 @@ export function ChatMessage({ message }: { message: Message }) {
                 {cited1Indexed.map(({ s, i }) => {
                   const isEaster = s.kind === 'easter'
                   const indexClass = isEaster
-                    ? 'text-[0.625rem] font-mono text-amber-300 w-4 text-right'
-                    : 'text-[0.625rem] font-mono text-blue-300/90 w-4 text-right'
+                    ? 'text-[0.625rem] font-mono text-highlight-fg w-4 text-right'
+                    : 'text-[0.625rem] font-mono text-link/90 w-4 text-right'
                   const labelClass = isEaster
-                    ? 'underline text-amber-300 hover:text-amber-200'
-                    : 'underline hover:text-zinc-200 text-zinc-200'
+                    ? 'underline text-highlight-fg hover:text-highlight'
+                    : 'underline hover:text-fg text-fg'
                   const label = s.code ?? s.title
                   return (
                     <li key={s.id} className="flex items-baseline gap-1.5">
@@ -377,7 +378,7 @@ export function ChatMessage({ message }: { message: Message }) {
                       )}
                       {s.score != null && (
                         <span
-                          className="ml-auto text-[0.625rem] font-mono text-zinc-500"
+                          className="ml-auto text-[0.625rem] font-mono text-fg-faint"
                           title="Retrieval score (cosine similarity, plus optional title-match and course-keyword boosts; pure cosine is in [-1, 1])"
                         >
                           {s.score.toFixed(3)}
@@ -391,18 +392,18 @@ export function ChatMessage({ message }: { message: Message }) {
 
             {uncited.length > 0 && (
               <>
-                <p className="mt-2 text-[0.625rem] uppercase tracking-wider text-zinc-600">
+                <p className="mt-2 text-[0.625rem] uppercase tracking-wider text-fg-faint">
                   Other retrieved context
                 </p>
                 <ul className="mt-1 space-y-1 opacity-60">
                   {uncited.map(({ s, i }) => {
                     const isEaster = s.kind === 'easter'
                     const indexClass = isEaster
-                      ? 'text-[0.625rem] font-mono text-amber-400/70 w-4 text-right'
-                      : 'text-[0.625rem] font-mono text-zinc-600 w-4 text-right'
+                      ? 'text-[0.625rem] font-mono text-highlight/70 w-4 text-right'
+                      : 'text-[0.625rem] font-mono text-fg-faint w-4 text-right'
                     const labelClass = isEaster
-                      ? 'underline text-amber-300/80 hover:text-amber-200'
-                      : 'underline hover:text-zinc-300'
+                      ? 'underline text-highlight-fg/80 hover:text-highlight'
+                      : 'underline hover:text-fg-muted'
                     const label = s.code ?? s.title
                     return (
                       <li key={s.id} className="flex items-baseline gap-1.5">
@@ -423,7 +424,7 @@ export function ChatMessage({ message }: { message: Message }) {
                         )}
                         {s.score != null && (
                           <span
-                            className="ml-auto text-[0.625rem] font-mono text-zinc-600"
+                            className="ml-auto text-[0.625rem] font-mono text-fg-faint"
                             title="Retrieval score (cosine similarity, plus optional title-match and course-keyword boosts; pure cosine is in [-1, 1])"
                           >
                             {s.score.toFixed(3)}

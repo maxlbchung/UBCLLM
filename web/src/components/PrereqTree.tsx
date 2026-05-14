@@ -129,19 +129,26 @@ const TEXT_LINE_HEIGHT = 15
 // EitherOrNode all render four invisible handles), so a coreq node is
 // just a regular node whose left handle happens to receive the prereq
 // chain and whose bottom handle happens to send the coreq edge.
+// Edge strokes/labels reference CSS vars so the graph follows the active
+// theme. SVG attributes resolve var() at paint time the same way regular
+// CSS does, so no separate light/dark dispatch is needed.
 const PREREQ_EDGE_STYLE = {
   sourceHandle: 'right-source',
   targetHandle: 'left-target',
-  style: { stroke: '#52525b', strokeWidth: 1.5 },
+  style: { stroke: 'var(--fg-faint)', strokeWidth: 1.5 },
 } as const
 
 const COREQ_EDGE_STYLE = {
   sourceHandle: 'bottom-source',
   targetHandle: 'top-target',
   label: 'co-req',
-  style: { stroke: '#f59e0b', strokeWidth: 1.5 },
-  labelStyle: { fill: '#f59e0b', fontSize: 10 },
-  labelBgStyle: { fill: '#27272a', stroke: '#3f3f46', strokeWidth: 1 },
+  style: { stroke: 'var(--highlight)', strokeWidth: 1.5 },
+  labelStyle: { fill: 'var(--highlight)', fontSize: 10 },
+  labelBgStyle: {
+    fill: 'var(--surface-raised)',
+    stroke: 'var(--line-soft)',
+    strokeWidth: 1,
+  },
   labelBgPadding: [4, 6] as [number, number],
   labelBgBorderRadius: 4,
 } as const
@@ -157,7 +164,7 @@ const SOFT_EDGE_STYLE = {
   sourceHandle: 'right-source',
   targetHandle: 'left-target',
   type: 'soft',
-  style: { stroke: '#52525b', strokeWidth: 1.5, strokeDasharray: '5 5' },
+  style: { stroke: 'var(--fg-faint)', strokeWidth: 1.5, strokeDasharray: '5 5' },
 } as const
 
 // Carried through walkAst whenever the current expression sits inside a
@@ -1416,7 +1423,7 @@ export function PrereqTree() {
     <div className="flex flex-col h-screen p-4 gap-3 w-full">
       <header className="flex items-center gap-3">
         <h2 className="text-xl font-semibold">Prerequisite Tree</h2>
-        <span className="text-xs text-zinc-500">
+        <span className="text-xs text-fg-faint">
           full transitive chain · boolean structure modeled
         </span>
       </header>
@@ -1426,28 +1433,28 @@ export function PrereqTree() {
           value={query}
           onChange={(e) => setQuery(e.target.value.toUpperCase())}
           placeholder="e.g. CPSC 320"
-          className="flex-1 rounded bg-zinc-900 border border-zinc-700 px-3 py-2 text-sm focus:outline-none focus:border-zinc-500"
+          className="flex-1 rounded bg-input border border-line-soft text-fg px-3 py-2 text-sm focus:outline-none focus:border-fg-faint"
         />
         <button
           type="submit"
-          className="rounded bg-blue-600 hover:bg-blue-500 px-3 py-2 text-sm"
+          className="rounded bg-accent hover:bg-accent-hover text-accent-fg px-3 py-2 text-sm"
         >
           Show
         </button>
       </form>
 
-      {!index && <p className="text-zinc-500">Loading course index…</p>}
+      {!index && <p className="text-fg-faint">Loading course index…</p>}
 
       {index && !activeCode && (
-        <p className="text-sm text-red-400">
+        <p className="text-sm text-danger-fg">
           No course found. Try a code like CPSC 110 or MATH 200.
         </p>
       )}
 
       {root && (
-        <p className="text-xs text-zinc-400">
+        <p className="text-xs text-fg-muted">
           Showing every transitive prerequisite of{' '}
-          <span className="text-zinc-200">{root.code}</span>
+          <span className="text-fg">{root.code}</span>
           {graph.nodes.length > 0 && (
             <>
               {' '}— {graph.nodes.length - 1} blocks across {graph.depthCount}{' '}
@@ -1460,7 +1467,7 @@ export function PrereqTree() {
         </p>
       )}
 
-      <div className="flex-1 rounded border border-zinc-800 bg-zinc-950">
+      <div className="flex-1 rounded border border-line bg-canvas">
         {graph.nodes.length > 0 ? (
           <ReactFlow
             nodes={graph.nodes}
@@ -1471,7 +1478,11 @@ export function PrereqTree() {
             nodesConnectable={false}
             proOptions={{ hideAttribution: true }}
           >
-            <Background color="#27272a" gap={16} />
+            {/* ReactFlow's Background renders SVG <circle> dots whose
+                fill resolves CSS variables, so a token reference works
+                here and lets the grid follow the active theme: zinc-700
+                in dark, zinc-300 in light. */}
+            <Background color="var(--line-soft)" gap={16} />
             <Controls showInteractive={false} />
             <HorizontalFitOnChange
               bbox={graph.bbox}
@@ -1479,14 +1490,14 @@ export function PrereqTree() {
             />
           </ReactFlow>
         ) : (
-          <div className="h-full flex items-center justify-center text-zinc-500 text-sm">
+          <div className="h-full flex items-center justify-center text-fg-faint text-sm">
             Enter a course code to render its prerequisite graph.
           </div>
         )}
       </div>
 
       {root && !root.prerequisites && !root.corequisites && (
-        <p className="text-sm text-zinc-400">
+        <p className="text-sm text-fg-muted">
           {root.code} has no prerequisites or corequisites listed in the calendar.
         </p>
       )}

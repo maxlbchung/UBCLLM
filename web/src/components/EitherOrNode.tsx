@@ -37,12 +37,18 @@ export function EitherOrNode({ data }: NodeProps<EitherOrData>) {
   return (
     <div
       style={{
-        background: '#1f1c2c',
-        border: '1px solid #71717a',
+        // Was a unique purple tint (#1f1c2c) in v1.5; that custom hue
+        // isn't in our token palette, so EitherOr now shares the
+        // surface tone with DisjunctionNode and relies on the stacked
+        // radio layout for visual distinction. Border bumps to
+        // --fg-faint (zinc-500) to stay a touch more present than a
+        // regular --line-soft block.
+        background: 'var(--surface)',
+        border: '1px solid var(--fg-faint)',
         borderRadius: 6,
         padding: 6,
         width: 200,
-        color: '#e5e7eb',
+        color: 'var(--fg)',
         fontSize: 11,
         textAlign: 'left',
       }}
@@ -56,7 +62,7 @@ export function EitherOrNode({ data }: NodeProps<EitherOrData>) {
           fontSize: 9,
           textTransform: 'uppercase',
           letterSpacing: '0.05em',
-          color: '#a1a1aa',
+          color: 'var(--fg-muted)',
           marginBottom: 4,
         }}
       >
@@ -77,10 +83,10 @@ export function EitherOrNode({ data }: NodeProps<EitherOrData>) {
                 padding: '4px 6px',
                 borderRadius: 4,
                 cursor: 'pointer',
-                background: selected ? '#27272a' : 'transparent',
+                background: selected ? 'var(--surface-raised)' : 'transparent',
                 opacity: selected ? 1 : 0.45,
                 border: selected
-                  ? '1px solid #52525b'
+                  ? '1px solid var(--fg-faint)'
                   : '1px solid transparent',
               }}
             >
@@ -90,14 +96,14 @@ export function EitherOrNode({ data }: NodeProps<EitherOrData>) {
                   width: 12,
                   height: 12,
                   borderRadius: '50%',
-                  border: '2px solid #71717a',
-                  background: selected ? '#3b82f6' : 'transparent',
+                  border: '2px solid var(--fg-faint)',
+                  background: selected ? 'var(--accent-hover)' : 'transparent',
                   marginTop: 2,
                 }}
               />
               <span style={{ lineHeight: 1.3 }}>
                 {opt.label && (
-                  <span style={{ color: '#a1a1aa', marginRight: 4 }}>
+                  <span style={{ color: 'var(--fg-muted)', marginRight: 4 }}>
                     ({opt.label})
                   </span>
                 )}

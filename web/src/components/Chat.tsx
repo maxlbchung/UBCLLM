@@ -232,9 +232,9 @@ export function Chat() {
     // scroller itself.
     <div className="flex flex-col h-screen flex-1 py-4 min-h-0 gap-4">
       <div className="mx-auto w-full max-w-[1200px] px-4">
-        <header className="flex items-baseline justify-between border-b border-zinc-800 pb-2">
+        <header className="flex items-baseline justify-between border-b border-line pb-2">
           <h1 className="text-lg font-semibold">AI Chatbot</h1>
-          <span className="text-xs text-zinc-500">
+          <span className="text-xs text-fg-faint">
             Reodite can make mistakes · Make sure to verify important information
           </span>
         </header>
@@ -243,7 +243,7 @@ export function Chat() {
       <div ref={scrollerRef} className="flex-1 overflow-y-auto min-h-0">
         <div className="mx-auto w-full max-w-[1200px] px-4 space-y-3">
           {messages.length === 0 && (
-            <div className="text-center text-zinc-500 mt-12 text-sm">
+            <div className="text-center text-fg-faint mt-12 text-sm">
               Ask about a UBC Vancouver course or program. Try:
               <ul className="mt-2 space-y-1">
                 <li>"What are the prerequisites for CPSC 110?"</li>
@@ -274,7 +274,7 @@ export function Chat() {
             }
             maxLength={MAX_INPUT_LENGTH}
             disabled={streaming}
-            className="flex-1 rounded bg-zinc-900 border border-zinc-700 px-3 py-2 text-sm focus:outline-none focus:border-zinc-500 disabled:opacity-60"
+            className="flex-1 rounded bg-input border border-line-soft text-fg px-3 py-2 text-sm focus:outline-none focus:border-fg-faint disabled:opacity-60"
             placeholder={
               streaming ? 'Generating…' : 'Ask about a UBC course or program'
             }
@@ -282,7 +282,7 @@ export function Chat() {
           <button
             type="submit"
             disabled={streaming || !input.trim()}
-            className="rounded bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:hover:bg-blue-600 px-4 py-2 text-sm font-medium"
+            className="rounded bg-accent hover:bg-accent-hover text-accent-fg disabled:opacity-50 disabled:hover:bg-accent px-4 py-2 text-sm font-medium"
           >
             Send
           </button>
@@ -290,8 +290,8 @@ export function Chat() {
         {input.length >= MAX_INPUT_LENGTH * 0.8 && (
           <div
             className={`mt-1 text-right text-xs ${input.length >= MAX_INPUT_LENGTH
-              ? 'text-amber-400'
-              : 'text-zinc-500'
+              ? 'text-highlight'
+              : 'text-fg-faint'
               }`}
           >
             {input.length} / {MAX_INPUT_LENGTH}

@@ -97,7 +97,7 @@ export function OtherPage() {
                 playSfx('click')
                 setTheme(e.target.value as Theme)
               }}
-              className="bg-input border border-line-soft rounded text-sm text-fg px-2 py-1 focus:outline-none focus:border-fg-faint"
+              className="w-28 bg-input border border-line-soft rounded text-sm text-fg px-2 py-1 focus:outline-none focus:border-fg-faint"
             >
               {THEME_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>
@@ -118,7 +118,7 @@ export function OtherPage() {
                 playSfx('click')
                 setZoom(Number(e.target.value) as Zoom)
               }}
-              className="bg-input border border-line-soft rounded text-sm text-fg px-2 py-1 focus:outline-none focus:border-fg-faint"
+              className="w-28 bg-input border border-line-soft rounded text-sm text-fg px-2 py-1 focus:outline-none focus:border-fg-faint"
             >
               {ZOOM_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>

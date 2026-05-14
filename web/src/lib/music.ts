@@ -115,7 +115,7 @@ function findChannel(key: string): SomaChannel {
 //      values in the lower half cover proportionally less audible
 //      change, matching how analog "audio-taper" pots have worked
 //      for decades.
-const MUSIC_MAX_GAIN = 0.5
+const MUSIC_MAX_GAIN = 0.75
 
 function musicGain(slider: number): number {
   return MUSIC_MAX_GAIN * (slider / 100) ** 2

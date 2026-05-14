@@ -1,7 +1,7 @@
 {
   "name": "web",
   "private": true,
-  "version": "1.7.14",
+  "version": "1.7.15",
   "license": "SEE LICENSE IN ../LICENSE",
   "type": "module",
   "scripts": {

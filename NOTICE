@@ -1,4 +1,4 @@
-UBCLLM
+UBCLLM (Reodite)
 Copyright (c) 2026 Max Libo Chung
 
 This product is licensed under the PolyForm Noncommercial License 1.0.0.
@@ -7,10 +7,74 @@ See the LICENSE file for full terms.
 ================================================================================
 
 Third-party content and notices
+
+This product depends on, redistributes, or makes use of the following
+third-party software, models, and content. Each remains subject to its
+own license; nothing in this NOTICE grants additional rights.
+
 ================================================================================
 
-UBC Vancouver Academic Calendar content
----------------------------------------
+
+1. Qwen3.5 (inference model)
+================================================================================
+Copyright (c) 2024 Alibaba Cloud / Qwen Team.
+Licensed under the Apache License, Version 2.0.
+Source: https://github.com/QwenLM/Qwen3
+Distribution: https://huggingface.co/Qwen
+
+The Qwen3.5 2B chat-tuned model is loaded at runtime from the MLC.ai /
+Hugging Face CDN by the user's browser. It is not redistributed by this
+repository.
+
+A copy of the Apache License 2.0 is available at:
+https://www.apache.org/licenses/LICENSE-2.0
+
+
+2. all-MiniLM-L6-v2 (sentence-embedding model)
+================================================================================
+Copyright (c) Microsoft Corporation (original MiniLM architecture,
+Wang et al., 2020) and the Sentence-Transformers / UKP-TUDA contributors
+(fine-tuned all-MiniLM-L6-v2 release, Reimers et al.).
+Licensed under the Apache License, Version 2.0.
+Source: https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2
+Original paper: https://arxiv.org/abs/2002.10957
+
+The model is loaded at runtime from the Hugging Face CDN by the user's
+browser via @xenova/transformers. It is not redistributed by this
+repository.
+
+
+3. @mlc-ai/web-llm (WebGPU LLM runtime)
+================================================================================
+Copyright (c) The MLC.ai Team.
+Licensed under the Apache License, Version 2.0.
+Source: https://github.com/mlc-ai/web-llm
+
+This library is bundled into the compiled web/dist output of this project
+under the terms of the Apache License 2.0.
+
+
+4. @xenova/transformers (transformers.js)
+================================================================================
+Copyright (c) Joshua Lochner (Xenova) and Hugging Face contributors.
+Licensed under the Apache License, Version 2.0.
+Source: https://github.com/huggingface/transformers.js
+
+This library is bundled into the compiled web/dist output of this project
+under the terms of the Apache License 2.0.
+
+
+5. Other open-source dependencies
+================================================================================
+This project depends on numerous open-source packages declared in
+web/package.json (React, Vite, Tailwind, Zustand, ReactFlow, and many
+transitive dependencies). Each is distributed under its own license — see
+the LICENSE / NOTICE files installed with each package under node_modules
+for the authoritative text.
+
+
+6. UBC Vancouver Academic Calendar content
+================================================================================
 The data files derived from the UBC Vancouver Academic Calendar
 (https://vancouver.calendar.ubc.ca/), including but not limited to:
 
@@ -21,29 +85,23 @@ The data files derived from the UBC Vancouver Academic Calendar
 are derivative works of content copyrighted by The University of British
 Columbia. They are used here to power academic advising and reference
 features for UBC students. Rights to the underlying calendar content
-belong to UBC.
-
-The PolyForm Noncommercial license in the LICENSE file applies to the
-original software in this repository. It does NOT grant any rights to the
-UBC calendar content itself. Use of the UBC calendar content is subject to
-UBC's own terms and copyright policies.
+belong to UBC. The PolyForm Noncommercial license in the LICENSE file
+covers only the original software in this repository; it does not grant
+any rights to the UBC calendar content.
 
 If you are a representative of The University of British Columbia and have
-concerns about the use of this content, please contact maxlbchung@gmail.com
+concerns about the use of this content, please contact reodite@libo.dev
 and the content will be removed promptly.
 
-Models
-------
-The application loads inference and embedding models at runtime from the
-user's browser. Those models are not redistributed by this repository and
-remain subject to their own licenses:
+================================================================================
 
-  - Qwen / Qwen3.5 family models (Apache-2.0 or Qwen-specific terms,
-    depending on the variant the WebLLM build resolves at runtime)
-  - sentence-transformers/all-MiniLM-L6-v2 (Apache-2.0)
+Apache License 2.0 reference
+================================================================================
+The full text of the Apache License, Version 2.0 is available at:
+https://www.apache.org/licenses/LICENSE-2.0
 
-Open-source dependencies
-------------------------
-This project depends on numerous open-source packages whose licenses are
-distributed with their respective node_modules. See web/package.json and
-the installed package metadata for the authoritative list.
+A summary of the obligations: when redistributing covered work, you must
+preserve copyright notices, include a copy of the license, mark any
+modifications you made, and propagate any included NOTICE files. This
+NOTICE file is the propagation point for the Apache-2.0-licensed
+components listed above.

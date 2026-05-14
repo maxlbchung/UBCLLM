@@ -241,6 +241,15 @@ export function OtherPage() {
           >
             UBC
           </a>
+          . Model and library credits:{' '}
+          <a
+            href="https://github.com/maxlbchung/UBCLLM/blob/master/NOTICE"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-link hover:underline"
+          >
+            NOTICE
+          </a>
           .
         </p>
       </section>

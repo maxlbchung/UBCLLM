@@ -11,17 +11,19 @@ BUILD TIME (Python, offline)              RUNTIME (Browser, WebGPU)
 UBC Calendar HTML                          User question
        │                                          │
        ▼                                          ▼
-   scraper/  ──► courses.json    ┌──► transformers.js MiniLM (embed query)
-                programs.json    │           │
-       │                         │           ▼
-       ▼                         │    cosine similarity → top-k chunks
-   pipeline/ ──► chunks.json ────┤           │
-                 embeddings.bin  │           ▼
-                                 │    system prompt + chunks + history
-                                 │           │
-                                 │           ▼
-                                 └──► WebLLM Qwen3.5 2B → streamed answer
+   scraper/  ──► courses.json         ┌──► transformers.js MiniLM (embed query)
+                faculties.json        │           │
+                degree_programs.json  │           ▼
+       │                              │    cosine similarity → top-k chunks
+       ▼                              │           │
+   pipeline/ ──► chunks.json ─────────┤           ▼
+                 embeddings.bin       │    system prompt + chunks
+                                      │           │
+                                      │           ▼
+                                      └──► WebLLM Qwen3.5 2B → streamed answer
 ```
+
+The corpus covers UBC Vancouver's full calendar: every course description (9,450 across 263 subject codes), every faculty/school/department hub, and every degree subtree — bachelors, masters, doctoral, and graduate/undergraduate certificates.
 
 ## Project layout
 
@@ -33,12 +35,15 @@ UBC Calendar HTML                          User question
 ## Build pipeline
 
 ```
-cd scraper  && uv run scrape_courses.py     # → output/courses.json
-cd scraper  && uv run scrape_programs.py    # → output/programs.json
-cd pipeline && uv run chunk_and_embed.py    # → web/public/data/{chunks.json, embeddings.bin}
-cd web      && npm run dev                  # local dev server
-cd web      && npm run build                # static site → web/dist/
+cd scraper  && uv run scrape_courses.py            # → output/courses.json
+cd scraper  && uv run scrape_faculties.py          # → output/faculties.json
+cd scraper  && uv run scrape_degree_programs.py    # → output/degree_programs.json
+cd pipeline && uv run chunk_and_embed.py           # → web/public/data/{chunks.json, embeddings.bin}
+cd web      && npm run dev                         # local dev server
+cd web      && npm run build                       # static site → web/dist/
 ```
+
+`scraper/output/*.json` is committed to git (it's the source of truth the CI workflow feeds to the pipeline). Re-running a scraper hits UBC's calendar — please respect their `robots.txt` and the 1 req/s rate limit.
 
 ## Requirements
 

@@ -2,7 +2,8 @@
 
 Inputs:
   ../scraper/output/courses.json
-  ../scraper/output/programs.json
+  ../scraper/output/faculties.json        — faculty/school/department hubs
+  ../scraper/output/degree_programs.json  — every degree subtree (BA/MSc/PhD/cert)
 
 Outputs:
   ../web/public/data/chunks.json    list[{id, kind, code, title, text, url}]
@@ -26,7 +27,13 @@ from sentence_transformers import SentenceTransformer
 
 ROOT = Path(__file__).resolve().parent.parent
 COURSES_JSON = ROOT / "scraper" / "output" / "courses.json"
-PROGRAMS_JSON = ROOT / "scraper" / "output" / "programs.json"
+# Faculty/school/department hub pages — the navigation layer of the
+# calendar. Owned by scrape_faculties.py.
+FACULTIES_JSON = ROOT / "scraper" / "output" / "faculties.json"
+# Every degree program subtree (undergraduate, masters, doctoral, certificate)
+# with rich per-page metadata: program, faculty, level, kind, referenced_courses.
+# Owned by scrape_degree_programs.py. Wins over faculties.json on URL collision.
+DEGREE_PROGRAMS_JSON = ROOT / "scraper" / "output" / "degree_programs.json"
 # Hand-curated easter-egg Q&A pairs that ride alongside the scraped corpus.
 # Lives next to the pipeline (not under scraper/output/) because nothing
 # scrapes it — it's authored by hand. Each entry: {id?, title, text, url?}.
@@ -140,6 +147,87 @@ def easter_chunk(e: dict) -> Chunk:
     )
 
 
+def degree_program_chunks(p: dict) -> list[Chunk]:
+    """Chunk one degree-program page (undergraduate, masters, doctoral, cert).
+
+    Same binning as program_chunks, but the chunk prefix carries the
+    program / faculty / level / section metadata so the embedder picks up
+    signals like "Bachelor of Science · The Faculty of Science · Level:
+    undergraduate · Section: degree_requirements" naturally — a query like
+    "what does a B.Sc. require" or "what's the MSc thesis option" lands
+    closer to this kind of chunk than to a navigation page.
+
+    Stays kind="program" on the Chunk so the browser's retrieval
+    heuristics (program-title boost in retrieve.ts) keep working
+    unchanged. Distinguished from generic program chunks via the
+    `degree:` id prefix.
+    """
+    text = (p.get("text") or "").strip()
+    if not text:
+        return []
+
+    paragraphs: list[str] = []
+    for pg in text.split("\n"):
+        pg = pg.strip()
+        if pg:
+            paragraphs.extend(_split_long(pg, TARGET_CHARS))
+
+    bins: list[list[str]] = []
+    cur: list[str] = []
+    cur_len = 0
+    for pg in paragraphs:
+        if cur and cur_len + len(pg) > TARGET_CHARS:
+            bins.append(cur)
+            cur = [pg]
+            cur_len = len(pg)
+        else:
+            cur.append(pg)
+            cur_len += len(pg) + 1
+    if cur:
+        bins.append(cur)
+
+    title = p.get("title") or ""
+    program = p.get("program") or ""
+    faculty = p.get("faculty") or ""
+    level = p.get("level") or ""
+    kind = p.get("kind") or ""
+    breadcrumbs = p.get("breadcrumbs") or []
+    crumb = " > ".join(breadcrumbs[1:]) if len(breadcrumbs) > 1 else ""
+    base_id = (p["url"].rstrip("/").rsplit("/", 1)[-1] or "root").lower()
+
+    meta_bits: list[str] = []
+    if program:
+        meta_bits.append(f"Program: {program}")
+    if faculty:
+        meta_bits.append(f"Faculty: {faculty}")
+    if level:
+        meta_bits.append(f"Level: {level}")
+    if kind and kind != "other":
+        meta_bits.append(f"Section: {kind.replace('_', ' ')}")
+    meta_line = " · ".join(meta_bits)
+
+    prefix_parts = [title]
+    if meta_line:
+        prefix_parts.append(meta_line)
+    if crumb:
+        prefix_parts.append(crumb)
+    prefix = "\n".join(p for p in prefix_parts if p)
+
+    out: list[Chunk] = []
+    for i, pg_lines in enumerate(bins):
+        body = "\n".join(pg_lines)
+        full = f"{prefix}\n\n{body}" if prefix else body
+        out.append(Chunk(
+            id=f"degree:{base_id}:{i}",
+            kind="program",
+            code=None,
+            title=title,
+            text=full,
+            url=p["url"],
+        ))
+    return out
+
+
 def program_chunks(p: dict) -> list[Chunk]:
     text = (p.get("text") or "").strip()
     if not text:
@@ -218,11 +306,44 @@ def main() -> None:
             chunks.append(course_chunk(c))
 
     if not args.no_programs:
-        log.info("Loading %s", PROGRAMS_JSON)
-        programs = json.loads(PROGRAMS_JSON.read_text(encoding="utf-8"))
-        log.info("  %d program pages", len(programs))
-        for p in programs:
-            chunks.extend(program_chunks(p))
+        # Load degree-program pages first; they have richer per-page metadata
+        # (program/faculty/level/kind/referenced_courses) and supersede any
+        # same-URL entry in the faculties hub set.
+        degree_urls: set[str] = set()
+        if DEGREE_PROGRAMS_JSON.exists():
+            log.info("Loading %s", DEGREE_PROGRAMS_JSON)
+            dp = json.loads(
+                DEGREE_PROGRAMS_JSON.read_text(encoding="utf-8")
+            )
+            log.info("  %d degree program pages", len(dp))
+            for p in dp:
+                chunks.extend(degree_program_chunks(p))
+                degree_urls.add(p["url"])
+        else:
+            log.info(
+                "Skipping %s (not found — run scrape_degree_programs.py)",
+                DEGREE_PROGRAMS_JSON,
+            )
+
+        if FACULTIES_JSON.exists():
+            log.info("Loading %s", FACULTIES_JSON)
+            faculties = json.loads(FACULTIES_JSON.read_text(encoding="utf-8"))
+            kept = 0
+            for p in faculties:
+                if p.get("url") in degree_urls:
+                    continue
+                chunks.extend(program_chunks(p))
+                kept += 1
+            log.info(
+                "  %d faculty hub pages (%d skipped as already covered by degree set)",
+                kept,
+                len(faculties) - kept,
+            )
+        else:
+            log.info(
+                "Skipping %s (not found — run scrape_faculties.py)",
+                FACULTIES_JSON,
+            )
 
     if not args.no_easter_eggs and EASTER_EGGS_JSON.exists():
         log.info("Loading %s", EASTER_EGGS_JSON)

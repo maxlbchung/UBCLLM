@@ -30,8 +30,10 @@ UBCLLM/
 │   └── public/data/    chunks.json + embeddings.bin (regenerated in CI)
 ├── scraper/            Python 3.14 — crawls UBC calendar (output committed)
 │   ├── common.py       rate-limited httpx + tenacity + on-disk HTML cache
-│   ├── scrape_courses.py / scrape_programs.py
-│   └── output/         courses.json (5.7 MB) + programs.json (2.9 MB)
+│   ├── scrape_courses.py            course descriptions per subject code
+│   ├── scrape_faculties.py          faculty/school/department hub pages (depth 2)
+│   ├── scrape_degree_programs.py    every degree subtree — BA/BSc/MSc/PhD/cert
+│   └── output/         courses.json + faculties.json + degree_programs.json
 ├── pipeline/           Python 3.12 (pinned) — chunks + embeds (output regen in CI)
 │   └── chunk_and_embed.py
 ├── smoke-test/         Standalone HTML — WebGPU + Qwen3.5 2B verification
@@ -44,9 +46,9 @@ The full v1 stack from the original plan is shipped and live. Highlights:
 
 **Data corpus** — committed at `scraper/output/`:
 - 9,450 courses across 263 UBC Vancouver subject codes (full calendar crawl).
-- 800 program/faculty pages (BFS depth 4, capped at 800 — depth 3 wasn't fully drained, depth 4 not crawled; raise `--max-pages` if you want fuller coverage).
-- The pipeline turns this into **10,910 chunks** (9,450 course + 1,460 program slices @ ~1,600 chars each) → 6.1 MB `chunks.json` + 16 MB `embeddings.bin`.
-- Median chunk text size: ~246 chars (course) vs ~1,430 chars (program). Programs dominate the LLM context budget when retrieved.
+- **Faculty hubs** (`faculties.json`) — shallow BFS (depth 2, cap 300) over `/faculties-colleges-and-schools/` that keeps only the navigation layer: faculty overviews, school overviews, departmental hubs, research centres. Anything that *looks like* a degree root (Bachelor/Master/Doctor/certificate by title or slug) is filtered out during the crawl so this set never overlaps with the degree set. Each record carries `kind` (faculty_overview / school_overview / college_overview / department / research_centre / vantage / other).
+- **Degree programs** (`degree_programs.json`) — self-contained scraper that does its own shallow BFS to discover every "Bachelor of …" / "Master of …" / "Doctor of …" / certificate landing page, then exhausts each subtree within its URL prefix. Covers undergraduate, masters, doctoral, and certificate/diploma levels in a single pass — graduate programs are no longer excluded. Each record carries `program`, `faculty`, `level` (undergraduate / masters / doctoral / certificate), `kind` (degree_overview / degree_requirements / specialization / major / minor / honours / admission / regulations / curriculum / advising / coop / dual_degree / other), and a `referenced_courses` list extracted by course-code regex.
+- The pipeline turns this into chunks: course rows + faculty-hub rows + degree-program rows. Degree chunks carry a richer prefix (`Program: … · Faculty: … · Level: … · Section: …`) so a query like "what's the MSc thesis option" lands close. When the same URL appears in both `faculties.json` and `degree_programs.json`, the degree record wins (richer metadata).
 
 **App features shipped:**
 - **Chat** with streaming Qwen3.5 2B output, single-shot per turn (no chat history sent — fact-bleed prevention), RAG context from top-8 chunks per turn.
@@ -67,7 +69,7 @@ The full v1 stack from the original plan is shipped and live. Highlights:
 - **Prereq AST parser** (`web/src/lib/prereqAst.ts`): recursive-descent over a small token alphabet (`one of`, `all of`, `either`, `and`, `or`, `;`, `.`, `,`, parens, branch labels, course codes, free text). Emits `Expr = And | Or-dropdown | Or-stacked | Code | Literal`. `parsePrereq` is null-safe for empty/whitespace input; unknown tokens collapse into `Literal` so the parser never throws on weird strings. `displayExpr` flattens an expression to a label string for dropdown / radio options. Top-level literals are dropped from the prereq tree (preserved as text in chat). Selection state in `PrereqTree` is keyed by `${ownerCourseCode}::${pathInExpr}` so toggling one disjunction doesn't perturb others, and selections persist across root-course switches.
 
 **Open opportunities** (none of these block daily use):
-- Programs crawl was capped at 800 — depth-4 leaves never reached. Bumping `--max-pages` would fill in deeper degree-requirement detail.
+- Other top-level calendar sections aren't crawled yet: `/academic-year/...` (sessional dates), `/campus-wide-policies-and-regulations/...` (academic standing, withdrawals, plagiarism), `/admissions/...` (transfer credit, AP/IB, English language), `/examinations/...`, `/fees/...`, `/awards-and-financial-aid/...`. Pattern matches `scrape_faculties.py` — would need one new seeded scraper per section (or a parametrized one).
 - Sidebar can collapse, but there's no proper mobile drawer / hamburger pattern yet — small viewports still get the desktop layout, just narrower.
 - "Clear cache" affordance is only surfaced on the model-load error screen. No general-purpose cache reset button in the running app.
 
@@ -102,9 +104,11 @@ cd pipeline && uv run chunk_and_embed.py     # generates web/public/data/{chunks
 # Day-to-day:
 cd web      && npm run dev                    # local dev server (http://localhost:5173/UBCLLM/)
 cd web      && npm run build                  # static build → web/dist/
-cd scraper  && uv run scrape_courses.py       # full crawl, ~10 min at 1 req/s
-cd scraper  && uv run scrape_programs.py      # full crawl, ~13 min (depth 4, max 800)
+cd scraper  && uv run scrape_courses.py            # full crawl, ~10 min at 1 req/s
+cd scraper  && uv run scrape_faculties.py          # shallow hubs (depth 2, cap 300), ~3-5 min
+cd scraper  && uv run scrape_degree_programs.py    # all degree subtrees (BA/MSc/PhD/cert), ~30-60 min cold
 cd scraper  && uv run scrape_courses.py --subject CPSC --limit 1   # debug
+cd scraper  && uv run scrape_degree_programs.py --only "Master of"  # one level, debug
 
 python -m http.server 8000 --directory smoke-test   # WebGPU smoke test page
 

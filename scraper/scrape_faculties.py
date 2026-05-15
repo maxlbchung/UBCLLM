@@ -1,21 +1,21 @@
-"""Crawl UBC Vancouver faculty / program calendar pages into JSON.
+"""Crawl UBC Vancouver faculty / school / department hub pages.
 
-The root index lives at:
-    https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools
+This scraper owns the *navigation* layer of the calendar: every page that
+lives directly under ``/faculties-colleges-and-schools/`` and is a faculty
+overview, school overview, or departmental hub — the kind of page that
+answers "tell me about the Faculty of Science" or "what is the Sauder
+School of Business." Pages that look like a specific degree (Bachelor of …,
+Master of …, Doctor of …, certificate, diploma) are explicitly filtered
+out — those are owned by ``scrape_degree_programs.py`` and would otherwise
+duplicate content with thinner metadata.
 
-Faculty pages are mostly navigation; the leaf pages (degree requirements,
-admission, etc.) carry the text we want. Internal table-of-contents entries
-often link via opaque /node/N IDs that redirect to canonical paths under
-/faculties-colleges-and-schools/, so we follow both forms.
-
-Output: scraper/output/programs.json — one record per page, with title,
-breadcrumb trail, and plain-text body.
+Output: scraper/output/faculties.json — one record per page.
 
 Usage:
-    uv run scrape_programs.py                # default depth 4, cap 800 pages
-    uv run scrape_programs.py --depth 2
-    uv run scrape_programs.py --max-pages 50 # debug
-    uv run scrape_programs.py --refresh
+    uv run scrape_faculties.py                # default depth 2, cap 300 pages
+    uv run scrape_faculties.py --depth 3
+    uv run scrape_faculties.py --max-pages 50 # debug
+    uv run scrape_faculties.py --refresh
 """
 from __future__ import annotations
 
@@ -40,7 +40,7 @@ from common import (
 )
 
 ROOT_URL = f"{BASE_URL}/faculties-colleges-and-schools"
-OUTPUT_FILE = OUTPUT_DIR / "programs.json"
+OUTPUT_FILE = OUTPUT_DIR / "faculties.json"
 
 ALLOWED_PATH_PREFIXES = ("/faculties-colleges-and-schools",)
 NODE_PATH_RE = re.compile(r"^/node/\d+/?$")
@@ -59,15 +59,53 @@ STRIP_SELECTORS = (
     "[role=navigation]",
 )
 
+# Title patterns / slug prefixes that mark a page as a degree root, which
+# means it belongs to scrape_degree_programs.py — we drop it here so the
+# two outputs don't overlap.
+DEGREE_TITLE_RE = re.compile(
+    r"^("
+    r"Bachelor of\b|UBC Bachelor of\b|"
+    r"Master of\b|UBC Master of\b|"
+    r"Doctor of\b|"
+    r"(?:Graduate|Undergraduate) Certificate\b|"
+    r"Certificate in\b|Diploma in\b|"
+    r"B\.[A-Z]+(?:\.[A-Z]+)*\.|"
+    r"M\.[A-Z]+(?:\.[A-Z]+)*\.|"
+    r"Ph\.?\s?D\.?|"
+    r"MBA\b|MFA\b|MEd\b|MEng\b|MASc\b|MSc\b|MA\b"
+    r")",
+    re.IGNORECASE,
+)
+DEGREE_SLUG_PREFIXES = (
+    "bachelor-", "basc-", "bsc-", "bsf-", "bils-", "b-i-l-s", "buf-", "b-u-f",
+    "master-", "masters-", "mba-", "mfa-", "med-", "meng-", "masc-",
+    "ma-", "msc-", "m-arch", "m-ed", "m-eng", "m-sc", "m-a",
+    "doctor-", "doctoral-", "phd-", "ph-d", "d-m-a",
+    "graduate-certificate-", "undergraduate-certificate-",
+    "certificate-", "diploma-",
+)
+
+# Hub-page classification. Order matters: most specific first.
+HUB_RULES: list[tuple[re.Pattern[str], str]] = [
+    (re.compile(r"^the faculty of\b", re.IGNORECASE), "faculty_overview"),
+    (re.compile(r"^faculty of\b", re.IGNORECASE), "faculty_overview"),
+    (re.compile(r"\bschool of\b", re.IGNORECASE), "school_overview"),
+    (re.compile(r"\bdepartment of\b|department$", re.IGNORECASE), "department"),
+    (re.compile(r"\bcollege of\b", re.IGNORECASE), "college_overview"),
+    (re.compile(r"\bcent(er|re) for\b|institute of\b|institute for\b", re.IGNORECASE), "research_centre"),
+    (re.compile(r"\bvantage\b", re.IGNORECASE), "vantage"),
+]
+
 
 @dataclass
-class ProgramPage:
+class FacultyPage:
     url: str
     title: str
     breadcrumbs: list[str]
     headings: list[str]
     text: str
     depth: int
+    kind: str
     discovered_from: str | None = None
     children: list[str] = field(default_factory=list)
 
@@ -94,6 +132,24 @@ def normalize(url: str) -> str:
     netloc = p.netloc or urlparse(BASE_URL).netloc
     path = p.path.rstrip("/") or "/"
     return f"{p.scheme or 'https'}://{netloc}{path}"
+
+
+def looks_like_degree(url: str, title: str) -> bool:
+    slug = urlparse(url).path.rsplit("/", 1)[-1].lower()
+    if any(slug.startswith(pre) for pre in DEGREE_SLUG_PREFIXES):
+        return True
+    if title and DEGREE_TITLE_RE.match(title):
+        return True
+    return False
+
+
+def classify_hub(title: str) -> str:
+    if not title:
+        return "other"
+    for pat, kind in HUB_RULES:
+        if pat.search(title):
+            return kind
+    return "other"
 
 
 # ---------- Content extraction ----------
@@ -188,14 +244,17 @@ async def crawl(
     max_pages: int,
     refresh: bool,
     rate: float,
-) -> list[ProgramPage]:
+) -> list[FacultyPage]:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    pages: dict[str, ProgramPage] = {}
+    pages: dict[str, FacultyPage] = {}
+    skipped_degree = 0
 
     async with make_async_client() as raw_client:
         client = RateLimitedClient(raw_client, min_interval=rate)
 
-        queue: deque[tuple[str, int, str | None]] = deque([(normalize(start), 0, None)])
+        queue: deque[tuple[str, int, str | None]] = deque(
+            [(normalize(start), 0, None)]
+        )
         visited: set[str] = set()
 
         while queue and len(pages) < max_pages:
@@ -212,31 +271,44 @@ async def crawl(
 
             tree = HTMLParser(html)
             cano = canonical_url(tree, url)
-            # Treat canonical and crawl URL as the same page, but key by canonical.
             if cano != url:
                 visited.add(cano)
             if cano in pages:
                 continue
 
             title = extract_title(tree)
+
+            # Drop degree-looking pages — they belong to scrape_degree_programs.py.
+            # We still want to walk through them at shallow depths so we can reach
+            # sibling hub pages, but we don't keep them in the output.
+            if looks_like_degree(cano, title):
+                skipped_degree += 1
+                links = extract_links(tree, cano)
+                if d < depth:
+                    for child in links:
+                        if child not in visited:
+                            queue.append((child, d + 1, cano))
+                continue
+
             breadcrumbs = extract_breadcrumbs(tree)
             text, headings = extract_body(tree)
             links = extract_links(tree, cano)
 
-            page = ProgramPage(
+            page = FacultyPage(
                 url=cano,
                 title=title,
                 breadcrumbs=breadcrumbs,
                 headings=headings,
                 text=text,
                 depth=d,
+                kind=classify_hub(title),
                 discovered_from=parent,
                 children=links,
             )
             pages[cano] = page
             log.info(
-                "[%d/%d depth=%d] %s -> %d links, %d chars",
-                len(pages), max_pages, d, cano, len(links), len(text),
+                "[%d/%d depth=%d kind=%s] %s",
+                len(pages), max_pages, d, page.kind, cano,
             )
 
             if d < depth:
@@ -244,18 +316,28 @@ async def crawl(
                     if child not in visited:
                         queue.append((child, d + 1, cano))
 
+    log.info(
+        "Crawl finished: kept %d hub pages, skipped %d degree-like pages",
+        len(pages),
+        skipped_degree,
+    )
     return list(pages.values())
 
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--start", default=ROOT_URL, help="Seed URL for the crawl")
-    ap.add_argument("--depth", type=int, default=4, help="Maximum BFS depth (default 4)")
+    ap.add_argument(
+        "--depth",
+        type=int,
+        default=2,
+        help="Maximum BFS depth (default 2 — index → faculty hub → department/centre)",
+    )
     ap.add_argument(
         "--max-pages",
         type=int,
-        default=800,
-        help="Hard cap on pages fetched (default 800)",
+        default=300,
+        help="Hard cap on hub pages kept (default 300)",
     )
     ap.add_argument(
         "--refresh",
@@ -286,8 +368,11 @@ def main() -> None:
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     payload = [asdict(p) for p in pages]
-    args.output.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
-    log.info("Wrote %d program pages to %s", len(payload), args.output)
+    args.output.write_text(
+        json.dumps(payload, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    log.info("Wrote %d faculty pages to %s", len(payload), args.output)
 
 
 if __name__ == "__main__":

@@ -3,6 +3,7 @@ import type { ChatCompletionMessageParam } from '@mlc-ai/web-llm'
 import {
   extractCourseCodes,
   getCourseIndex,
+  getSubjectSet,
   topK,
   type Chunk,
 } from '../lib/retrieve'
@@ -194,9 +195,17 @@ export function Chat() {
     }, TOTAL_STREAM_TIMEOUT_MS)
 
     try {
-      const bareSubject = BARE_SUBJECT_RE.test(q)
+      // Shape-match first, then verify the candidate is actually a UBC
+      // subject. Without the membership check, natural 2–4 letter words
+      // ("hi", "no", "yes", "what", "thanks") all pass the regex and
+      // trigger the "user typed only the subject code X" prompt path,
+      // making the model ask which course HI refers to.
+      const bareCandidate = BARE_SUBJECT_RE.test(q)
         ? q.toUpperCase().replace(/_V$/, '')
         : undefined
+      const subjects = bareCandidate ? await getSubjectSet() : null
+      const bareSubject =
+        bareCandidate && subjects?.has(bareCandidate) ? bareCandidate : undefined
 
       let missingCodes: string[] = []
       if (!bareSubject) {

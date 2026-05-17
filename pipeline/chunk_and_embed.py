@@ -75,10 +75,20 @@ def course_chunk(c: dict) -> Chunk:
         parts.append(f"Credits: {c['credits']}")
     if c.get("description"):
         parts.append(c["description"])
-    if c.get("prerequisites"):
-        parts.append(f"Prerequisites: {c['prerequisites']}")
-    if c.get("corequisites"):
-        parts.append(f"Corequisites: {c['corequisites']}")
+    # Emit "Prerequisites: None" / "Corequisites: None" explicitly when
+    # the scraped record has nothing in those fields. The model otherwise
+    # has to infer "no prereqs" from the *absence* of a Prerequisites
+    # line — which a 2B model can't reliably do, especially when Mode A
+    # Pass 2 sweeps in downstream courses that DO have prereq lines
+    # mentioning the asked code (the PHIL 222 case: PHIL 220, 320, 321,
+    # … all list "Prerequisites: …" with PHIL 222 in them, and the model
+    # fact-bleeds those onto PHIL 222 itself). A direct "Prerequisites:
+    # None" line on the asked-course chunk gives the model an explicit
+    # statement to cite. Equivalency / Recommended stay absence-as-empty
+    # because their omission is more ambiguous (could be unset, could be
+    # not-applicable).
+    parts.append(f"Prerequisites: {c['prerequisites']}" if c.get("prerequisites") else "Prerequisites: None")
+    parts.append(f"Corequisites: {c['corequisites']}" if c.get("corequisites") else "Corequisites: None")
     if c.get("equivalency"):
         parts.append(f"Equivalency: {c['equivalency']}")
     if c.get("recommended"):

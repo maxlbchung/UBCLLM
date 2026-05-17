@@ -285,12 +285,24 @@ export async function topK(
   // applied a +2 score boost to the Pass 1 chunks, but that boost only
   // affected the displayed score: Pass 1 already includes asked courses
   // unconditionally and Pass 2 doesn't see the boost, so removing it makes
-  // the displayed score honestly reflect cosine similarity. The
-  // `requested.has(c.code)` check stays canonical-only — extractCourseCodes
-  // ("CPS 110") yields "CPS 110" which isn't a real chunk code, so partial
-  // subject typos can't hijack inclusion. "hi" extracts nothing (regex
-  // needs both letters and digits).
-  const requested = new Set(extractCourseCodes(query))
+  // the displayed score honestly reflect cosine similarity.
+  //
+  // `requested` is filtered against the canonical course set so Mode A
+  // only fires for codes that actually exist in the corpus. A query
+  // like "FAKE 999" still extracts a code-shaped token, but with no
+  // matching `c.code` in the corpus, Mode A would walk both passes and
+  // return [] — sending the user into noSources mode. Filtering up-front
+  // means non-existent codes fall through to Mode B/C, where the
+  // semantic search has a chance to surface adjacent real content, and
+  // Chat.tsx's missingCodes Note still flags the bogus code to the
+  // model for the no-info disclaimer.
+  const validCodes = new Set<string>()
+  for (const c of chunks) {
+    if (c.kind === 'course' && c.code) validCodes.add(c.code)
+  }
+  const requested = new Set(
+    extractCourseCodes(query).filter((code) => validCodes.has(code)),
+  )
 
   // Program / easter boost: pure-semantic ranking buries the umbrella
   // program / faculty / school overview chunk under individual courses
@@ -569,6 +581,30 @@ export function getCourseIndex(): Promise<Map<string, Chunk>> {
   return courseIndexPromise
 }
 
+let subjectSetPromise: Promise<Set<string>> | null = null
+
+/**
+ * Set of canonical subject codes ("CPSC", "MATH", "ASTR", …) derived
+ * from the course index. Used to gate the bare-subject branch in
+ * Chat.tsx — without this check the BARE_SUBJECT_RE shape match
+ * triggers on natural English words ("hi", "no", "yes", "what") and
+ * sends them down the "user typed only the subject code X" prompt
+ * path, where the model dutifully asks which course they refer to.
+ */
+export function getSubjectSet(): Promise<Set<string>> {
+  if (!subjectSetPromise) {
+    subjectSetPromise = getCourseIndex().then((index) => {
+      const subjects = new Set<string>()
+      for (const code of index.keys()) {
+        const subject = code.split(' ')[0]
+        if (subject) subjects.add(subject)
+      }
+      return subjects
+    })
+  }
+  return subjectSetPromise
+}
+
 export interface ParsedCourse {
   code: string
   title: string
@@ -640,7 +676,13 @@ export function extractCourseCodes(text: string | undefined): string[] {
   if (!text) return []
   const seen = new Set<string>()
   const out: string[] = []
-  for (const m of text.matchAll(/\b([A-Z]{3,5})(?:_V)?\s*(\d{2,4}[A-Z]?)\b/gi)) {
+  // UBC subject codes are 2–4 letters (AI, BA, ASL, CPSC, …) and course
+  // numbers are always 3 digits + an optional trailing letter (e.g.
+  // STAT 447B). The earlier {3,5} / {2,4} bounds were stale on both
+  // ends — dropping the legit 2-letter codes (AI, BA) and accepting
+  // garbage on the loose side. See BARE_SUBJECT_RE in Chat.tsx for the
+  // matching subject-length audit.
+  for (const m of text.matchAll(/\b([A-Z]{2,4})(?:_V)?\s*(\d{3}[A-Z]?)\b/gi)) {
     const code = `${m[1].toUpperCase()} ${m[2].toUpperCase()}`
     if (!seen.has(code)) {
       seen.add(code)

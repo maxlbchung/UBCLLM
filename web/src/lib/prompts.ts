@@ -13,10 +13,19 @@ import type { Chunk } from './retrieve'
 // actually count as it writes, and the stop-when-done line discourages
 // the "let me also mention…" tail it otherwise loves to attach.
 //
-// `/no_think` is a Qwen3 / Qwen3.5 chat-template directive that disables
-// the model's reasoning mode (otherwise it emits a <think>...</think>
-// block before the answer, which wastes the word budget and surfaces
-// half-formed reasoning to the user).
+// Reasoning-mode suppression: BOTH `/no_think` here AND
+// `extra_body.enable_thinking: false` in lib/llm.ts are on. They
+// aren't equivalent: the chat-template flag inserts an empty
+// `<think></think>` so the model skips the reasoning block
+// structurally, but only the in-prompt directive tells the model
+// holistically "be direct, don't ramble" — that token-level
+// conditioning leans on Qwen3.5's training and noticeably improves
+// answer quality on the small 2B tier. Dropping `/no_think` and
+// keeping only the API flag empirically degrades replies (mid-stream
+// drift, occasional half-coherent generation when the model treats
+// the empty `<think></think>` as an out-of-distribution prefill).
+// Keep both unless you've verified the model behaves the same
+// without one.
 const SYSTEM_PROMPT_BASE = `You are a UBC Vancouver academic advisor. Answer questions about UBC Vancouver courses and programs using only the sources provided in the user's message. /no_think`
 
 // Rules block for the default RAG path. Lives in the system prompt (not the

@@ -38,3 +38,6 @@ Thumbs.db
 
 # Claude Code local workspace
 .claude/
+
+# Local scratch / personal notes
+random.txt

@@ -110,7 +110,12 @@ export function Home() {
           className="flex flex-col items-start gap-2 rounded-lg border border-line bg-surface-soft hover:bg-surface-raised hover:border-line-soft p-5 text-left transition-colors"
         >
           <span className="text-2xl" aria-hidden>💬</span>
-          <span className="text-sm font-semibold">Start chatting</span>
+          <span className="flex items-center gap-2 text-sm font-semibold">
+            Start chatting
+            <span className="text-[0.5625rem] uppercase tracking-wider text-highlight font-mono px-1.5 py-0.5 rounded border border-highlight/40">
+              BETA
+            </span>
+          </span>
           <span className="text-xs text-fg-muted leading-relaxed">
             Ask about UBC courses, programs, and prerequisites. Answers
             cite the calendar entries used.

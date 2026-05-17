@@ -41,6 +41,15 @@ import { playSfx } from '../lib/sfx'
 const LONGEST_TREE_ROOT_CODE = 'FNH 483'
 const LONGEST_TREE_DEPTH_COLUMN = 14
 
+// Matches the bare "none" placeholder the chunker writes when prereqs /
+// coreqs are absent (see `parsePrereq` for the parser-side counterpart).
+// Used by the "no prerequisites or corequisites listed" footer message so
+// it fires for both literally-empty values and the explicit "None" marker.
+function isNoneOrEmpty(value: string | undefined): boolean {
+  if (!value) return true
+  return /^\s*none\s*\.?\s*$/i.test(value)
+}
+
 function normalize(query: string): string {
   const m = query.toUpperCase().match(/^([A-Z]{2,5})(?:_V)?\s*(\d{2,4}[A-Z]?)$/)
   if (!m) return query.toUpperCase().replace(/\s+/g, ' ').trim()
@@ -1496,7 +1505,7 @@ export function PrereqTree() {
         )}
       </div>
 
-      {root && !root.prerequisites && !root.corequisites && (
+      {root && isNoneOrEmpty(root.prerequisites) && isNoneOrEmpty(root.corequisites) && (
         <p className="text-sm text-fg-muted">
           {root.code} has no prerequisites or corequisites listed in the calendar.
         </p>

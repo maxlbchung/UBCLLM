@@ -208,7 +208,12 @@ export function Sidebar() {
               }
             >
               <span aria-hidden>{t.icon}</span>
-              {t.label}
+              <span>{t.label}</span>
+              {t.view === 'chat' && (
+                <span className="ml-auto text-[0.5625rem] uppercase tracking-wider text-highlight font-mono">
+                  BETA
+                </span>
+              )}
             </button>
           ))}
         </div>

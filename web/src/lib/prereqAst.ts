@@ -1218,6 +1218,12 @@ function parseClause(raw: string): Expr | null {
  */
 export function parsePrereq(raw: string | null | undefined): Expr | null {
   if (!raw) return null
+  // Bare "none" is the chunker's placeholder for an absent prereq/coreq
+  // string (`chunk_and_embed.py` emits "Prerequisites: None" so the LLM
+  // sees the explicit signal). For the prereq tree it means "nothing to
+  // render" — without this short-circuit it would parse to a literal
+  // info block that just says "None".
+  if (/^\s*none\s*\.?\s*$/i.test(raw)) return null
   const noNoise = stripTrailingNoise(raw.trim())
   const { hard, soft } = splitRecommended(noNoise)
   const hardExpr = hard ? parseClause(hard) : null

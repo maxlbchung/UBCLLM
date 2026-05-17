@@ -1,0 +1,314 @@
+Mid-tier (3-4B) prefill hang on WebGPU — UBCLLM
+================================================
+
+Reference for the v1.9.4–v1.10.2 investigation into why every
+~3-4B-parameter WebLLM model deterministically hangs the GPU on
+RAG-length prefill on the dev hardware (modern NVIDIA, Chrome
+stable, Windows D3D12). Mid tier is gated off as of v1.10.2; this
+doc is the source of truth for any future re-enable attempt.
+
+
+────────────────────────────────────────────
+TL;DR
+────────────────────────────────────────────
+
+Bigger-than-2B models do too much work in a single prefill
+dispatch for this user's Chrome+Dawn+D3D12+NVIDIA stack to
+complete, so Windows TDR (or a kernel-level deadlock that LOOKS
+like TDR) kills the device. Failure is independent of model
+family, quantization, and architecture — it correlates only with
+per-dispatch FLOPs. Same failure class WebLLM upstream documents
+as "use a smaller model" (issues #209, #647). No JS-side fix is
+available. Mid tier (4B / 9B) is hidden from the picker.
+
+
+────────────────────────────────────────────
+SYMPTOM
+────────────────────────────────────────────
+
+`stream-start` fires, no deltas arrive, ~4-5 s later `device.lost`
+resolves and every pending mapAsync rejects with:
+
+  AbortError: Failed to execute 'mapAsync' on 'GPUBuffer':
+  Buffer was unmapped before mapping was resolved.
+
+Underlying device-lost detail (captured by the diag bridge in
+web/src/lib/llm.worker.ts):
+
+  ID3D12Device::GetDeviceRemovedReason failed with
+  DXGI_ERROR_DEVICE_HUNG (0x887A0006)
+   - While handling unexpected error type Internal when allowed
+     errors are (Validation|DeviceLost).
+
+DXGI_ERROR_DEVICE_HUNG is Windows D3D12's "watchdog tripped" code.
+Default TdrDelay is 2 s; the 4-5 s observed lag is the time for
+the device-loss event to propagate from the GPU process back
+through Chrome and Dawn to our worker.
+
+
+────────────────────────────────────────────
+TESTED MODEL SWAPS — ALL FAILED IDENTICALLY
+────────────────────────────────────────────
+
+  Model                       Quant     Outcome   Eliminated
+  --------------------------  -------   -------   ------------------
+  Qwen3.5-2B                  q4f16_1   works     (baseline)
+  Qwen3.5-4B                  q4f16_1   hangs     first to fail
+  Qwen3.5-4B                  q4f32_1   hangs     fp16 shader path
+  Qwen3-4B                    q4f16_1   hangs     Qwen3.5 hybrid GDN
+  Llama-3.2-3B-Instruct       q4f16_1   hangs     Qwen family; 4B-only
+
+By the elimination chain, ruled OUT as causes:
+  - fp16 vs f32 compute dtype
+  - Qwen3.5's hybrid Gated DeltaNet + linear attention shaders
+  - Qwen family / tokenizer
+  - 4B parameter count specifically (3B fails too)
+  - prefill_chunk_size differences (all four ship cs1k wasms)
+  - VRAM exhaustion in absolute terms (Llama-3.2-3B is ~2.3 GB,
+    similar to the working 2B at ~1.2 GB; user's NVIDIA has
+    plenty of headroom)
+
+
+────────────────────────────────────────────
+THE DISCRIMINATOR: PER-DISPATCH FLOPS
+────────────────────────────────────────────
+
+Per-chunk forward-pass FLOPs at N=1024 (one prefill dispatch):
+
+  Model               Layers   per-chunk FLOPs    Result
+  ------------------- ------   ---------------    ------
+  Qwen3.5-2B            24        ~412 GFLOPs     works
+  Llama-3.2-3B          28        ~840 GFLOPs     hangs
+  Qwen3-4B              36      ~1,080 GFLOPs     hangs
+
+Everything ≥ ~2× 2B's per-dispatch FLOPs fails. The exact mechanism
+on this stack is opaque from outside Chrome/Dawn/WebLLM internals
+(real >2 s compute vs kernel deadlock vs driver path bug all
+surface as the same DXGI_ERROR_DEVICE_HUNG). Matches the upstream
+"device lost, use a smaller model" pattern in WebLLM issues #209
+and #647.
+
+Note: the prefill chunks aren't padded. Actual per-dispatch
+compute scales with the live token count of the chunk, capped by
+prefill_chunk_size. So the comparison is fair — same N=1024, same
+chunking scheme, just different per-layer compute weights.
+
+
+────────────────────────────────────────────
+WEBLLM INTERNALS LEARNED — WHICH KNOBS WORK
+────────────────────────────────────────────
+
+WebLLM @ 0.2.83 paths verified in
+node_modules/@mlc-ai/web-llm/lib/index.js:
+
+prefill_chunk_size
+  Read from the WASM `_metadata` function at line 9654:
+    `this.prefillChunkSize = metadata.prefill_chunk_size`
+  BAKED INTO THE COMPILED WASM. JSON config, ModelRecord.overrides,
+  and chatOpts are ALL ignored for this field. Cannot push smaller
+  chunks without recompiling the wasm via MLC toolchain.
+
+  Every ~3-4B-class WebLLM model we tested ships a `cs1k` wasm
+  variant (prefill_chunk_size = 1024).
+
+context_window_size
+  Merged from chatOpts at line 12129:
+    `Object.assign({}, jsonConfig, modelRecord.overrides, chatOpts)`
+  Used at line 9661 to size the KV cache:
+    `this.contextWindowSize = config.contextWindowSize`
+  Overridable up to the model's native max.
+
+WebLLM's prebuilt config sets Qwen3.5-2B's
+  overrides.context_window_size = 4096
+Qwen3.5-2B's native context is 262,144.
+
+
+────────────────────────────────────────────
+HARD CAPS FOR 2B (THE WORKING TIER)
+────────────────────────────────────────────
+
+In order of which one binds first, smallest first:
+
+  1. WebLLM `context_window_size: 4096` override
+     → 4 full chunks. Overridable via chatOpts (knob #2 above).
+     CURRENTLY THE BINDING CAP.
+
+  2. Model native context: 262,144 tokens / 256 chunks
+     → architectural cap.
+
+  3. WebGPU maxStorageBufferBindingSize: 2 GB per single buffer
+     → never binds for 2B (per-layer KV buffer ~13 MB / 1k tokens;
+       even at 262k native max, one layer = ~350 MB).
+
+  4. TDR at default 2 s: ~400 chunks of accumulated context
+     before the N-th chunk's attention work exceeds the
+     watchdog. Never binds for 2B at any realistic size.
+
+  5. GPU VRAM: ~32 KB/token KV cache + ~1.2 GB weights + buffers
+     → ~250k tokens with 8 GB free in Chrome's GPU process.
+       Device-dependent.
+
+
+────────────────────────────────────────────
+OUR CODEBASE CAPS (THE LEVERS WE CONTROL)
+────────────────────────────────────────────
+
+  MAX_INPUT_LENGTH               500 chars   Chat.tsx:37
+  SOURCE_TOKEN_BUDGET['2b']      1,100 tk    retrieve.ts:113
+  MAX_CHUNKS['2b']               12 chunks   retrieve.ts:118
+  HARD_WORD_CAP                  300 words   llm.ts:410
+  STREAM_INACTIVITY_TIMEOUT_MS   60 s        llm.ts:439
+  TOTAL_STREAM_TIMEOUT_MS        5 min       Chat.tsx:48
+  THINK_PREFIX_BUFFER_MAX        5,000 ch    llm.ts:435
+
+Worst-case prefill today (2B):
+
+  system prompt (rules + base)    ~  350 tokens
+  + sources (capped at 1100)       ≤ 1,100
+  + question wrapper               ~   30
+  + user query (500-char cap)      ≤  125
+  + conv template framing          ~   15
+  ────────────────────────────────────────────
+  TOTAL                           ≤ ~1,620 tokens ≈ 1.6 chunks
+
+Headroom under WebLLM's 4096 override: ~2,400 tokens of slack.
+Practical upside without touching any override: bump
+SOURCE_TOKEN_BUDGET['2b'] from 1100 → ~3000. Past ~3000 source
+tokens we need to also pass chatOpts.context_window_size > 4096
+when constructing the engine.
+
+
+────────────────────────────────────────────
+WHAT'S SHIPPED (v1.10.2)
+────────────────────────────────────────────
+
+  - MODEL_OPTIONS (Chat.tsx) exposes only the 2B tier
+  - Persistence schema bumped to v5; persisted '4b' / '9b' / '8b'
+    all coerce to '2b' on rehydration (settings.ts migrate hook)
+  - MODEL_MATCHERS retains 4B / 9B entries pointing at
+    Qwen3.5-4B / Qwen3.5-9B so re-enabling either is a one-line
+    add to MODEL_OPTIONS
+  - modelLabel() returns `Qwen3.5 ${SIZE}` for all tiers
+  - retrieve.ts retains SOURCE_TOKEN_BUDGET / MAX_CHUNKS entries
+    for 4B and 9B as dead-but-not-deleted code; harmless until
+    one of those tiers is re-enabled
+
+
+────────────────────────────────────────────
+RE-ENABLING PATHS (IF / WHEN WE TRY AGAIN)
+────────────────────────────────────────────
+
+1. CHEAP DIAGNOSTIC FIRST: raise TDR via Windows registry.
+
+   HKLM\System\CurrentControlSet\Control\GraphicsDrivers
+     TdrDelay     (DWORD) = 10   (seconds; default 2)
+     TdrDdiDelay  (DWORD) = 10
+
+   Reboot, then unhide a mid-tier option in MODEL_OPTIONS and
+   test the standard RAG question.
+
+     Tokens stream cleanly  → compute IS the bottleneck. The
+                              custom-wasm path below is real.
+     Same ~5 s hang        → kernel is genuinely stuck. TDR
+                              raise doesn't help; gate stays.
+     Hang at ~12 s         → compute is over budget but
+                              extendable. Custom wasm still
+                              viable, target per-dispatch
+                              ≤ 2B's working ~412 GFLOPs.
+
+   This test is one registry edit + reboot, definitive, and
+   should always be step 1 before any toolchain work.
+
+2. CUSTOM-COMPILED SMALLER-CHUNK WASM (real fix, ~half day work).
+
+   Use mlc-llm tooling to recompile the target model with a
+   smaller prefill_chunk_size so each dispatch's per-chunk work
+   matches what 2B successfully streams:
+
+     mlc_llm convert_weight <hf-model> --quantization q4f16_1 -o dist/
+     mlc_llm gen_config <hf-model> --quantization q4f16_1 \
+       --conv-template <template> --prefill-chunk-size 256 -o dist/
+     mlc_llm compile dist/mlc-chat-config.json --device webgpu \
+       -o dist/<model>_cs256-webgpu.wasm
+
+   Host the compiled wasm + quantized weights under our own HF
+   org or static-asset bucket. Add a custom appConfig.model_list
+   entry pointing at the URL when constructing the engine
+   (CreateWebWorkerMLCEngine accepts a custom appConfig).
+
+   Target: per-dispatch FLOPs ≤ ~412 G (2B's known-working
+   budget). Rough chunk size to hit that target:
+     - 3B-class model:  prefill_chunk_size ~512
+     - 4B-class model:  prefill_chunk_size ~256
+   Will need empirical tuning.
+
+3. WAIT FOR UPSTREAM.
+
+   WebLLM is actively iterating on kernels (issue #807 is a
+   recent crash bug on Qwen3-0.6B; the team is responsive).
+   A future version may land a fix for the mid-tier hang.
+   Recheck cadence: bump @mlc-ai/web-llm minor versions and
+   re-test with a temporary unhide of the mid tier.
+
+
+────────────────────────────────────────────
+UPSTREAM POINTERS
+────────────────────────────────────────────
+
+WebLLM issue #209 — maxStorageBufferBindingSize on Android.
+  Same failure class on a memory-constrained platform.
+  Maintainers' fix: ship -1k context variants (smaller KV cache).
+  https://github.com/mlc-ai/web-llm/issues/209
+
+WebLLM issue #647 — Llama 3.1 device-lost during reload.
+  Maintainer reply: insufficient memory / GPU constraints.
+  https://github.com/mlc-ai/web-llm/issues/647
+
+WebLLM issue #489 — DXGI_ERROR_DEVICE_HUNG on Intel UHD 630.
+  Different platform (integrated GPU), fix was "update GPU
+  driver". Our user's NVIDIA driver is already current.
+  https://github.com/mlc-ai/web-llm/issues/489
+
+WebLLM issue #778 — Qwen3.5 model request (gated-deltanet + MoE).
+  Confirms the architectural details we used to rule out the
+  hybrid-attention-bug theory after Qwen3-4B failed identically.
+  https://github.com/mlc-ai/web-llm/issues/778
+
+
+────────────────────────────────────────────
+LESSONS
+────────────────────────────────────────────
+
+1. "Buffer was unmapped" has had FOUR distinct upstream causes
+   in this codebase. See docs/llm-error-log.txt for the first
+   three (race, long-idle device-loss, oversized-prefill TDR);
+   this doc is the fourth (per-dispatch FLOPs ceiling at
+   mid-tier scale). The error string alone is not diagnostic;
+   always read the device-lost detail from the diag ring before
+   theorizing.
+
+2. The worker-side GPU diag bridge (llm.worker.ts → main via
+   BroadcastChannel) is the only signal that disambiguates an
+   OOM-class device-lost from a TDR-class device-lost from a
+   stale-engine teardown. Keep it on.
+
+3. Model architecture / family / quantization were NOT the
+   discriminators for this failure class. Per-dispatch GPU work
+   was. The investigation burned hours on shader-bug and
+   hybrid-attention theories before checking compute volume
+   against the working baseline. Next time: compare
+   per-dispatch FLOPs to the working tier first.
+
+4. WebLLM's prefill_chunk_size is wasm-baked and ignores the
+   JSON config / overrides / chatOpts path. context_window_size
+   IS overridable. Knowing which knob is which saves a half day
+   of doomed prompt-shrinking experiments.
+
+5. Powerful hardware doesn't change the picture. The constraint
+   lives in Chrome's WebGPU implementation, not the GPU.
+   "use a smaller model" from WebLLM maintainers is the genuine
+   workaround, not a deflection.
+
+6. When the user pushes back on a theory ("that's not it, my
+   GPU is powerful"), update priors fast. Don't keep selling
+   a hypothesis past the point where the data disagrees.

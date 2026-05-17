@@ -79,8 +79,9 @@
   /* blue-500/30 */
   --accent-soft-fg: #bfdbfe;
   /* blue-200 */
-  --link: var(--accent);
-  /* inline links share the accent color */
+  --link: var(--accent-hover);
+  /* dark theme: links use the brighter blue-500 (the New chat button's
+     hover shade) so they read distinctly against the canvas */
   --highlight: #fbbf24;
   /* amber-400 */
   --highlight-fg: #fcd34d;
@@ -436,6 +437,24 @@ body {
   30% {
     opacity: 1;
     transform: translateY(-0.2rem);
+  }
+}
+
+/* Easter-egg toast entrance — slide up from below the resting position
+   while fading in. The toast itself carries an inline
+   `transform: translateX(-50%)` for horizontal centering, so the
+   keyframes bake the same value in to avoid clobbering it. Used by
+   EasterEggToast.tsx; the fade-OUT is driven by an opacity transition
+   on the React component, not by this animation. */
+@keyframes egg-toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
   }
 }
 

@@ -2,12 +2,25 @@ import type { ComponentPropsWithoutRef, ReactNode } from 'react'
 import { Children } from 'react'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import type { Message } from '../store/chat'
+import type { Message, StopReason } from '../store/chat'
 import type { Chunk } from '../lib/retrieve'
 import { playSfx } from '../lib/sfx'
 import { ErrorDetails } from './ErrorDetails'
 
 const CITATION_RE = /\[(\d+)\]/g
+
+// Pulls the "Section: …" line out of a chunk's text body. The pipeline's
+// degree_program_chunks / program_chunks emit this line as part of each
+// chunk's prefix (e.g. "Section: Major: Data Science (DSCI) >
+// Specialization Requirements"); without surfacing it in the UI, every
+// slice of one program page renders with the same title ("Data Science")
+// and you can't tell major-tagged chunks from minor-tagged chunks at a
+// glance. Returns null for chunks that don't carry a section line —
+// course chunks, easters, and the intro slice of any program page.
+function chunkSectionLabel(s: Chunk): string | null {
+  const m = s.text.match(/^Section:\s*(.+)$/m)
+  return m ? m[1].trim() : null
+}
 
 const ICON_CLASS =
   'shrink-0 w-6 h-6 mt-1 text-fg-faint [&>svg]:w-full [&>svg]:h-full'
@@ -260,6 +273,27 @@ function buildComponents(sources: Chunk[]): Components {
   }
 }
 
+// Short italic line appended to a stopped assistant reply, in the
+// model's own voice. Folded into the markdown content (rather than
+// rendered as a separate banner) so it reads as part of the response.
+// Errors take a different path — ErrorDetails handles those — so this
+// only covers clean stops where there's no error.message to surface.
+const STOP_NOTE: Record<StopReason, string> = {
+  user: 'Response stopped by user.',
+  timeout: 'Response stopped — took too long.',
+  word_cap: 'Response stopped at length limit.',
+  // Generic uncategorized failure. The full ChatError block beneath the
+  // message bubble already carries the technical details; this line is
+  // just the inline summary so the reply doesn't look truncated.
+  error: 'Response stopped due to an error.',
+}
+
+function withStopNote(content: string, reason: StopReason | undefined): string {
+  if (!reason) return content
+  const note = `_${STOP_NOTE[reason]}_`
+  return content ? `${content}\n\n${note}` : note
+}
+
 export function ChatMessage({ message }: { message: Message }) {
   const isUser = message.role === 'user'
   const sources = message.sources ?? []
@@ -271,6 +305,13 @@ export function ChatMessage({ message }: { message: Message }) {
   const uncited = sources
     .map((s, i) => ({ s, i: i + 1 }))
     .filter(({ i }) => !cited.has(i))
+
+  // User turns never carry a stopReason; this collapses to the raw
+  // content for them. For assistant turns the note (if any) lands as
+  // the trailing markdown paragraph.
+  const displayContent = isUser
+    ? message.content
+    : withStopNote(message.content, message.stopReason)
 
   return (
     <div
@@ -287,23 +328,22 @@ export function ChatMessage({ message }: { message: Message }) {
             : 'bg-surface-raised text-fg border border-line-soft')
         }
       >
-        {message.content ? (
+        {displayContent ? (
           isUser ? (
-            message.content
+            displayContent
           ) : (
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               components={buildComponents(sources)}
             >
-              {message.content}
+              {displayContent}
             </ReactMarkdown>
           )
         ) : (
           !isUser &&
-          // Suppress the thinking-dots animation once an error/timeout
-          // lands on this message — the streamed delta will never arrive,
-          // and a bouncing indicator next to a "Sources retrieved" + error
-          // block reads as if the model is still working.
+          // Thinking dots only render for an in-flight turn with no
+          // content and no stop note yet. Errors take over the bubble
+          // via ErrorDetails below.
           !message.error && (
             <span
               className="inline-flex items-center gap-1 text-fg-faint"
@@ -359,27 +399,35 @@ export function ChatMessage({ message }: { message: Message }) {
                     ? 'underline text-highlight-fg hover:text-highlight'
                     : 'underline hover:text-fg text-fg'
                   const label = s.code ?? s.title
+                  const section = chunkSectionLabel(s)
                   return (
                     <li key={s.id} className="flex items-baseline gap-1.5">
                       <span className={indexClass}>[{i}]</span>
-                      {s.url ? (
-                        <a
-                          href={s.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className={labelClass}
-                        >
-                          {label}
-                        </a>
-                      ) : (
-                        <span className={labelClass.replace('underline ', '')}>
-                          {label}
-                        </span>
-                      )}
+                      <div className="flex-1 min-w-0">
+                        {s.url ? (
+                          <a
+                            href={s.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={labelClass}
+                          >
+                            {label}
+                          </a>
+                        ) : (
+                          <span className={labelClass.replace('underline ', '')}>
+                            {label}
+                          </span>
+                        )}
+                        {section && (
+                          <span className="ml-1.5 text-[0.625rem] text-fg-faint italic">
+                            {section}
+                          </span>
+                        )}
+                      </div>
                       {s.score != null && (
                         <span
                           className="ml-auto text-[0.625rem] font-mono text-fg-faint"
-                          title="Retrieval score (cosine similarity, plus optional title-match and course-keyword boosts; pure cosine is in [-1, 1])"
+                          title="Retrieval score (cosine similarity, plus optional +0.5 exact-code-match, +0.25 program-title, +0.25 course-keyword, and +0.1 buddy boosts; pure cosine is in [-1, 1]). Chunks at or above 0.6 render in the LLM's 'Most relevant sources' block; below 0.6 render in 'Additional resources'."
                         >
                           {s.score.toFixed(3)}
                         </span>
@@ -405,27 +453,35 @@ export function ChatMessage({ message }: { message: Message }) {
                       ? 'underline text-highlight-fg/80 hover:text-highlight'
                       : 'underline hover:text-fg-muted'
                     const label = s.code ?? s.title
+                    const section = chunkSectionLabel(s)
                     return (
                       <li key={s.id} className="flex items-baseline gap-1.5">
                         <span className={indexClass}>[{i}]</span>
-                        {s.url ? (
-                          <a
-                            href={s.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className={labelClass}
-                          >
-                            {label}
-                          </a>
-                        ) : (
-                          <span className={labelClass.replace('underline ', '')}>
-                            {label}
-                          </span>
-                        )}
+                        <div className="flex-1 min-w-0">
+                          {s.url ? (
+                            <a
+                              href={s.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={labelClass}
+                            >
+                              {label}
+                            </a>
+                          ) : (
+                            <span className={labelClass.replace('underline ', '')}>
+                              {label}
+                            </span>
+                          )}
+                          {section && (
+                            <span className="ml-1.5 text-[0.625rem] text-fg-faint italic">
+                              {section}
+                            </span>
+                          )}
+                        </div>
                         {s.score != null && (
                           <span
                             className="ml-auto text-[0.625rem] font-mono text-fg-faint"
-                            title="Retrieval score (cosine similarity, plus optional title-match and course-keyword boosts; pure cosine is in [-1, 1])"
+                            title="Retrieval score (cosine similarity, plus optional +0.5 exact-code-match, +0.25 program-title, +0.25 course-keyword, and +0.1 buddy boosts; pure cosine is in [-1, 1]). Chunks at or above 0.6 render in the LLM's 'Most relevant sources' block; below 0.6 render in 'Additional resources'."
                           >
                             {s.score.toFixed(3)}
                           </span>
@@ -445,3 +501,4 @@ export function ChatMessage({ message }: { message: Message }) {
     </div>
   )
 }
+

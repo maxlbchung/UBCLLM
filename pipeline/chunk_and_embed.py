@@ -94,6 +94,40 @@ def course_chunk(c: dict) -> Chunk:
 
 
 _SENTENCE_BOUNDARY_RE = re.compile(r"(?<=[.!?])\s+")
+_HEADING_RE = re.compile(r"^(#{2,4})\s+(.+)$")
+# Umbrella headings act as parent context for the headings that follow.
+# The UBC calendar template uses h4 for everything on degree pages, so a
+# page like Data Science has "Specializations" → "Major: Data Science
+# (DSCI)" → "Learning Outcomes" / "Specialization Requirements" /
+# "Co-op Option" → "Minor in Data Science" → "Lower-Level Requirements"
+# / "Upper-Level Requirements" all rendered as flat h4s. Without an
+# umbrella signal, the chunker would tag the major's "Specialization
+# Requirements" section identically to the minor's "Upper-Level
+# Requirements" section. The pattern below catches the common umbrella
+# shapes: "Specializations", "Major: …", "Minor in …", "Bachelor of …",
+# "Master of …", etc. The most recent umbrella becomes the chunk
+# section path's first entry; the section's own heading is appended
+# after it.
+_UMBRELLA_RE = re.compile(
+    r"^("
+    r"Specializations\s*$|"
+    r"Major\s*[:]|Major\s+in\s|"
+    r"Minor\s*[:]|Minor\s+in\s|"
+    r"Honours\s*[:]|Honours\s+in\s|"
+    r"Combined\s+Major|Dual\s+Degree|"
+    r"Bachelor of\s|Master of\s|Doctor of\s|"
+    r"Certificate in\s|Diploma in\s"
+    r")",
+    re.IGNORECASE,
+)
+# Sections shorter than this stay as a single chunk. Only when a single
+# section's body exceeds this threshold do we bin-pack within it. Set
+# above TARGET_CHARS so a section a bit larger than the typical bin still
+# stays whole (a "Learning Outcomes" list shouldn't be sliced in half just
+# because it overshoots by 200 chars). The old greedy bin-packing crossed
+# section boundaries; the new behaviour respects header structure first
+# and only falls back to bin-packing inside oversized sections.
+SECTION_SPLIT_THRESHOLD = TARGET_CHARS * 2  # 1600 chars
 
 
 def _split_long(text: str, max_chars: int) -> list[str]:
@@ -127,6 +161,115 @@ def _split_long(text: str, max_chars: int) -> list[str]:
     return out
 
 
+def _split_into_sections(text: str) -> list[tuple[list[str], str]]:
+    """Walk heading-marked text and emit `[(heading_path, content)]`.
+
+    Heading markers come from the scrapers' extract_body (`##` h2,
+    `###` h3, `####` h4). Section path is built from:
+      1. The hierarchical heading stack — an h4 keeps the active h2/h3
+         in the path because they're its structural ancestors.
+      2. The most recent "umbrella" heading at the same level (matched
+         against _UMBRELLA_RE). UBC degree pages render "Specializations"
+         / "Major: X" / "Minor in X" as flat h4s alongside their own
+         subsections; without the umbrella signal, the major's
+         "Specialization Requirements" and the minor's "Lower-Level
+         Requirements" would look indistinguishable to MiniLM. We
+         capture the umbrella and prepend it to the path of any
+         subsequent same-level heading.
+    Text before any heading is emitted with an empty path (the intro).
+    """
+    sections: list[tuple[list[str], str]] = []
+    heading_stack: list[tuple[int, str]] = []  # (level, text)
+    umbrella_at_level: dict[int, str] = {}
+    content_lines: list[str] = []
+
+    def current_path() -> list[str]:
+        path = [h[1] for h in heading_stack[:-1]]
+        if heading_stack:
+            level, heading = heading_stack[-1]
+            umb = umbrella_at_level.get(level)
+            if umb and umb != heading and umb not in path:
+                path.append(umb)
+            path.append(heading)
+        return path
+
+    def flush() -> None:
+        body = "\n".join(content_lines).strip()
+        if body:
+            sections.append((current_path(), body))
+        content_lines.clear()
+
+    for line in text.split("\n"):
+        m = _HEADING_RE.match(line)
+        if m:
+            level = len(m.group(1))
+            heading_text = m.group(2).strip()
+            flush()
+            # Pop hierarchical entries at same-or-deeper level. Drop
+            # umbrellas at strictly deeper levels — they've gone out of
+            # scope when their ancestor changes — but keep same-level
+            # umbrellas so an active "Major: X" survives past its own
+            # sibling subsections.
+            while heading_stack and heading_stack[-1][0] >= level:
+                heading_stack.pop()
+            for lvl in list(umbrella_at_level):
+                if lvl > level:
+                    del umbrella_at_level[lvl]
+            heading_stack.append((level, heading_text))
+            if _UMBRELLA_RE.match(heading_text):
+                umbrella_at_level[level] = heading_text
+        else:
+            content_lines.append(line)
+    flush()
+    return sections
+
+
+def _bin_pack(content: str, target_chars: int) -> list[str]:
+    """Greedy bin-pack content into ≤ target_chars bins, splitting any
+    single oversized paragraph on sentence boundaries first. Same shape as
+    the old in-line bin packer in degree_program_chunks; pulled out so it
+    can be reused inside section-aware chunking when a section is too big
+    to keep whole."""
+    paragraphs: list[str] = []
+    for pg in content.split("\n"):
+        pg = pg.strip()
+        if pg:
+            paragraphs.extend(_split_long(pg, target_chars))
+    bins: list[list[str]] = []
+    cur: list[str] = []
+    cur_len = 0
+    for pg in paragraphs:
+        if cur and cur_len + len(pg) > target_chars:
+            bins.append(cur)
+            cur = [pg]
+            cur_len = len(pg)
+        else:
+            cur.append(pg)
+            cur_len += len(pg) + 1
+    if cur:
+        bins.append(cur)
+    return ["\n".join(b) for b in bins]
+
+
+def _section_aware_bodies(text: str) -> list[tuple[str, str]]:
+    """Convert heading-marked text into `[(section_label, body)]` chunks
+    ready for embedding. section_label is `" > ".join(heading_path)` or
+    empty string for the intro. body is kept whole when its length is at
+    or below SECTION_SPLIT_THRESHOLD; oversized sections fall through to
+    the greedy bin-packer with TARGET_CHARS. Repeats the section_label
+    across all bins from one section so MiniLM sees the same section
+    context on every slice."""
+    out: list[tuple[str, str]] = []
+    for path, content in _split_into_sections(text):
+        label = " > ".join(path)
+        if len(content) <= SECTION_SPLIT_THRESHOLD:
+            out.append((label, content))
+            continue
+        for body in _bin_pack(content, TARGET_CHARS):
+            out.append((label, body))
+    return out
+
+
 def easter_chunk(e: dict) -> Chunk:
     """Hand-curated Q&A entry. Embedded text is "title\\n\\nbody" so a query
     that paraphrases the title lands close in MiniLM space and the chunk gets
@@ -150,47 +293,32 @@ def easter_chunk(e: dict) -> Chunk:
 def degree_program_chunks(p: dict) -> list[Chunk]:
     """Chunk one degree-program page (undergraduate, masters, doctoral, cert).
 
-    Same binning as program_chunks, but the chunk prefix carries the
-    program / faculty / level / section metadata so the embedder picks up
-    signals like "Bachelor of Science · The Faculty of Science · Level:
-    undergraduate · Section: degree_requirements" naturally — a query like
-    "what does a B.Sc. require" or "what's the MSc thesis option" lands
-    closer to this kind of chunk than to a navigation page.
+    Chunks are section-aware: the scraper's extract_body emits `##/###/####`
+    markers around each heading on the page, and _section_aware_bodies
+    above slices the body at those markers so each chunk is "one section
+    of one page", not "a greedy paragraph bin that crosses heading
+    boundaries". Each chunk's text is prefixed with the page metadata
+    (program / faculty / level / page-kind / breadcrumb) plus the
+    in-page section path (e.g. "Section: Major: Data Science (DSCI) >
+    Specialization Requirements") so the embedder and the LLM both see
+    which sub-section the chunk came from. This is what lets a query
+    like "data science MAJOR specialization requirements" land closer
+    to the major's section than to the minor's similar-looking content.
 
     Stays kind="program" on the Chunk so the browser's retrieval
-    heuristics (program-title boost in retrieve.ts) keep working
-    unchanged. Distinguished from generic program chunks via the
+    heuristics (program-title boost, buddy boost in retrieve.ts) keep
+    working unchanged. Distinguished from generic program chunks via the
     `degree:` id prefix.
     """
     text = (p.get("text") or "").strip()
     if not text:
         return []
 
-    paragraphs: list[str] = []
-    for pg in text.split("\n"):
-        pg = pg.strip()
-        if pg:
-            paragraphs.extend(_split_long(pg, TARGET_CHARS))
-
-    bins: list[list[str]] = []
-    cur: list[str] = []
-    cur_len = 0
-    for pg in paragraphs:
-        if cur and cur_len + len(pg) > TARGET_CHARS:
-            bins.append(cur)
-            cur = [pg]
-            cur_len = len(pg)
-        else:
-            cur.append(pg)
-            cur_len += len(pg) + 1
-    if cur:
-        bins.append(cur)
-
     title = p.get("title") or ""
     program = p.get("program") or ""
     faculty = p.get("faculty") or ""
     level = p.get("level") or ""
-    kind = p.get("kind") or ""
+    page_kind = p.get("kind") or ""
     breadcrumbs = p.get("breadcrumbs") or []
     crumb = " > ".join(breadcrumbs[1:]) if len(breadcrumbs) > 1 else ""
     base_id = (p["url"].rstrip("/").rsplit("/", 1)[-1] or "root").lower()
@@ -202,20 +330,27 @@ def degree_program_chunks(p: dict) -> list[Chunk]:
         meta_bits.append(f"Faculty: {faculty}")
     if level:
         meta_bits.append(f"Level: {level}")
-    if kind and kind != "other":
-        meta_bits.append(f"Section: {kind.replace('_', ' ')}")
+    # Renamed from "Section: <kind>" to "Page: <kind>" because the
+    # per-chunk "Section: …" label below now carries the actual in-page
+    # heading path. Keeping both lines without renaming this one would
+    # have two competing "Section:" lines per chunk.
+    if page_kind and page_kind != "other":
+        meta_bits.append(f"Page: {page_kind.replace('_', ' ')}")
     meta_line = " · ".join(meta_bits)
 
-    prefix_parts = [title]
+    base_prefix_parts = [title]
     if meta_line:
-        prefix_parts.append(meta_line)
+        base_prefix_parts.append(meta_line)
     if crumb:
-        prefix_parts.append(crumb)
-    prefix = "\n".join(p for p in prefix_parts if p)
+        base_prefix_parts.append(crumb)
+    base_prefix = "\n".join(s for s in base_prefix_parts if s)
 
     out: list[Chunk] = []
-    for i, pg_lines in enumerate(bins):
-        body = "\n".join(pg_lines)
+    for i, (section_label, body) in enumerate(_section_aware_bodies(text)):
+        if section_label:
+            prefix = f"{base_prefix}\nSection: {section_label}" if base_prefix else f"Section: {section_label}"
+        else:
+            prefix = base_prefix
         full = f"{prefix}\n\n{body}" if prefix else body
         out.append(Chunk(
             id=f"degree:{base_id}:{i}",
@@ -229,43 +364,32 @@ def degree_program_chunks(p: dict) -> list[Chunk]:
 
 
 def program_chunks(p: dict) -> list[Chunk]:
+    """Chunk one faculty/school/department hub page from faculties.json.
+
+    Section-aware via _section_aware_bodies — same approach as
+    degree_program_chunks but without the degree-specific metadata
+    (program / faculty / level / page-kind). The chunker prepends the
+    page title + breadcrumb + in-page section path to each chunk so the
+    embedder sees structural context."""
     text = (p.get("text") or "").strip()
     if not text:
         return []
-    # Split first, then bin. Without the per-paragraph split, a single
-    # oversized paragraph becomes its own un-split bin (the old bug — a 6.4k-
-    # char paragraph would ride straight into chunks.json untouched).
-    paragraphs: list[str] = []
-    for pg in text.split("\n"):
-        pg = pg.strip()
-        if pg:
-            paragraphs.extend(_split_long(pg, TARGET_CHARS))
-
-    bins: list[list[str]] = []
-    cur: list[str] = []
-    cur_len = 0
-    for pg in paragraphs:
-        if cur and cur_len + len(pg) > TARGET_CHARS:
-            bins.append(cur)
-            cur = [pg]
-            cur_len = len(pg)
-        else:
-            cur.append(pg)
-            cur_len += len(pg) + 1
-    if cur:
-        bins.append(cur)
 
     title = p.get("title") or ""
     breadcrumbs = p.get("breadcrumbs") or []
     crumb = " > ".join(breadcrumbs[1:]) if len(breadcrumbs) > 1 else ""
     base_id = (p["url"].rstrip("/").rsplit("/", 1)[-1] or "root").lower()
 
+    base_prefix = title
+    if crumb:
+        base_prefix = f"{title}\n{crumb}"
+
     out: list[Chunk] = []
-    for i, pg_lines in enumerate(bins):
-        prefix = title
-        if crumb:
-            prefix = f"{title}\n{crumb}"
-        body = "\n".join(pg_lines)
+    for i, (section_label, body) in enumerate(_section_aware_bodies(text)):
+        if section_label:
+            prefix = f"{base_prefix}\nSection: {section_label}" if base_prefix else f"Section: {section_label}"
+        else:
+            prefix = base_prefix
         full = f"{prefix}\n\n{body}" if prefix else body
         out.append(Chunk(
             id=f"program:{base_id}:{i}",

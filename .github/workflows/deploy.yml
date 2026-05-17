@@ -39,6 +39,10 @@ jobs:
         working-directory: pipeline
         run: uv run chunk_and_embed.py
 
+      - name: Build calendar.json
+        working-directory: pipeline
+        run: uv run build_calendar.py
+
       # ---- Vite build ----
       - uses: actions/setup-node@v4
         with:

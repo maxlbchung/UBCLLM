@@ -1,21 +1,23 @@
 import { useEffect } from 'react'
-import { ModelLoader } from './components/ModelLoader'
 import { Sidebar } from './components/Sidebar'
+import { Home } from './components/Home'
 import { Chat } from './components/Chat'
 import { CourseLookup } from './components/CourseLookup'
 import { PrereqTree } from './components/PrereqTree'
 import { OtherPage } from './components/OtherPage'
+import { EasterEggToast } from './components/EasterEggToast'
 import { useConversations } from './store/conversations'
 import { useSettings } from './store/settings'
+import { DEFAULT_MODEL_SIZE, useLLMLoader } from './store/llmLoader'
 import { useMusicPlayer } from './lib/music'
 
 export default function App() {
   // Sync the active theme to <html data-theme="..."> so the CSS variable
   // palette in index.css swaps as soon as the user picks a different theme
-  // in OtherPage. Lives at the App root (above ModelLoader) so the splash
-  // and any error fallback already render under the active theme.
+  // in OtherPage.
   const theme = useSettings((s) => s.theme)
   const zoom = useSettings((s) => s.zoom)
+  const startLoad = useLLMLoader((s) => s.startLoad)
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
   }, [theme])
@@ -26,12 +28,15 @@ export default function App() {
     // borders) stay fixed by design.
     document.documentElement.style.fontSize = `${(20 * zoom) / 100}px`
   }, [zoom])
+  useEffect(() => {
+    // Auto-load Qwen3.5 2B on mount — no user choice, no picker. Warm
+    // visits hit the IndexedDB cache in ~1-3 s; first visits stream the
+    // weights in the background while the user can poke around the
+    // Home / Course Lookup / Prereq Tree panels.
+    void startLoad(DEFAULT_MODEL_SIZE)
+  }, [startLoad])
 
-  return (
-    <ModelLoader>
-      <Shell />
-    </ModelLoader>
-  )
+  return <Shell />
 }
 
 function Shell() {
@@ -48,6 +53,9 @@ function Shell() {
     <div className="flex h-screen w-screen overflow-hidden">
       <Sidebar />
       <main className="flex-1 min-w-0 flex flex-col">
+        <div className={view === 'home' ? 'flex-1 min-h-0 flex flex-col' : 'hidden'}>
+          <Home />
+        </div>
         <div className={view === 'chat' ? 'flex-1 min-h-0 flex flex-col' : 'hidden'}>
           <Chat />
         </div>
@@ -61,6 +69,9 @@ function Shell() {
           <OtherPage />
         </div>
       </main>
+      {/* Floating discovery notice for new easter eggs. Lives at the
+          shell level so it appears regardless of which view is active. */}
+      <EasterEggToast />
     </div>
   )
 }

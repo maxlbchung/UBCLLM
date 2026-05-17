@@ -22,6 +22,12 @@ export type Theme = 'dark' | 'light' | 'royal' | 'terminal'
 // shouldn't bloom with text. Limited to a small set so the dropdown
 // presents discrete steps.
 export type Zoom = 75 | 100 | 125
+// Tier label kept around for the internal model-loading machinery
+// (lib/llm.ts matchers, lib/retrieve.ts token-budget map). Only '2b'
+// is ever loaded today — the app auto-loads Qwen3.5 2B on startup
+// with no user choice. The union retains '4b' / '9b' so re-enabling a
+// tier later is a one-file change.
+export type ModelSize = '2b' | '4b' | '9b'
 
 interface State {
   volume: number
@@ -67,24 +73,29 @@ export const useSettings = create<State>()(
     {
       name: 'reodite-settings',
       storage: createJSONStorage(() => localStorage),
-      // v1.5.x shipped a Theme union of 'dark'|'light'|'midnight'|'forest'|
-      // 'sunset' with only 'dark' actually rendered. The styled three were
-      // dropped in v1.6.0 when theming went live; v1.6.8 added 'royal'.
-      // Coerce anything outside the current union back to 'dark' so a
-      // rehydrated store can't carry an out-of-union value.
-      version: 1,
+      // v6 (v1.10.4): model picking removed — Qwen3.5 2B auto-loads on
+      //   startup. Drop the persisted `model` field on rehydrate so it
+      //   doesn't linger in localStorage forever.
+      version: 6,
       migrate: (persistedState, _version) => {
         if (!persistedState) return persistedState as State
-        const s = persistedState as Partial<State>
+        const s = persistedState as Partial<State> & {
+          model?: string | null
+          theme?: string
+          zoom?: number
+        }
         const validThemes: Theme[] = ['dark', 'light', 'royal', 'terminal']
         const validZooms: Zoom[] = [75, 100, 125]
-        const out = { ...s }
+        const out = { ...s } as Partial<State> & { model?: unknown }
         if (!validThemes.includes(s.theme as Theme)) {
           out.theme = 'dark'
         }
         if (!validZooms.includes(s.zoom as Zoom)) {
           out.zoom = 100
         }
+        // The picker is gone — drop the persisted `model` field if any
+        // older version left one behind so it doesn't linger forever.
+        delete out.model
         return out as State
       },
     },

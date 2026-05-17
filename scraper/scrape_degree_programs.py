@@ -88,10 +88,11 @@ DEGREE_TITLE_RE = re.compile(
     re.IGNORECASE,
 )
 
-# Slug prefixes for degree-root pages. The discovery pass only nominates a
-# page as a seed if its URL slug matches one of these — keeps us from
-# accidentally adopting a child page (e.g. "honours" under a Bachelor) as a
-# new seed.
+# Slug prefixes for degree-root pages. The discovery pass nominates a
+# page as a seed if its URL slug matches one of these (prefix) or one
+# of DEGREE_SLUG_SUFFIXES below (suffix) — keeps us from accidentally
+# adopting a child page (e.g. "honours" under a Bachelor) as a new
+# seed.
 DEGREE_SLUG_PREFIXES = (
     # Bachelor
     "bachelor-", "basc-", "bsc-", "bsf-", "bils-", "b-i-l-s", "buf-", "b-u-f",
@@ -103,6 +104,34 @@ DEGREE_SLUG_PREFIXES = (
     # Certificate / diploma
     "graduate-certificate-", "undergraduate-certificate-",
     "certificate-", "diploma-",
+)
+
+# Some degree pages tag the degree as a slug SUFFIX rather than prefix —
+# e.g. ".../data-science-mds" (Master of Data Science) or
+# ".../public-policy-and-global-affairs-mppga". The program name leads
+# and the degree-type abbreviation trails. Mapping suffix → level so the
+# level classifier can use it as a fallback when title-prefix matching
+# doesn't find the degree word.
+DEGREE_SLUG_SUFFIXES_BY_LEVEL: list[tuple[str, str]] = [
+    # masters abbreviations
+    ("-mds", "masters"), ("-msc", "masters"), ("-meng", "masters"),
+    ("-masc", "masters"), ("-mba", "masters"), ("-mfa", "masters"),
+    ("-med", "masters"), ("-march", "masters"), ("-mmm", "masters"),
+    ("-mpp", "masters"), ("-mppga", "masters"), ("-mph", "masters"),
+    ("-mhsc", "masters"), ("-mn", "masters"), ("-mlis", "masters"),
+    ("-mhlp", "masters"), ("-mhrm", "masters"),
+    # doctoral
+    ("-phd", "doctoral"), ("-dma", "doctoral"), ("-edd", "doctoral"),
+]
+
+# Trailing degree-abbreviation in a page title, like "Data Science
+# (M.D.S.)" or "Public Policy and Global Affairs (M.P.P.G.A.)". Matches
+# parenthesized abbreviations of one initial letter + dotted suffix at
+# the end of the title — used alongside DEGREE_TITLE_RE so pages whose
+# title doesn't *start* with a degree word still get picked up.
+TRAILING_ABBREV_RE = re.compile(
+    r"\(\s*(B|M|D|Ph)\.?\s?[A-Z]+(?:\.\s?[A-Z]+)*\.?\s*\)\s*$",
+    re.IGNORECASE,
 )
 
 # Tags whose textual content is navigation chrome, not page body.
@@ -210,18 +239,40 @@ def in_subtree(url: str, root_path: str) -> bool:
 def matches_degree(url: str, title: str) -> tuple[bool, str]:
     """Return (is_degree_root, level) for a candidate URL + title.
 
-    Both the slug prefix and the title pattern must match — a slug like
-    "minor-statistics" is not a degree root even though "minor" is part of
-    the degree-page vocabulary.
+    Slug matches if it starts with one of DEGREE_SLUG_PREFIXES (the
+    common case — "bachelor-arts", "master-business-administration") OR
+    ends with a degree abbreviation suffix from DEGREE_SLUG_SUFFIXES_BY_LEVEL
+    (the UBC-quirk case — "data-science-mds", "public-policy-…-mppga"
+    name the program first and tag the degree-type as a trailing
+    abbreviation).
+
+    Title matches if it starts with a degree word (DEGREE_TITLE_RE) OR
+    ends with a parenthesized degree abbreviation (TRAILING_ABBREV_RE)
+    like "Data Science (M.D.S.)".
+
+    Both gates have to pass — a slug like "minor-statistics" still
+    isn't a degree root, and a title like "Honours" inside a Bachelor
+    subtree isn't either.
     """
     slug = urlparse(url).path.rsplit("/", 1)[-1].lower()
-    if not any(slug.startswith(pre) for pre in DEGREE_SLUG_PREFIXES):
+    slug_prefix_hit = any(slug.startswith(pre) for pre in DEGREE_SLUG_PREFIXES)
+    slug_suffix_level = next(
+        (lvl for suf, lvl in DEGREE_SLUG_SUFFIXES_BY_LEVEL if slug.endswith(suf)),
+        None,
+    )
+    if not slug_prefix_hit and slug_suffix_level is None:
         return False, ""
-    if not title or not DEGREE_TITLE_RE.match(title):
+    if not title:
         return False, ""
+    if not DEGREE_TITLE_RE.match(title) and not TRAILING_ABBREV_RE.search(title):
+        return False, ""
+    # Prefer title-prefix level classification (more specific); fall
+    # back to slug-suffix level for the abbreviation-suffix case.
     for pat, lvl in LEVEL_RULES:
         if pat.match(title):
             return True, lvl
+    if slug_suffix_level is not None:
+        return True, slug_suffix_level
     return True, "other"
 
 
@@ -274,19 +325,73 @@ def _strip_chrome(node: Node) -> None:
             chrome.decompose()
 
 
+_BODY_TAGS = {"p", "li", "h2", "h3", "h4", "td"}
+
+
+def _walk_document_order(node: Node):
+    """Depth-first descendant walk yielding nodes in document order.
+
+    selectolax's `.css(selector_a, selector_b, ...)` returns elements
+    grouped by selector, not interleaved by DOM position — so it can't
+    be used when the relative order of different tags matters. This
+    walker uses the child/next/parent linked-list to do a true DFS.
+    """
+    child = node.child
+    while child is not None:
+        yield child
+        # Skip text nodes' descendants — they have none.
+        if child.tag != "-text":
+            yield from _walk_document_order(child)
+        child = child.next
+
+
 def extract_body(tree: HTMLParser) -> tuple[str, list[str]]:
+    """Extract body text + heading list. Headings are emitted inline in the
+    body stream with Markdown-style level markers (`##` for h2, `###` for
+    h3, `####` for h4) so the chunking pipeline downstream can section the
+    text by header and prepend the section path to each chunk. Without
+    markers the chunker treats headings as plain paragraphs and major /
+    minor sections become indistinguishable to MiniLM."""
     root = _content_root(tree)
     _strip_chrome(root)
+    # The UBC calendar template injects screen-reader-only anchor labels
+    # inside each <h4> (e.g. "15400-minor-in-data" inside the "Minor in
+    # Data Science" heading). selectolax's .text() concatenates child
+    # text without separators, so the anchor id ends up glued to the
+    # heading text. Decompose these before extraction.
+    for sel in (".anchor-invisible", ".sr-only", "a.anchor"):
+        for n in root.css(sel):
+            n.decompose()
     headings: list[str] = []
-    for h in root.css("h2, h3, h4"):
-        t = h.text(strip=True)
-        if t:
-            headings.append(re.sub(r"\s+", " ", t))
     blocks: list[str] = []
-    for el in root.css("p, li, h2, h3, h4, td"):
+    for el in _walk_document_order(root):
+        tag = el.tag
+        if tag not in _BODY_TAGS:
+            continue
+        # Skip if a body-tag ancestor will also emit this content
+        # (e.g. <td><p>x</p></td> would otherwise emit "x" twice — once
+        # for the td via td.text() including descendants, once for the
+        # nested p). Walking upward to the content root is cheap on the
+        # depth-shallow DOMs these calendar pages produce.
+        anc = el.parent
+        nested = False
+        while anc is not None and anc is not root:
+            if anc.tag in _BODY_TAGS:
+                nested = True
+                break
+            anc = anc.parent
+        if nested:
+            continue
         t = el.text(separator=" ", strip=True)
-        if t:
-            blocks.append(re.sub(r"\s+", " ", t))
+        if not t:
+            continue
+        t = re.sub(r"\s+", " ", t)
+        if tag in ("h2", "h3", "h4"):
+            headings.append(t)
+            marker = "#" * int(tag[1])  # h2 -> "##", h3 -> "###", h4 -> "####"
+            blocks.append(f"{marker} {t}")
+        else:
+            blocks.append(t)
     text = "\n".join(blocks).strip()
     return text, headings
 

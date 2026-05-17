@@ -1,4 +1,6 @@
+import { useEffect } from 'react'
 import { useSettings, type Theme, type Zoom } from '../store/settings'
+import { useEasterEggs } from '../store/easterEggs'
 import { playSfx } from '../lib/sfx'
 import { SOMAFM_CHANNELS } from '../lib/music'
 
@@ -32,6 +34,19 @@ export function OtherPage() {
   const setTheme = useSettings((s) => s.setTheme)
   const zoom = useSettings((s) => s.zoom)
   const setZoom = useSettings((s) => s.setZoom)
+
+  // Easter-egg progress — same numbers EasterEggToast uses. Touch the
+  // store so the corpus load runs if the user landed here before
+  // anything else triggered it.
+  const discovered = useEasterEggs((s) => s.discovered)
+  const validIds = useEasterEggs((s) => s.validIds)
+  const loadFromCorpus = useEasterEggs((s) => s.loadFromCorpus)
+  useEffect(() => {
+    void loadFromCorpus()
+  }, [loadFromCorpus])
+  const validIdSet = new Set(validIds)
+  const discoveredCount = discovered.filter((id) => validIdSet.has(id)).length
+  const eggTotal = validIds.length
 
   const selectedChannel =
     SOMAFM_CHANNELS.find((c) => c.key === musicStation) ?? SOMAFM_CHANNELS[0]
@@ -127,6 +142,18 @@ export function OtherPage() {
               ))}
             </select>
           </div>
+        </section>
+
+        <section className="flex flex-col gap-2 bg-surface-soft border border-line rounded-md p-5">
+          <h3 className="text-xs uppercase tracking-wide text-fg-faint">
+            Easter Eggs
+          </h3>
+          <p className="text-sm text-fg">
+            <span className="font-mono text-highlight-fg">
+              {discoveredCount} / {eggTotal || '–'}
+            </span>{' '}
+            discovered
+          </p>
         </section>
         </div>
 

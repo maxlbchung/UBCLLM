@@ -58,6 +58,7 @@ The full v1 stack from the original plan is shipped and live. Highlights:
 - **Conversation persistence** — `localStorage` key `ubcllm-conversations` via `zustand/middleware/persist`; on reload the active conversation rehydrates into `useChat`.
 - **Citation surfacing** — `buildSystemPrompt('default')` requires `[N]` citations matching the bracketed numbering in `buildContext`; `ChatMessage` parses them, renders inline superscript chips linking to the chunk's UBC URL, and splits the sources panel into "Sources used" vs "Other retrieved context."
 - **Model-load error recovery** — `ModelLoader` distinguishes network/cache errors from WebGPU/capability errors. Network failures (the usual "corrupted cached shard from an interrupted download" case) get a "Clear cache and try again" button that wipes `webllm/*` Cache Storage entries + IndexedDB databases and re-runs the load, plus a plain "Try again" fallback. Capability errors keep the original "needs WebGPU + ~2.5 GB GPU memory" message.
+- **Calendar widget** (Home page) — read-only `CalendarWidget` showing UBC events / academic deadlines / statutory holidays. Three independent filter chips, side-by-side mini-grid + upcoming list on desktop (stacks on mobile), prev/next month navigation, click month header to jump back to today. Fed by three scrapers (`scrape_events.py`, `scrape_academic_dates.py`, `scrape_holidays.py`) → normalized in `pipeline/build_calendar.py` → consumed as `web/public/data/calendar.json`. Calendar data is **not** in the RAG corpus on purpose (date-keyed facts don't belong in semantic retrieval).
 
 **Important runtime contracts (don't break these silently):**
 - **Retrieval modes + boosts in `topK`** (`web/src/lib/retrieve.ts`): three modes (A: course-code, B: program/easter via ALIASES hit, C: default semantic) with two additive boosts — a program-title-match boost for any program OR easter chunk whose title substring-matches a query token, and a course-keyword boost for course chunks (only) when the query says "course"/"class". Mode A uses string-contains-on-asked-code as the structural signal (no score boost), so the literal course always lands in the result regardless of MiniLM's clustering blindspot for course numbers. Easter chunks ride the program-title boost (since it reflects real topical alignment) but deliberately do NOT ride the course-keyword boost (which is unconditional on kind and would let easters win against on-topic courses for unrelated queries).
@@ -65,11 +66,11 @@ The full v1 stack from the original plan is shipped and live. Highlights:
 - **Same MiniLM both sides**: `pipeline/chunk_and_embed.py` uses `sentence-transformers/all-MiniLM-L6-v2`; `web/src/lib/embed.ts` uses `Xenova/all-MiniLM-L6-v2`. Same weights, different distributions — both must be normalized so dot product == cosine.
 - **CI uses `npm install`, not `npm ci`**: the lockfile is generated on Windows and skips Linux-only platform-optional packages (e.g. `@tailwindcss/oxide-linux-x64-gnu` and its `@emnapi/*` transitives), so `npm ci` on the Ubuntu runner fails. `npm install` resolves them on the runner.
 - **`scraper/output/*.json` is committed.** Re-running the scraper hits UBC servers; the corpus snapshot in git is the source of truth that CI feeds to the pipeline.
-- **`web/public/data/{chunks.json, embeddings.bin}` are regenerated in CI**, not committed. Locally, run `cd pipeline && uv run chunk_and_embed.py` once after pulling, then `npm run dev`.
+- **`web/public/data/{chunks.json, embeddings.bin, calendar.json}` are regenerated in CI**, not committed. Locally, run `cd pipeline && uv run chunk_and_embed.py && uv run build_calendar.py` once after pulling, then `npm run dev`. `calendar.json` is a separate pipeline from the RAG corpus — it normalizes the three calendar-source scrapers (events / academic_dates / holidays) into one date-sorted JSON for the home-page widget; do not merge it into `chunks.json`.
 - **Prereq AST parser** (`web/src/lib/prereqAst.ts`): recursive-descent over a small token alphabet (`one of`, `all of`, `either`, `and`, `or`, `;`, `.`, `,`, parens, branch labels, course codes, free text). Emits `Expr = And | Or-dropdown | Or-stacked | Code | Literal`. `parsePrereq` is null-safe for empty/whitespace input; unknown tokens collapse into `Literal` so the parser never throws on weird strings. `displayExpr` flattens an expression to a label string for dropdown / radio options. Top-level literals are dropped from the prereq tree (preserved as text in chat). Selection state in `PrereqTree` is keyed by `${ownerCourseCode}::${pathInExpr}` so toggling one disjunction doesn't perturb others, and selections persist across root-course switches.
 
 **Open opportunities** (none of these block daily use):
-- Other top-level calendar sections aren't crawled yet: `/academic-year/...` (sessional dates), `/campus-wide-policies-and-regulations/...` (academic standing, withdrawals, plagiarism), `/admissions/...` (transfer credit, AP/IB, English language), `/examinations/...`, `/fees/...`, `/awards-and-financial-aid/...`. Pattern matches `scrape_faculties.py` — would need one new seeded scraper per section (or a parametrized one).
+- Other top-level calendar sections aren't crawled yet: `/campus-wide-policies-and-regulations/...` (academic standing, withdrawals, plagiarism), `/admissions/...` (transfer credit, AP/IB, English language), `/examinations/...`, `/fees/...`, `/awards-and-financial-aid/...`. Pattern matches `scrape_faculties.py` — would need one new seeded scraper per section (or a parametrized one). (Sessional dates from `/dates-and-deadlines` are now covered by `scrape_academic_dates.py`, but only the term-dates and course-drop tables — the wider `/academic-year/...` overview pages remain un-scraped.)
 - Sidebar can collapse, but there's no proper mobile drawer / hamburger pattern yet — small viewports still get the desktop layout, just narrower.
 - "Clear cache" affordance is only surfaced on the model-load error screen. No general-purpose cache reset button in the running app.
 
@@ -100,6 +101,7 @@ Single source of truth: `web/src/version.ts` (`APP_VERSION`). Mirror it in `web/
 ```
 # First-time setup after a fresh clone (pipeline output is .gitignored):
 cd pipeline && uv run chunk_and_embed.py     # generates web/public/data/{chunks.json, embeddings.bin}
+cd pipeline && uv run build_calendar.py      # generates web/public/data/calendar.json
 
 # Day-to-day:
 cd web      && npm run dev                    # local dev server (http://localhost:5173/UBCLLM/)
@@ -107,6 +109,9 @@ cd web      && npm run build                  # static build → web/dist/
 cd scraper  && uv run scrape_courses.py            # full crawl, ~10 min at 1 req/s
 cd scraper  && uv run scrape_faculties.py          # shallow hubs (depth 2, cap 300), ~3-5 min
 cd scraper  && uv run scrape_degree_programs.py    # all degree subtrees (BA/MSc/PhD/cert), ~30-60 min cold
+cd scraper  && uv run scrape_events.py             # events.ubc.ca via REST API, ~30 s
+cd scraper  && uv run scrape_academic_dates.py     # /dates-and-deadlines tables, < 5 s
+cd scraper  && uv run scrape_holidays.py           # hr.ubc.ca/statutory-holidays, < 5 s
 cd scraper  && uv run scrape_courses.py --subject CPSC --limit 1   # debug
 cd scraper  && uv run scrape_degree_programs.py --only "Master of"  # one level, debug
 

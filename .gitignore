@@ -22,6 +22,7 @@ scraper/cache/
 pipeline/output/
 web/public/data/*.bin
 web/public/data/chunks.json
+web/public/data/calendar.json
 
 # Editor / OS
 .DS_Store

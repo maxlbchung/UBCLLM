@@ -1,0 +1,296 @@
+[
+  {
+    "term": "Term 1 (May – June, 2026)",
+    "event": "Start",
+    "dateText": "Monday, May 11",
+    "start": "2026-05-11",
+    "end": null
+  },
+  {
+    "term": "Last day to drop without a W standing through Workday",
+    "event": "Courses starting in May",
+    "dateText": "May 15, 2026",
+    "start": "2026-05-15",
+    "end": null
+  },
+  {
+    "term": "Last day to drop without a W standing through Workday",
+    "event": "Courses Spanning May to August",
+    "dateText": "May 25, 2026",
+    "start": "2026-05-25",
+    "end": null
+  },
+  {
+    "term": "Student self-service in Workday unavailable; Faculty approval required",
+    "event": "Courses starting in May",
+    "dateText": "After June 5, 2026",
+    "start": "2026-06-05",
+    "end": null
+  },
+  {
+    "term": "Term 1 (May – June, 2026)",
+    "event": "Finish",
+    "dateText": "Thursday, June 18",
+    "start": "2026-06-18",
+    "end": null
+  },
+  {
+    "term": "Term 1 (May – June, 2026)",
+    "event": "Exams Start",
+    "dateText": "Monday, June 22",
+    "start": "2026-06-22",
+    "end": null
+  },
+  {
+    "term": "Term 1 (May – June, 2026)",
+    "event": "Exams Finish",
+    "dateText": "Friday, June 26",
+    "start": "2026-06-26",
+    "end": null
+  },
+  {
+    "term": "Student self-service in Workday unavailable; Faculty approval required",
+    "event": "Courses Spanning May to August",
+    "dateText": "After July 3, 2026",
+    "start": "2026-07-03",
+    "end": null
+  },
+  {
+    "term": "Term 2 (July – August, 2026)",
+    "event": "Start",
+    "dateText": "Monday, July 6",
+    "start": "2026-07-06",
+    "end": null
+  },
+  {
+    "term": "Last day to drop without a W standing through Workday",
+    "event": "Courses starting in July",
+    "dateText": "July 10, 2026",
+    "start": "2026-07-10",
+    "end": null
+  },
+  {
+    "term": "Student self-service in Workday unavailable; Faculty approval required",
+    "event": "Courses starting in July",
+    "dateText": "After July 31, 2026",
+    "start": "2026-07-31",
+    "end": null
+  },
+  {
+    "term": "Term 2 (July – August, 2026)",
+    "event": "Finish",
+    "dateText": "Thursday, August 13",
+    "start": "2026-08-13",
+    "end": null
+  },
+  {
+    "term": "Term 2 (July – August, 2026)",
+    "event": "Exams Start",
+    "dateText": "Monday, August 17",
+    "start": "2026-08-17",
+    "end": null
+  },
+  {
+    "term": "Term 2 (July – August, 2026)",
+    "event": "Exams Finish",
+    "dateText": "Friday, August 21",
+    "start": "2026-08-21",
+    "end": null
+  },
+  {
+    "term": "Term 1 (September – December, 2026)",
+    "event": "Start",
+    "dateText": "Tuesday, September 8",
+    "start": "2026-09-08",
+    "end": null
+  },
+  {
+    "term": "Last day to drop without a W standing through Workday",
+    "event": "Term 1 Course",
+    "dateText": "September 21, 2026",
+    "start": "2026-09-21",
+    "end": null
+  },
+  {
+    "term": "Last day to drop without a W standing through Workday",
+    "event": "Full-year course (Terms 1 and 2)",
+    "dateText": "September 28, 2026",
+    "start": "2026-09-28",
+    "end": null
+  },
+  {
+    "term": "Student self-service in Workday unavailable; Faculty approval required",
+    "event": "Term 1 Course",
+    "dateText": "After October 30, 2026",
+    "start": "2026-10-30",
+    "end": null
+  },
+  {
+    "term": "Student self-service in Workday unavailable; Faculty approval required",
+    "event": "Full-year course (Terms 1 and 2)",
+    "dateText": "After November 27, 2026",
+    "start": "2026-11-27",
+    "end": null
+  },
+  {
+    "term": "Term 1 (September – December, 2026)",
+    "event": "Finish",
+    "dateText": "Monday, December 7",
+    "start": "2026-12-07",
+    "end": null
+  },
+  {
+    "term": "Term 1 (September – December, 2026)",
+    "event": "Exams Start",
+    "dateText": "Friday, December 11",
+    "start": "2026-12-11",
+    "end": null
+  },
+  {
+    "term": "Term 1 (September – December, 2026)",
+    "event": "Exams Finish",
+    "dateText": "Tuesday, December 22",
+    "start": "2026-12-22",
+    "end": null
+  },
+  {
+    "term": "Term 2 (January – April, 2027)",
+    "event": "Start",
+    "dateText": "Tuesday, January 5",
+    "start": "2027-01-05",
+    "end": null
+  },
+  {
+    "term": "Last day to drop without a W standing through Workday",
+    "event": "Term 2 Course",
+    "dateText": "January 18, 2027",
+    "start": "2027-01-18",
+    "end": null
+  },
+  {
+    "term": "Student self-service in Workday unavailable; Faculty approval required",
+    "event": "Term 2 Course",
+    "dateText": "After March 5, 2027",
+    "start": "2027-03-05",
+    "end": null
+  },
+  {
+    "term": "Term 2 (January – April, 2027)",
+    "event": "Finish",
+    "dateText": "Monday, April 12",
+    "start": "2027-04-12",
+    "end": null
+  },
+  {
+    "term": "Term 2 (January – April, 2027)",
+    "event": "Exams Start",
+    "dateText": "Friday, April 16",
+    "start": "2027-04-16",
+    "end": null
+  },
+  {
+    "term": "Term 2 (January – April, 2027)",
+    "event": "Exams Finish",
+    "dateText": "Tuesday, April 27",
+    "start": "2027-04-27",
+    "end": null
+  },
+  {
+    "term": "Term 1 (May – June, 2027)",
+    "event": "Start",
+    "dateText": "Monday, May 10",
+    "start": "2027-05-10",
+    "end": null
+  },
+  {
+    "term": "Last day to drop without a W standing through Workday",
+    "event": "Courses starting in May or June",
+    "dateText": "May 14, 2027",
+    "start": "2027-05-14",
+    "end": null
+  },
+  {
+    "term": "Last day to drop without a W standing through Workday",
+    "event": "Courses Spanning May to August",
+    "dateText": "May 21, 2027",
+    "start": "2027-05-21",
+    "end": null
+  },
+  {
+    "term": "Student self-service in Workday unavailable; Faculty approval required",
+    "event": "Courses starting in May or June",
+    "dateText": "After June 4, 2027",
+    "start": "2027-06-04",
+    "end": null
+  },
+  {
+    "term": "Term 1 (May – June, 2027)",
+    "event": "Finish",
+    "dateText": "Thursday, June 17",
+    "start": "2027-06-17",
+    "end": null
+  },
+  {
+    "term": "Term 1 (May – June, 2027)",
+    "event": "Exams Start",
+    "dateText": "Monday, June 21",
+    "start": "2027-06-21",
+    "end": null
+  },
+  {
+    "term": "Term 1 (May – June, 2027)",
+    "event": "Exams Finish",
+    "dateText": "Friday, June 25",
+    "start": "2027-06-25",
+    "end": null
+  },
+  {
+    "term": "Student self-service in Workday unavailable; Faculty approval required",
+    "event": "Courses Spanning May to August",
+    "dateText": "After July 2, 2027",
+    "start": "2027-07-02",
+    "end": null
+  },
+  {
+    "term": "Term 2 (July – August, 2027)",
+    "event": "Start",
+    "dateText": "Monday, July 5",
+    "start": "2027-07-05",
+    "end": null
+  },
+  {
+    "term": "Last day to drop without a W standing through Workday",
+    "event": "Courses starting in July or August",
+    "dateText": "July 9, 2027",
+    "start": "2027-07-09",
+    "end": null
+  },
+  {
+    "term": "Student self-service in Workday unavailable; Faculty approval required",
+    "event": "Courses starting in July or August",
+    "dateText": "After July 30, 2027",
+    "start": "2027-07-30",
+    "end": null
+  },
+  {
+    "term": "Term 2 (July – August, 2027)",
+    "event": "Finish",
+    "dateText": "Thursday, August 12",
+    "start": "2027-08-12",
+    "end": null
+  },
+  {
+    "term": "Term 2 (July – August, 2027)",
+    "event": "Exams Start",
+    "dateText": "Monday, August 16",
+    "start": "2027-08-16",
+    "end": null
+  },
+  {
+    "term": "Term 2 (July – August, 2027)",
+    "event": "Exams Finish",
+    "dateText": "Friday, August 20",
+    "start": "2027-08-20",
+    "end": null
+  }
+]

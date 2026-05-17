@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState, type MouseEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { useConversations, type View } from '../store/conversations'
-import { useEasterEggs } from '../store/easterEggs'
 import { playSfx } from '../lib/sfx'
 import { APP_VERSION } from '../version'
 
 const TOOLS: { view: View; label: string; icon: string }[] = [
+  { view: 'home', label: 'Home', icon: '🏠' },
   { view: 'chat', label: 'AI Chatbot', icon: '💬' },
   { view: 'lookup', label: 'Course Lookup', icon: '🔎' },
   { view: 'prereq', label: 'Prerequisite Tree', icon: '🌳' },
@@ -26,138 +26,9 @@ export function Sidebar() {
   const setView = useConversations((s) => s.setView)
   const toggleSidebar = useConversations((s) => s.toggleSidebar)
 
-  // Easter-egg counter (bottom-right). Total comes from the live corpus so
-  // adding/removing eggs in the pipeline reflects on next session without
-  // any migration. The corpus is shared via a cached promise in retrieve.ts,
-  // so this just attaches to whatever load is already in flight (or kicks
-  // one off if the user opened the sidebar before sending a message).
-  const discovered = useEasterEggs((s) => s.discovered)
-  const validIds = useEasterEggs((s) => s.validIds)
-  const loadFromCorpus = useEasterEggs((s) => s.loadFromCorpus)
-  useEffect(() => {
-    void loadFromCorpus()
-  }, [loadFromCorpus])
-  const validIdSet = new Set(validIds)
-  const discoveredCount = discovered.filter((id) => validIdSet.has(id)).length
-  const eggTotal = validIds.length
-
-  // Discovery animation sequence:
-  //   t=0     rings fade in around the number (anticipation)
-  //   t≈160   rings hold at full size, drawing attention
-  //   t≈790   rings start zooming inward toward the number
-  //   t=1100  IMPACT — number flips to new value + pops, sparks burst out
-  //   t=1150  rings hit zero scale and vanish
-  //   t≈3600  sparks finish (egg-spark = 2500ms)
-  //
-  // `displayedCount` is the value rendered in the counter — it lags
-  // `discoveredCount` by 850ms so the visible flip lands on the impact
-  // beat rather than the moment the store updates. Each burst gets its own
-  // id so back-to-back discoveries can stack without one cancelling the
-  // other.
-  const [displayedCount, setDisplayedCount] = useState(discoveredCount)
-  const [popKey, setPopKey] = useState(0)
-  const [ringBursts, setRingBursts] = useState<{ id: number }[]>([])
-  const [sparkBursts, setSparkBursts] = useState<
-    { id: number; particles: { id: number; dx: number; dy: number }[] }[]
-  >([])
-  const prevCountRef = useRef(discoveredCount)
-  // `initializedRef` gates the animation against the page-open false-positive.
-  // validIds is not persisted (loadFromCorpus repopulates it on every mount),
-  // so on every page open discoveredCount goes 0 (pre-load filter against
-  // empty validIds) → N (post-load filter sees the persisted IDs). Without
-  // this gate, that 0 → N transition reads as a new discovery and the
-  // animation fires on load. We treat the first effect run with a populated
-  // validIds as the baseline-snap: align prevCountRef + displayedCount, no
-  // animation. Only subsequent increments animate.
-  const initializedRef = useRef(false)
-  // Discovery animation effect. Depends on discoveredCount and the loaded
-  // state of validIds. Listing ringBursts.length here was the bug fixed in
-  // v1.0.14: the Phase 1 setRingBursts caused a re-render → effect cleanup →
-  // clearTimeout cascade that nuked the impact/ring/spark timers before they
-  // fired. The "keep displayed in sync at rest" branch lives in a separate
-  // effect below — it has no cleanup, so it can't tear this one's timers down.
-  useEffect(() => {
-    if (!initializedRef.current) {
-      // Wait for loadFromCorpus to populate validIds before establishing
-      // the baseline; until then discoveredCount is artificially 0.
-      if (validIds.length > 0) {
-        initializedRef.current = true
-        prevCountRef.current = discoveredCount
-        setDisplayedCount(discoveredCount)
-      }
-      return
-    }
-    if (discoveredCount <= prevCountRef.current) {
-      prevCountRef.current = discoveredCount
-      return
-    }
-    const burstId = Date.now()
-    const targetCount = discoveredCount
-
-    // Sound timeline runs in lockstep with the visual animation:
-    //   t=0     eggFound  — quick rising sine as the rings fade in
-    //   t=0     eggWind   — slow-attack pad that swells through the
-    //                       rings-hold + rings-zoom phases
-    //   t=1100  eggVictory — triumphant chord on impact (fired inside
-    //                        the existing impactTimer below)
-    // Found + wind start together: the wind has a 400 ms attack so its
-    // volume is still near silence while the found chirp is at its
-    // bright peak, then takes over as the found tails off.
-    playSfx('eggFound')
-    playSfx('eggWind')
-
-    // Phase 1: rings appear
-    setRingBursts((b) => [...b, { id: burstId }])
-
-    // Phase 2: impact. Snap the number, pop, fire sparks.
-    const PARTICLE_COUNT = 28
-    const particles = Array.from({ length: PARTICLE_COUNT }, (_, i) => {
-      const baseAngle = (Math.PI * 2 * i) / PARTICLE_COUNT
-      const angle = baseAngle + (Math.random() - 0.5) * 0.5
-      const distance = 70 + Math.random() * 50
-      return {
-        id: burstId + i,
-        dx: Math.cos(angle) * distance,
-        dy: Math.sin(angle) * distance,
-      }
-    })
-    const impactTimer = window.setTimeout(() => {
-      setDisplayedCount(targetCount)
-      setPopKey((k) => k + 1)
-      setSparkBursts((b) => [...b, { id: burstId, particles }])
-      // Synced to the visual impact: number snap + sparks + chord all
-      // land on the same frame, so the chord reads as the cause rather
-      // than a follow-up beat.
-      playSfx('eggVictory')
-    }, 1100)
-
-    // Phase 3: ring cleanup just after they vanish.
-    const ringTimer = window.setTimeout(() => {
-      setRingBursts((b) => b.filter((x) => x.id !== burstId))
-    }, 1200)
-
-    // Phase 4: spark cleanup after they finish (impact + 2500ms run + buffer).
-    const sparkTimer = window.setTimeout(() => {
-      setSparkBursts((b) => b.filter((x) => x.id !== burstId))
-    }, 1100 + 2700)
-
-    prevCountRef.current = discoveredCount
-    return () => {
-      window.clearTimeout(impactTimer)
-      window.clearTimeout(ringTimer)
-      window.clearTimeout(sparkTimer)
-    }
-  }, [discoveredCount, validIds.length])
-
-  // Keep the displayed count in sync when no animation is running (e.g.
-  // initial hydration from localStorage, or a count that decreased because
-  // validIds shrank between deploys). No cleanup function so it can't
-  // interfere with the discovery effect's timers.
-  useEffect(() => {
-    if (discoveredCount !== displayedCount && ringBursts.length === 0) {
-      setDisplayedCount(discoveredCount)
-    }
-  }, [discoveredCount, displayedCount, ringBursts.length])
+  // Easter-egg discovery now lives in EasterEggToast (mounted at the App
+  // shell in App.tsx). It handles SFX, the popup, and corpus loading;
+  // the persistent count is surfaced on the Other page.
 
   // Inline delete-confirmation popup. Replaces window.confirm() so we get a
   // styled prompt anchored to the row rather than a system dialog. We anchor
@@ -457,94 +328,12 @@ export function Sidebar() {
           <span aria-hidden>⚙</span>
           <span>Other</span>
         </button>
-        <div className="flex items-center justify-between text-[0.625rem] font-mono">
-          <span className="text-fg-faint">v{APP_VERSION}</span>
-          <span
-            className="text-highlight-fg"
-            title={
-              eggTotal > 0
-                ? `${discoveredCount} of ${eggTotal} easter eggs discovered`
-                : 'Easter eggs (loading…)'
-            }
-          >
-            {/* Inner relative wrapper anchors the rings + sparks to just the
-                numbers, not the whole "N/total Easter Eggs Found" line. */}
-            <span className="relative inline-block">
-              {/* key={popKey} remounts the span so the egg-pop keyframe
-                  restarts on each impact. Without remount, replaying the
-                  same animation on the same element is a no-op. */}
-              <span
-                key={popKey}
-                className="inline-block origin-center"
-                style={{
-                  animation: popKey > 0 ? 'egg-pop 450ms ease-out' : undefined,
-                }}
-              >
-                {displayedCount}/{eggTotal || '–'}
-              </span>
-              {/* Anticipation rings — three same-size circles staggered by
-                  100ms / 150ms so they pulse out one after another rather
-                  than animating concentrically. Sized in rem so they scale
-                  with the rem-base setting in index.css. The glow color
-                  is derived from --highlight-fg via color-mix so it tints
-                  per theme without needing a separate token. */}
-              {ringBursts.map((burst) => (
-                <span
-                  key={burst.id}
-                  aria-hidden
-                  className="pointer-events-none absolute left-1/2 top-1/2"
-                >
-                  {[0, 100, 150].map((delayMs, i) => (
-                    <span
-                      key={i}
-                      className="absolute left-0 top-0 rounded-full border-2 border-highlight-fg"
-                      style={{
-                        width: '4.2rem',
-                        height: '4.2rem',
-                        boxShadow:
-                          '0 0 6px 1px color-mix(in oklab, var(--highlight-fg) 50%, transparent)',
-                        animation: 'egg-ring 1150ms linear forwards',
-                        animationDelay: `${delayMs}ms`,
-                      }}
-                    />
-                  ))}
-                </span>
-              ))}
-              {sparkBursts.map((burst) => (
-                <span
-                  key={burst.id}
-                  aria-hidden
-                  className="pointer-events-none absolute inset-0"
-                >
-                  {burst.particles.map((p) => (
-                    <span
-                      key={p.id}
-                      className="absolute left-1/2 top-1/2 h-2 w-2 rounded-full bg-highlight-fg"
-                      style={
-                        {
-                          '--dx': `${p.dx}px`,
-                          '--dy': `${p.dy}px`,
-                          boxShadow:
-                            '0 0 8px 2px color-mix(in oklab, var(--highlight-fg) 80%, transparent)',
-                          animation:
-                            'egg-spark 2500ms cubic-bezier(0.16, 1, 0.3, 1) forwards',
-                        } as React.CSSProperties
-                      }
-                    />
-                  ))}
-                </span>
-              ))}
-            </span>
-            <span> Easter Eggs Found</span>
-          </span>
-        </div>
-        {/* Copyright + license link. PolyForm-NC is source-available but
-            forbids commercial use; surfaced here so visitors don't have to
-            dig through the repo to find the terms. Link points to the
-            LICENSE on GitHub since this is a static deploy with no
-            local route. */}
+        {/* Footer line — version + copyright + license collapsed onto one
+            row. PolyForm-NC is source-available but forbids commercial
+            use; the License link points at LICENSE on GitHub since this
+            is a static deploy with no local route. */}
         <div className="text-[0.625rem] text-fg-faint font-mono leading-relaxed">
-          © 2026 Max Chung ·{' '}
+          v{APP_VERSION} · © 2026 Max Chung ·{' '}
           <a
             href="https://github.com/maxlbchung/UBCLLM/blob/master/LICENSE"
             target="_blank"

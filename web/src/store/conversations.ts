@@ -6,7 +6,7 @@ import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { useChat, type Message } from './chat'
 
-export type View = 'chat' | 'lookup' | 'prereq' | 'other'
+export type View = 'home' | 'chat' | 'lookup' | 'prereq' | 'other'
 
 export interface Conversation {
   id: string
@@ -55,7 +55,10 @@ export const useConversations = create<State>()(
       conversations: {},
       order: [],
       activeId: null,
-      view: 'chat',
+      // First-time visitors land on Home so they see the app's intro
+      // panel before the chat picker. Returning visitors restore
+      // whatever view they were last on via the persist middleware.
+      view: 'home',
       sidebarCollapsed: false,
 
       newConversation: () => {

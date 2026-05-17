@@ -31,7 +31,7 @@ const MIN_SCORE = 0.5
 // title boost). It does not promote unrelated chunks; only siblings of
 // an already-winning page. See the buddy-boost block in topK for the
 // full rationale.
-const BUDDY_BOOST = 0.1
+const BUDDY_BOOST = 0.15
 
 // When the user explicitly says "course"/"class" (incl. plurals), they
 // want a course chunk, not a program/faculty page. The matching `wantsCourses`
@@ -388,23 +388,25 @@ export async function topK(
   // Programs are scraped as a single page then bin-split into multiple
   // slices (program:cognitive-systems:0, :1, :2, …) — they share a URL
   // because they're sub-sections of the same canonical page. When one
-  // slice wins the corpus-wide #1 spot, the rest of that page often has
+  // slice wins a confident match, the rest of that page often has
   // additional context the user wants but sits just below the minScore
   // floor. The motivating case: "what is cogs?" puts slice :0 (the
-  // definitional opener) at the top with raw 0.458 + 0.25 program-title
-  // = 0.708, but slice :1 (the required-courses list) lands at raw 0.166
-  // + 0.25 = 0.416, just under the 0.5 floor — even though it answers
-  // "what courses does COGS require" which a user asking "what is cogs?"
-  // very plausibly also wants.
+  // definitional opener) at ~raw 0.42 + 0.25 program-title boost = ~0.67,
+  // but slice :1 (the required-courses list) lands at ~raw 0.15 + 0.25
+  // = ~0.40, just under the 0.5 floor — even though it answers "what
+  // courses does COGS require" which a user asking "what is cogs?" very
+  // plausibly also wants.
   //
-  // The fix: if and only if the #1 chunk in the corpus is a program
-  // slice that already cleared minScore (so we know this is a real,
-  // confident match — not a greeting query where every chunk is near
-  // zero), give every other program slice with the same URL a +0.1
-  // bump. The nudge is small on purpose: it only crosses the floor for
-  // siblings already close to passing (post-program-title score ≥ 0.4).
-  // It doesn't promote unrelated chunks; the URL-equality gate scopes
-  // it strictly to the winning page.
+  // The guard fires on the highest-scoring PROGRAM chunk, not the
+  // corpus-wide top. Earlier this required `allIndicesByScore[0]` to
+  // be a program chunk, which failed whenever a course chunk happened
+  // to outscore the winning program slice (e.g. COGS 200 "Introduction
+  // to Cognitive Systems" outranking slice :0 on raw cosine because
+  // the v1.9.0 degree-program scraper added a heavier metadata prefix
+  // — `Program: Bachelor of Arts · Faculty: … · breadcrumb` — that
+  // dilutes short-query cosine alignment). The new gate is still
+  // gated by `>= minScore` on that top program so we don't promote
+  // siblings of a near-zero match.
   //
   // Scope: program kind only. Course chunks share a URL across an
   // entire subject (every CPSC course points at /course-descriptions/
@@ -413,20 +415,23 @@ export async function topK(
   // over-inclusive. Easters are single-slice. Mode A is course-code-
   // structural (Pass 2 already covers cross-course context) and ignores
   // these scores anyway.
-  if (allIndicesByScore.length > 0) {
-    const topIdx = allIndicesByScore[0]
-    const topChunk = chunks[topIdx]
-    if (topChunk.kind === 'program' && scores[topIdx] >= minScore) {
-      const topUrl = topChunk.url
-      for (let i = 0; i < chunks.length; i++) {
-        if (i === topIdx) continue
-        const c = chunks[i]
-        if (c.kind === 'program' && c.url === topUrl) {
-          scores[i] += BUDDY_BOOST
-        }
-      }
-      allIndicesByScore.sort((a, b) => scores[b] - scores[a])
+  let topProgIdx = -1
+  for (const i of allIndicesByScore) {
+    if (chunks[i].kind === 'program') {
+      topProgIdx = i
+      break
     }
+  }
+  if (topProgIdx >= 0 && scores[topProgIdx] >= minScore) {
+    const topUrl = chunks[topProgIdx].url
+    for (let i = 0; i < chunks.length; i++) {
+      if (i === topProgIdx) continue
+      const c = chunks[i]
+      if (c.kind === 'program' && c.url === topUrl) {
+        scores[i] += BUDDY_BOOST
+      }
+    }
+    allIndicesByScore.sort((a, b) => scores[b] - scores[a])
   }
 
   // ---- Mode A: course-code mode ----
@@ -526,27 +531,22 @@ export async function topK(
   // queries every chunk's cosine sits near zero, so this returns [];
   // userPromptWithContext + the SCOPE rule then handle the empty case.
   //
-  // Per-source dedup: top-K should be K distinct sources, not K slices
-  // of the same page. We dedup on `c.code ?? c.url` because course
-  // chunks all share a single per-subject URL (every CPSC course points
-  // at /course-descriptions/subject/cpscv) — using URL alone collapsed
-  // every CPSC course into a single chunk and let lower-scoring chunks
-  // from other subjects (ATSC 212, MATH 442, …) take the freed slots.
-  // For programs and easters c.code is null, so dedup falls back to URL,
-  // preserving the original "one chunk per program page" behaviour.
+  // No dedup. Course codes are unique per chunk by construction in the
+  // pipeline (one chunk per course code), so there's nothing to collapse
+  // on the course side. Program sibling slices share a URL on purpose —
+  // each carries a distinct sub-section (definitional opener, course
+  // list, admission rules, streams) — and the buddy boost above already
+  // exists to lift those siblings over the floor when one of them
+  // confidently matches, so we want them grouped in the result, not
+  // collapsed away. This matches Mode B's behaviour for alias-triggered
+  // program queries. Sorted descending by score, so break (not continue)
+  // once we drop below minScore — every remaining chunk fails the gate.
+  // enforceTokenBudget below trims further if the score-passing set is
+  // still too large.
   const modeC: Chunk[] = []
-  const seenKeysC = new Set<string>()
-  // Sorted descending by score, so break (not continue) once we drop
-  // below minScore — every remaining chunk fails the gate. This is the
-  // loop's natural termination condition; enforceTokenBudget below
-  // trims further if the score-passing set is still too large.
   for (const i of allIndicesByScore) {
     if (scores[i] < minScore) break
-    const c = chunks[i]
-    const key = c.code ?? c.url
-    if (seenKeysC.has(key)) continue
-    seenKeysC.add(key)
-    modeC.push({ ...c, score: scores[i] })
+    modeC.push({ ...chunks[i], score: scores[i] })
   }
   return enforceTokenBudget(easterCollapse(modeC))
 }

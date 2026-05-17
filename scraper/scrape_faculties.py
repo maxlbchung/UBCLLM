@@ -201,19 +201,63 @@ def _strip_chrome(node: Node) -> None:
             chrome.decompose()
 
 
+_BODY_TAGS = {"p", "li", "h2", "h3", "h4"}
+
+
+def _walk_document_order(node: Node):
+    """Depth-first descendant walk yielding nodes in document order.
+
+    selectolax's `.css(selector_a, selector_b, ...)` returns elements
+    grouped by selector, not interleaved by DOM position — so it can't
+    be used when the relative order of different tags matters. This
+    walker uses the child/next linked-list to do a true DFS.
+    """
+    child = node.child
+    while child is not None:
+        yield child
+        if child.tag != "-text":
+            yield from _walk_document_order(child)
+        child = child.next
+
+
 def extract_body(tree: HTMLParser) -> tuple[str, list[str]]:
+    """Extract body text + heading list. Headings are emitted inline in the
+    body stream with Markdown-style level markers (`##` h2, `###` h3,
+    `####` h4) so the chunking pipeline can section the text by header.
+    See the matching docstring in scrape_degree_programs.py for the full
+    rationale."""
     root = _content_root(tree)
     _strip_chrome(root)
+    for sel in (".anchor-invisible", ".sr-only", "a.anchor"):
+        for n in root.css(sel):
+            n.decompose()
     headings: list[str] = []
-    for h in root.css("h2, h3, h4"):
-        t = h.text(strip=True)
-        if t:
-            headings.append(re.sub(r"\s+", " ", t))
     blocks: list[str] = []
-    for el in root.css("p, li, h2, h3, h4"):
+    for el in _walk_document_order(root):
+        tag = el.tag
+        if tag not in _BODY_TAGS:
+            continue
+        # Skip nested body tags (e.g. <td><p>x</p></td>) so we don't
+        # emit "x" twice — see comment in scrape_degree_programs.py.
+        anc = el.parent
+        nested = False
+        while anc is not None and anc is not root:
+            if anc.tag in _BODY_TAGS:
+                nested = True
+                break
+            anc = anc.parent
+        if nested:
+            continue
         t = el.text(separator=" ", strip=True)
-        if t:
-            blocks.append(re.sub(r"\s+", " ", t))
+        if not t:
+            continue
+        t = re.sub(r"\s+", " ", t)
+        if tag in ("h2", "h3", "h4"):
+            headings.append(t)
+            marker = "#" * int(tag[1])
+            blocks.append(f"{marker} {t}")
+        else:
+            blocks.append(t)
     text = "\n".join(blocks).strip()
     return text, headings
 

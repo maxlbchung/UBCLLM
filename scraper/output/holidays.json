@@ -1,0 +1,67 @@
+[
+  {
+    "name": "New Year's Day",
+    "dateText": "Thursday, January 1",
+    "date": "2026-01-01"
+  },
+  {
+    "name": "Family Day",
+    "dateText": "Monday, February 16",
+    "date": "2026-02-16"
+  },
+  {
+    "name": "Good Friday",
+    "dateText": "Friday, April 3",
+    "date": "2026-04-03"
+  },
+  {
+    "name": "Easter Monday",
+    "dateText": "Monday, April 6",
+    "date": "2026-04-06"
+  },
+  {
+    "name": "Victoria Day",
+    "dateText": "Monday, May 18",
+    "date": "2026-05-18"
+  },
+  {
+    "name": "Canada Day",
+    "dateText": "Wednesday, July 1",
+    "date": "2026-07-01"
+  },
+  {
+    "name": "BC Day",
+    "dateText": "Monday, August 3",
+    "date": "2026-08-03"
+  },
+  {
+    "name": "Labour Day",
+    "dateText": "Monday, September 7",
+    "date": "2026-09-07"
+  },
+  {
+    "name": "National Day for Truth and Reconciliation",
+    "dateText": "Wednesday, September 30",
+    "date": "2026-09-30"
+  },
+  {
+    "name": "Thanksgiving Day",
+    "dateText": "Monday, October 12",
+    "date": "2026-10-12"
+  },
+  {
+    "name": "Remembrance Day",
+    "dateText": "Wednesday, November 11",
+    "date": "2026-11-11"
+  },
+  {
+    "name": "Christmas Day",
+    "dateText": "Friday, December 25",
+    "date": "2026-12-25"
+  },
+  {
+    "name": "Boxing Day",
+    "dateText": "Monday, December 28 (in lieu)",
+    "date": "2026-12-28"
+  }
+]

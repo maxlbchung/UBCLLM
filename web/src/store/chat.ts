@@ -33,12 +33,26 @@ export interface ChatError {
   diag?: DiagEvent[]
 }
 
+// Why the assistant stream stopped, when the cause was something other
+// than a model-side EOS. ChatMessage reads this off the Message to
+// render an inline banner. `undefined` on the message means the model
+// ended its own reply normally; no banner needed.
+//
+//   'user'     — Stop button (cancelStream in Chat.tsx)
+//   'timeout'  — wallclock watchdog or inactivity stall caught and
+//                surfaced from streamChat's catch
+//   'word_cap' — HARD_WORD_CAP backstop tripped on a runaway loop
+//   'error'    — generic uncategorized failure; ChatMessage pairs this
+//                with the structured ChatError block below it
+export type StopReason = 'user' | 'timeout' | 'word_cap' | 'error'
+
 export interface Message {
   id: string
   role: Role
   content: string
   sources?: Chunk[]
   error?: ChatError
+  stopReason?: StopReason
 }
 
 interface ChatState {
@@ -48,6 +62,7 @@ interface ChatState {
   appendToLast: (delta: string) => void
   setSourcesOnLast: (sources: Chunk[]) => void
   setErrorOnLast: (error: ChatError) => void
+  setStopReasonOnLast: (reason: StopReason) => void
   setStreaming: (v: boolean) => void
   reset: () => void
 }
@@ -99,6 +114,15 @@ export const useChat = create<ChatState>((set) => ({
       }
       const msgs = s.messages.slice()
       msgs[msgs.length - 1] = { ...last, error }
+      return { messages: msgs }
+    }),
+  setStopReasonOnLast: (reason) =>
+    set((s) => {
+      if (s.messages.length === 0) return {}
+      const last = s.messages[s.messages.length - 1]
+      if (last.role !== 'assistant') return {}
+      const msgs = s.messages.slice()
+      msgs[msgs.length - 1] = { ...last, stopReason: reason }
       return { messages: msgs }
     }),
   setStreaming: (v) => set({ streaming: v }),

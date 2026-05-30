@@ -169,6 +169,44 @@ const PRESETS: Record<string, Tone[]> = {
   // at the call site. Very low amplitude so a fast stream doesn't
   // turn into a buzzing wash; just a hint of "keys clacking".
   botTyping: [{ freq: 1200, type: 'sine', duration: 0.018, amp: 0.2 }],
+  // Planner: picking up a course block. Quick upward chirp — short
+  // and snappy so it reads as "grabbed" without cluttering a fast
+  // drag sequence. Pitched between the course-expand and tab presets.
+  dragLift: [{ freq: [440, 780], type: 'sine', duration: 0.07, amp: 0.45 }],
+  // Planner: block placed into a term (move or new). Soft low thump
+  // that sweeps down quickly — reads as something landing on a surface.
+  // Used for both "add from lookup" and "reorder/move existing block".
+  dragDrop: [
+    { freq: [220, 100], type: 'sine', duration: 0.1, amp: 0.5 },
+    { freq: [440, 200], type: 'sine', duration: 0.06, amp: 0.2 },
+  ],
+  // Planner: drag cancelled (dropped on nothing). Soft descending
+  // blip — the block settling back to its origin. Lower energy than
+  // dragLift so it feels like an undo, not a new action.
+  dragCancel: [{ freq: [600, 340], type: 'sine', duration: 0.08, amp: 0.3 }],
+  // Planner: trash drop — block deleted. Reuses the conversation-
+  // delete shape (blip + low bump) but pitched slightly differently
+  // so it feels related but contextually distinct.
+  plannerTrash: [
+    { freq: 680, type: 'sine', duration: 0.03, amp: 0.4 },
+    { freq: 180, type: 'sine', duration: 0.14, amp: 0.4, delay: 0.035 },
+  ],
+  // Planner: autofill completed. Three quick ascending notes — a
+  // mini-fanfare that signals "batch operation done" without the full
+  // weight of the easter-egg victory chord.
+  autofillDone: [
+    { freq: 520, type: 'sine', duration: 0.06, amp: 0.5 },
+    { freq: 660, type: 'sine', duration: 0.06, amp: 0.5, delay: 0.06 },
+    { freq: 880, type: 'sine', duration: 0.1, amp: 0.55, delay: 0.12 },
+  ],
+  // Planner: "Clear All" pressed. Quick descending three-note motif
+  // — the inverse of autofillDone — so it sounds like things being
+  // swept away.
+  plannerClear: [
+    { freq: 880, type: 'sine', duration: 0.05, amp: 0.45 },
+    { freq: 660, type: 'sine', duration: 0.05, amp: 0.45, delay: 0.05 },
+    { freq: 440, type: 'sine', duration: 0.09, amp: 0.4, delay: 0.1 },
+  ],
 }
 
 // Hard ceiling on output gain. Each preset's per-tone `amp` multiplies

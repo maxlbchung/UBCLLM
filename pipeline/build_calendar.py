@@ -1,4 +1,4 @@
-"""Merge events / academic_dates / holidays into web/public/data/calendar.json.
+"""Merge academic_dates / holidays into web/public/data/calendar.json.
 
 Each scraper in ``scraper/output/`` emits a source-specific shape; this
 script normalizes them into a single ``CalendarItem`` schema, sorts by
@@ -24,7 +24,6 @@ ROOT = Path(__file__).resolve().parent.parent
 SCRAPER_OUTPUT = ROOT / "scraper" / "output"
 WEB_DATA = ROOT / "web" / "public" / "data"
 
-EVENTS_FILE = SCRAPER_OUTPUT / "events.json"
 ACADEMIC_FILE = SCRAPER_OUTPUT / "academic_dates.json"
 HOLIDAYS_FILE = SCRAPER_OUTPUT / "holidays.json"
 OUTPUT_FILE = WEB_DATA / "calendar.json"
@@ -45,33 +44,6 @@ def _load(path: Path) -> list[dict]:
     if not path.exists():
         return []
     return json.loads(path.read_text(encoding="utf-8"))
-
-
-def _normalize_events(raw: list[dict]) -> list[dict]:
-    out: list[dict] = []
-    for ev in raw:
-        date = (ev.get("start") or "").strip()
-        if not date:
-            continue
-        title = (ev.get("title") or "").strip()
-        if not title:
-            continue
-        item = {
-            "id": _hash("event", date, title, ev.get("url") or ""),
-            "category": "event",
-            "title": title,
-            "date": date,
-        }
-        if ev.get("end"):
-            item["endDate"] = ev["end"]
-        if ev.get("url"):
-            item["url"] = ev["url"]
-        if ev.get("location"):
-            item["description"] = ev["location"]
-        if ev.get("image"):
-            item["image"] = ev["image"]
-        out.append(item)
-    return out
 
 
 import re
@@ -186,7 +158,6 @@ def _prune_past(items: list[dict], today: dt.date) -> list[dict]:
 def build(today: dt.date | None = None) -> dict:
     today = today or dt.date.today()
     items: list[dict] = []
-    items.extend(_normalize_events(_load(EVENTS_FILE)))
     items.extend(_normalize_academic(_load(ACADEMIC_FILE)))
     items.extend(_normalize_holidays(_load(HOLIDAYS_FILE)))
     items = _prune_past(items, today)
@@ -212,12 +183,12 @@ def main() -> None:
         encoding="utf-8",
     )
 
-    counts = {"academic": 0, "holiday": 0, "event": 0}
+    counts = {"academic": 0, "holiday": 0}
     for it in payload["items"]:
         counts[it["category"]] = counts.get(it["category"], 0) + 1
     print(
         f"Wrote {len(payload['items'])} items "
-        f"(academic={counts['academic']} holiday={counts['holiday']} event={counts['event']}) "
+        f"(academic={counts['academic']} holiday={counts['holiday']}) "
         f"to {args.output}"
     )
 

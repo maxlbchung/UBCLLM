@@ -6,7 +6,12 @@ import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { useChat, type Message } from './chat'
 
-export type View = 'home' | 'chat' | 'lookup' | 'prereq' | 'other'
+// The landing page is its own route now (see lib/router + App.tsx). This
+// `view` only selects which tool panel shows inside the app shell, so it no
+// longer carries a 'home' member.
+export type View = 'chat' | 'lookup' | 'prereq' | 'planning' | 'other'
+
+const VALID_VIEWS: View[] = ['chat', 'lookup', 'prereq', 'planning', 'other']
 
 export interface Conversation {
   id: string
@@ -55,10 +60,10 @@ export const useConversations = create<State>()(
       conversations: {},
       order: [],
       activeId: null,
-      // First-time visitors land on Home so they see the app's intro
-      // panel before the chat picker. Returning visitors restore
-      // whatever view they were last on via the persist middleware.
-      view: 'home',
+      // Which tool panel shows when the app shell (/app route) is open. The
+      // chat panel is the default first tool; returning visitors restore
+      // whatever tool they were last on via the persist middleware.
+      view: 'chat',
       sidebarCollapsed: false,
 
       newConversation: () => {
@@ -170,7 +175,15 @@ export const useConversations = create<State>()(
     {
       name: 'ubcllm-conversations',
       storage: createJSONStorage(() => localStorage),
-      version: 1,
+      version: 2,
+      // v1 persisted a 'home' view that has since become its own route. Map
+      // any leftover 'home' (or otherwise unknown) view onto the chat panel
+      // so a rehydrated app shell always has a valid tool selected.
+      migrate: (persisted) => {
+        const s = (persisted ?? {}) as Record<string, unknown>
+        if (!VALID_VIEWS.includes(s.view as View)) s.view = 'chat'
+        return s as unknown as State
+      },
       // After hydration, load the active conversation's messages into the
       // chat store so the UI reflects what the user was last looking at.
       onRehydrateStorage: () => (state) => {

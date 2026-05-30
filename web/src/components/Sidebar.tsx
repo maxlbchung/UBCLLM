@@ -1,14 +1,40 @@
-import { useEffect, useRef, useState, type MouseEvent } from 'react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ComponentType,
+  type MouseEvent,
+} from 'react'
 import { createPortal } from 'react-dom'
 import { useConversations, type View } from '../store/conversations'
+import { ROUTES, navigate } from '../lib/router'
 import { playSfx } from '../lib/sfx'
 import { APP_VERSION } from '../version'
+import {
+  ChatIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  GradCapIcon,
+  GraphIcon,
+  PencilIcon,
+  PlusIcon,
+  SearchIcon,
+  SettingsIcon,
+  XIcon,
+  type IconProps,
+} from './icons'
 
-const TOOLS: { view: View; label: string; icon: string }[] = [
-  { view: 'home', label: 'Home', icon: '🏠' },
-  { view: 'chat', label: 'AI Chatbot', icon: '💬' },
-  { view: 'lookup', label: 'Course Lookup', icon: '🔎' },
-  { view: 'prereq', label: 'Prerequisite Tree', icon: '🌳' },
+// Home is no longer one of these — it's a separate route (no sidebar), reached
+// via the dedicated Home button rendered above the tool list.
+const TOOLS: {
+  view: View
+  label: string
+  Icon: ComponentType<IconProps>
+}[] = [
+  { view: 'chat', label: 'Ask AI', Icon: ChatIcon },
+  { view: 'lookup', label: 'Course Finder', Icon: SearchIcon },
+  { view: 'prereq', label: 'Prerequisite Visualizer', Icon: GraphIcon },
+  { view: 'planning', label: 'Degree Planner', Icon: GradCapIcon },
 ]
 
 const POPUP_WIDTH = 224 // px; matches Tailwind's w-56
@@ -137,18 +163,96 @@ export function Sidebar() {
   }, [pendingDeleteId])
 
   if (collapsed) {
+    // Mirrors the expanded layout's vertical skeleton (same `p-3 gap-3`,
+    // same per-row heights: h-9 new-chat, h-8 nav rows) so every control
+    // sits at the exact same Y as its expanded counterpart and nothing
+    // jumps when toggling. Dividers appear only where the expanded sidebar
+    // has them: above the (here-empty) chat-history region, and the
+    // full-bleed rule above the settings row.
     return (
-      <aside className="w-12 shrink-0 flex flex-col items-center bg-canvas border-r border-line py-3 gap-2 h-screen">
+      <aside className="w-12 shrink-0 flex flex-col bg-canvas border-r border-line py-3 px-2 gap-3 h-screen">
+        <div className="flex items-center justify-center">
+          <button
+            onClick={() => {
+              playSfx('expand')
+              toggleSidebar()
+            }}
+            className="text-fg-muted hover:text-fg hover:bg-surface rounded p-1"
+            aria-label="Expand sidebar"
+            title="Expand sidebar"
+          >
+            <ChevronRightIcon className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* New chat — square button, kept centered in the taller h-9 slot
+            so its Y still matches the expanded new-chat row. */}
+        <div className="h-9 flex items-center justify-center">
+          <button
+            onClick={() => {
+              playSfx('click')
+              newConversation()
+            }}
+            className="h-8 w-8 flex items-center justify-center rounded bg-accent hover:bg-accent-hover text-accent-fg"
+            aria-label="New chat"
+            title="New chat"
+          >
+            <PlusIcon className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Page selectors — square buttons, each filling its h-8 slot so
+            the Y matches the expanded tool rows. */}
+        <div className="flex flex-col items-center gap-1">
+          {TOOLS.map((t) => {
+            const active = view === t.view
+            return (
+              <button
+                key={t.view}
+                onClick={() => {
+                  if (view !== t.view) playSfx('tab')
+                  setView(t.view)
+                }}
+                className={
+                  'h-8 w-8 flex items-center justify-center rounded ' +
+                  (active ? 'bg-surface-raised' : 'hover:bg-surface')
+                }
+                aria-label={t.label}
+                aria-current={active ? 'page' : undefined}
+                title={t.label}
+              >
+                <t.Icon className="w-4 h-4 text-accent" />
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Divider mirroring the expanded "Chat History" rule. */}
+        <div className="border-t border-line" />
+
+        {/* Stands in for the expanded history list so the settings row
+            sinks to the bottom. */}
+        <div className="flex-1" />
+
+        {/* Full-bleed footer divider, matching the expanded `-mx-3` rule. */}
+        <div className="-mx-2 border-t border-line" />
+
+        {/* Other / settings */}
         <button
+          type="button"
           onClick={() => {
-            playSfx('expand')
-            toggleSidebar()
+            if (view !== 'other') playSfx('tab')
+            setView('other')
           }}
-          className="text-fg-muted hover:text-fg hover:bg-surface rounded p-1.5 text-base leading-none"
-          aria-label="Expand sidebar"
-          title="Expand sidebar"
+          className={
+            'self-center h-8 w-8 flex items-center justify-center rounded ' +
+            (view === 'other' ? 'bg-surface-raised' : 'hover:bg-surface')
+          }
+          aria-label="Other"
+          aria-current={view === 'other' ? 'page' : undefined}
+          title="Other"
         >
-          ▶
+          <SettingsIcon className="w-4 h-4 text-accent" />
         </button>
       </aside>
     )
@@ -160,7 +264,15 @@ export function Sidebar() {
     <>
       <aside className="w-72 shrink-0 flex flex-col bg-canvas border-r border-line p-3 gap-3 h-screen">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 min-w-0">
+          <button
+            onClick={() => {
+              playSfx('tab')
+              navigate(ROUTES.home)
+            }}
+            className="flex items-center gap-2 min-w-0 text-left rounded hover:opacity-80"
+            aria-label="Back to home"
+            title="Back to home"
+          >
             <img
               src={`${import.meta.env.BASE_URL}logo.png`}
               alt="Reodite"
@@ -168,17 +280,17 @@ export function Sidebar() {
             />
             <h1 className="text-sm font-semibold tracking-wide">Reodite</h1>
             <span className="text-[0.625rem] text-fg-faint">AI Academic Assistance</span>
-          </div>
+          </button>
           <button
             onClick={() => {
               playSfx('collapse')
               toggleSidebar()
             }}
-            className="text-fg-muted hover:text-fg hover:bg-surface rounded p-1 text-base leading-none shrink-0"
+            className="text-fg-muted hover:text-fg hover:bg-surface rounded p-1 shrink-0"
             aria-label="Collapse sidebar"
             title="Collapse sidebar"
           >
-            ◀
+            <ChevronLeftIcon className="w-4 h-4" />
           </button>
         </div>
 
@@ -207,7 +319,7 @@ export function Sidebar() {
                   : 'text-fg-muted hover:bg-surface hover:text-fg')
               }
             >
-              <span aria-hidden>{t.icon}</span>
+              <t.Icon className="w-4 h-4 text-accent" />
               <span>{t.label}</span>
               {t.view === 'chat' && (
                 <span className="ml-auto text-[0.5625rem] uppercase tracking-wider text-highlight font-mono">
@@ -283,7 +395,7 @@ export function Sidebar() {
                 <button
                   onClick={(e) => startRename(e, id)}
                   className={
-                    'text-fg-faint hover:text-fg text-xs ' +
+                    'text-fg-faint hover:text-fg ' +
                     (isRenaming
                       ? 'opacity-100 text-fg'
                       : 'opacity-0 group-hover:opacity-100')
@@ -291,12 +403,12 @@ export function Sidebar() {
                   aria-label="Rename conversation"
                   title="Rename"
                 >
-                  ✎
+                  <PencilIcon className="w-3.5 h-3.5" />
                 </button>
                 <button
                   onClick={(e) => openDeletePrompt(e, id)}
                   className={
-                    'text-fg-faint hover:text-danger-fg text-xs ' +
+                    'text-fg-faint hover:text-danger-fg ' +
                     (isPendingDelete
                       ? 'opacity-100 text-danger-fg'
                       : 'opacity-0 group-hover:opacity-100')
@@ -305,7 +417,7 @@ export function Sidebar() {
                   aria-haspopup="dialog"
                   aria-expanded={isPendingDelete}
                 >
-                  ✕
+                  <XIcon className="w-3.5 h-3.5" />
                 </button>
               </div>
             )
@@ -330,7 +442,7 @@ export function Sidebar() {
               : 'text-fg-muted hover:bg-surface hover:text-fg')
           }
         >
-          <span aria-hidden>⚙</span>
+          <SettingsIcon className="w-4 h-4 text-accent" />
           <span>Other</span>
         </button>
         {/* Footer line — version + copyright + license collapsed onto one

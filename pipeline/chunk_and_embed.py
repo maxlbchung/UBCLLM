@@ -93,6 +93,18 @@ def course_chunk(c: dict) -> Chunk:
         parts.append(f"Equivalency: {c['equivalency']}")
     if c.get("recommended"):
         parts.append(f"Recommended: {c['recommended']}")
+    # Credit/D/Fail eligibility. The course scraper stores this as a boolean
+    # (`credit_d_fail`, from UBC's field_course_crdfail). Render it explicitly
+    # — same rationale as the Prerequisites/Corequisites lines above — so the
+    # model can answer "can I take X Credit/D/Fail?" by citing a statement
+    # rather than inferring from absence. Pre-JSON:API this rode inline in the
+    # description as "...not eligible for Credit/D/Fail grading"; keeping a line
+    # here preserves that answerability now that it's a structured field.
+    cdf = c.get("credit_d_fail")
+    if cdf is True:
+        parts.append("Credit/D/Fail grading: eligible")
+    elif cdf is False:
+        parts.append("Credit/D/Fail grading: not eligible")
     return Chunk(
         id=f"course:{c['subject']}_{c['number']}",
         kind="course",

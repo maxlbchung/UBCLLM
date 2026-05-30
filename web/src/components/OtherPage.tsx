@@ -3,6 +3,15 @@ import { useSettings, type Theme, type Zoom } from '../store/settings'
 import { useEasterEggs } from '../store/easterEggs'
 import { playSfx } from '../lib/sfx'
 import { SOMAFM_CHANNELS } from '../lib/music'
+import {
+  EggIcon,
+  InfoIcon,
+  MusicIcon,
+  PaletteIcon,
+  PlayIcon,
+  StopIcon,
+  VolumeIcon,
+} from './icons'
 
 const THEME_OPTIONS: { value: Theme; label: string }[] = [
   { value: 'dark', label: 'Dark' },
@@ -52,7 +61,8 @@ export function OtherPage() {
     SOMAFM_CHANNELS.find((c) => c.key === musicStation) ?? SOMAFM_CHANNELS[0]
 
   return (
-    <div className="flex flex-col h-screen p-6 gap-8 max-w-3xl mx-auto w-full min-h-0 overflow-y-auto">
+    <div className="h-screen min-h-0 overflow-y-auto">
+    <div className="flex flex-col p-6 gap-8 max-w-3xl mx-auto w-full">
       <header>
         <h2 className="text-xl font-semibold">Other</h2>
       </header>
@@ -68,7 +78,10 @@ export function OtherPage() {
       <div className="flex flex-wrap items-start gap-8">
         <div className="flex flex-col gap-4 w-72">
         <section className="flex flex-col gap-4 bg-surface-soft border border-line rounded-md p-5">
-          <h3 className="text-xs uppercase tracking-wide text-fg-faint">Audio Effects</h3>
+          <h3 className="flex items-center gap-1.5 text-xs uppercase tracking-wide text-fg-faint">
+            <VolumeIcon className="w-3.5 h-3.5 text-accent" />
+            Audio Effects
+          </h3>
 
           <VolumeSlider
             id="settings-volume"
@@ -92,7 +105,8 @@ export function OtherPage() {
         </section>
 
         <section className="flex flex-col gap-4 bg-surface-soft border border-line rounded-md p-5">
-          <h3 className="text-xs uppercase tracking-wide text-fg-faint">
+          <h3 className="flex items-center gap-1.5 text-xs uppercase tracking-wide text-fg-faint">
+            <PaletteIcon className="w-3.5 h-3.5 text-accent" />
             Visuals
           </h3>
           <div className="flex items-center justify-between">
@@ -145,7 +159,8 @@ export function OtherPage() {
         </section>
 
         <section className="flex flex-col gap-2 bg-surface-soft border border-line rounded-md p-5">
-          <h3 className="text-xs uppercase tracking-wide text-fg-faint">
+          <h3 className="flex items-center gap-1.5 text-xs uppercase tracking-wide text-fg-faint">
+            <EggIcon className="w-6 h-6 text-highlight" />
             Easter Eggs
           </h3>
           <p className="text-sm text-fg">
@@ -158,7 +173,10 @@ export function OtherPage() {
         </div>
 
         <section className="flex flex-col gap-4 w-72 bg-surface-soft border border-line rounded-md p-5">
-          <h3 className="text-xs uppercase tracking-wide text-fg-faint">Music</h3>
+          <h3 className="flex items-center gap-1.5 text-xs uppercase tracking-wide text-fg-faint">
+            <MusicIcon className="w-3.5 h-3.5 text-accent" />
+            Music
+          </h3>
 
           <VolumeSlider
             id="settings-music-volume"
@@ -167,12 +185,36 @@ export function OtherPage() {
             onChange={setMusicVolume}
           />
 
-          <ThemedToggle
+          {/* Music transport. A play button that swaps to a stop button
+              while streaming (filled accent = playing) rather than the
+              pill toggle the other audio rows use — reads as a media
+              control. role=switch keeps the on/off a11y semantics. */}
+          <button
             id="settings-music"
-            label="Play"
-            checked={musicEnabled}
-            onChange={setMusicEnabled}
-          />
+            type="button"
+            role="switch"
+            aria-checked={musicEnabled}
+            aria-label={musicEnabled ? 'Stop music' : 'Play music'}
+            onClick={() => {
+              // Update the store before the chirp, matching ThemedToggle's
+              // ordering so playSfx reads the new state.
+              setMusicEnabled(!musicEnabled)
+              playSfx(musicEnabled ? 'toggleOff' : 'toggleOn')
+            }}
+            className={
+              'flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30 ' +
+              (musicEnabled
+                ? 'bg-accent text-accent-fg hover:bg-accent-hover'
+                : 'border border-line bg-surface-raised text-fg hover:bg-surface hover:border-line-soft')
+            }
+          >
+            {musicEnabled ? (
+              <StopIcon className="w-4 h-4" />
+            ) : (
+              <PlayIcon className="w-4 h-4" />
+            )}
+            <span>{musicEnabled ? 'Stop' : 'Play'}</span>
+          </button>
 
           {/* Station picker — faded and inert until Play is on. We pair
               `disabled` on the <select> (keyboard / screen-reader
@@ -241,7 +283,8 @@ export function OtherPage() {
       </div>
 
       <section className="mt-auto pt-6 border-t border-line">
-        <h3 className="text-xs uppercase tracking-wide text-fg-faint mb-2">
+        <h3 className="flex items-center gap-1.5 text-xs uppercase tracking-wide text-fg-faint mb-2">
+          <InfoIcon className="w-3.5 h-3.5 text-accent" />
           About
         </h3>
         <p className="text-xs text-fg-muted leading-relaxed">
@@ -280,6 +323,7 @@ export function OtherPage() {
           .
         </p>
       </section>
+    </div>
     </div>
   )
 }

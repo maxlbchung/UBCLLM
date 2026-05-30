@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Handle, Position, type NodeProps } from 'reactflow'
 import { renderTextWithLinks } from '../lib/renderText'
 import { playSfx } from '../lib/sfx'
+import { ChevronDownIcon } from './icons'
 
 // ReactFlow custom node for an `Or-dropdown` group — used when the prereq
 // string says "one of A, B, C" (or a bare "A or B" without a wrapping
@@ -233,7 +234,9 @@ function DropdownSelect({
         >
           {current}
         </span>
-        <span style={{ color: 'var(--fg-faint)', fontSize: 9 }}>▾</span>
+        <span style={{ color: 'var(--fg-faint)', display: 'flex' }}>
+          <ChevronDownIcon className="w-2.5 h-2.5" />
+        </span>
       </button>
       {open && (
         <div

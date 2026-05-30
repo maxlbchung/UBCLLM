@@ -14496,9 +14496,7 @@
     "faculty": "The Faculty of Medicine",
     "level": "undergraduate",
     "kind": "other",
-    "referenced_courses": [
-      "FACNM 320"
-    ],
+    "referenced_courses": [],
     "children": []
   },
   {

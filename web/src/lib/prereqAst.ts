@@ -1264,3 +1264,93 @@ export function displayExpr(expr: Expr): string {
       return expr.children.map(displayExpr).join(' / ')
   }
 }
+
+/**
+ * Evaluate a prereq AST against a set of already-completed course codes.
+ * Used by the Degree Planner to flag blocks whose prereqs aren't met by
+ * earlier terms (or, for coreqs, by earlier-or-same terms).
+ *
+ * Unevaluable branches (raw `literal` prose like "third-year standing" or
+ * a `flattened` clause with no extractable code structure) are *skipped*
+ * inside AND/OR rather than treated as satisfied. That asymmetric
+ * behaviour matters: when a course's prereq is something like
+ *   "Either (a) one of MATH 100/102/… or (b) advanced credit for MATH 100"
+ * UBC's branch (b) parses as a literal, and the old "literal = true"
+ * rule made the entire OR look satisfied even when the student has
+ * nothing planned. Skipping literals lets the evaluator answer based on
+ * the branches it can actually verify; when every branch is unevaluable
+ * the result defaults to satisfied (we can't disprove it, so don't
+ * paint a red border over prose conditions we can't reason about).
+ *
+ * `soft` always evaluates to satisfied — it wraps a recommendation, not
+ * a requirement.
+ */
+export function isSatisfied(
+  expr: Expr | null,
+  completed: Set<string>,
+): boolean {
+  if (!expr) return true
+  switch (expr.kind) {
+    case 'code':
+      return completed.has(expr.code)
+    case 'and': {
+      const evaluable = expr.children.filter((c) => !isUnevaluable(c))
+      if (evaluable.length === 0) return true
+      return evaluable.every((c) => isSatisfied(c, completed))
+    }
+    case 'or': {
+      const evaluable = expr.children.filter((c) => !isUnevaluable(c))
+      if (evaluable.length === 0) return true
+      return evaluable.some((c) => isSatisfied(c, completed))
+    }
+    case 'soft':
+      return true
+    case 'literal':
+      return true
+    case 'flattened':
+      return expr.subExpr ? isSatisfied(expr.subExpr, completed) : true
+  }
+}
+
+// A node is "unevaluable" when nothing inside it maps to a course code
+// the planner can check. Pure literals (e.g. "third-year standing") and
+// flattened branches whose parser couldn't extract any structured code
+// both qualify. AND/OR with mixed evaluable + unevaluable children
+// ignore the unevaluable ones during satisfaction checks.
+function isUnevaluable(expr: Expr): boolean {
+  if (expr.kind === 'literal') return true
+  if (expr.kind === 'flattened' && expr.subExpr === null) return true
+  return false
+}
+
+/**
+ * Collect the unmet pieces of a prereq tree as displayable strings — one
+ * per top-level unsatisfied AND-child, with OR-groups flattened as
+ * "X / Y / Z" via displayExpr. Returns [] when fully satisfied. Feeds the
+ * tooltip on red-bordered planner blocks.
+ */
+export function missingPrereqs(
+  expr: Expr | null,
+  completed: Set<string>,
+): string[] {
+  if (!expr) return []
+  if (isSatisfied(expr, completed)) return []
+  switch (expr.kind) {
+    case 'code':
+      return [expr.code]
+    case 'and':
+      return expr.children
+        .filter((c) => !isUnevaluable(c))
+        .flatMap((c) => missingPrereqs(c, completed))
+    case 'or':
+      // OR fails only when all branches fail — surface the whole group
+      // collapsed to "A / B / C" so the user sees the choices, not just
+      // the first arm.
+      return [displayExpr(expr)]
+    case 'soft':
+    case 'literal':
+      return []
+    case 'flattened':
+      return expr.subExpr ? missingPrereqs(expr.subExpr, completed) : []
+  }
+}

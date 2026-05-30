@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import json
 import logging
 import time
 from pathlib import Path
@@ -29,12 +30,12 @@ OUTPUT_DIR = Path(__file__).parent / "output"
 log = logging.getLogger("ubcllm.scraper")
 
 
-def cache_path_for(url: str) -> Path:
+def cache_path_for(url: str, suffix: str = "html") -> Path:
     """Map a URL to a deterministic file in CACHE_DIR."""
     parsed = urlparse(url)
     safe = (parsed.path.strip("/") or "index").replace("/", "__")
     digest = hashlib.sha1(url.encode("utf-8")).hexdigest()[:10]
-    return CACHE_DIR / f"{safe}_{digest}.html"
+    return CACHE_DIR / f"{safe}_{digest}.{suffix}"
 
 
 class RateLimitedClient:
@@ -80,10 +81,22 @@ class RateLimitedClient:
         cache_file.write_text(html, encoding="utf-8")
         return html
 
+    async def get_json(self, url: str, *, force: bool = False) -> dict:
+        """Fetch a JSON document (e.g. a JSON:API page), using the on-disk
+        cache unless force=True. Cached alongside HTML in CACHE_DIR with a
+        .json suffix so the two fetch paths never collide."""
+        cache_file = cache_path_for(url, "json")
+        if cache_file.exists() and not force:
+            return json.loads(cache_file.read_text(encoding="utf-8"))
+        text = await self._get_raw(url)
+        cache_file.parent.mkdir(parents=True, exist_ok=True)
+        cache_file.write_text(text, encoding="utf-8")
+        return json.loads(text)
 
-def make_async_client() -> httpx.AsyncClient:
+
+def make_async_client(accept: str = "text/html") -> httpx.AsyncClient:
     return httpx.AsyncClient(
-        headers={"User-Agent": USER_AGENT, "Accept": "text/html"},
+        headers={"User-Agent": USER_AGENT, "Accept": accept},
         timeout=DEFAULT_TIMEOUT,
         follow_redirects=True,
     )

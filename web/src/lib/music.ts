@@ -165,7 +165,7 @@ function fadeVolume(
     }
     const t = Math.min(1, (now - startTime) / FADE_MS)
     const k = fadingOut ? 1 - (1 - t) ** 3 : t ** 3
-    audioEl.volume = from + (to - from) * k
+    audioEl.volume = Math.min(1, Math.max(0, from + (to - from) * k))
     if (t >= 1) {
       fadeRaf = null
       onComplete?.()

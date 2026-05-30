@@ -7,7 +7,7 @@ Browser-native UBC academic-advisor chatbot. Qwen3.5 2B runs in the user's brows
 - **Latest version:** see `web/src/version.ts` (`APP_VERSION`); shown bottom-left in the running app.
 
 Original setup plan (kept for reference; some details now stale):
-**`C:\Users\max\.claude\plans\set-up-the-environment-nested-wigderson.md`**
+**`C:\Users\max\.Codex\plans\set-up-the-environment-nested-wigderson.md`**
 
 ## Architecture (one-liner per piece)
 
@@ -21,11 +21,11 @@ Original setup plan (kept for reference; some details now stale):
 UBCLLM/
 ├── web/                Vite + React 19 + TS app (the only thing deployed)
 │   ├── src/
-│   │   ├── lib/        embed.ts · retrieve.ts · llm.ts · prompts.ts · router.ts
+│   │   ├── lib/        embed.ts · retrieve.ts · llm.ts · prompts.ts
 │   │   ├── store/      chat.ts (Zustand) · conversations.ts (localStorage-persisted)
 │   │   ├── components/ Sidebar · Chat · ChatMessage · ModelLoader
 │   │   │               · CourseLookup · PrereqTree
-│   │   ├── App.tsx     route switcher: /home (no sidebar) vs /app (sidebar + tool views)
+│   │   ├── App.tsx     view switcher: chat / lookup / prereq
 │   │   └── version.ts  APP_VERSION (mirrored in package.json)
 │   └── public/data/    chunks.json + embeddings.bin (regenerated in CI)
 ├── scraper/            Python 3.14 — crawls UBC calendar (output committed)
@@ -61,7 +61,6 @@ The full v1 stack from the original plan is shipped and live. Highlights:
 - **Calendar widget** (Home page) — read-only `CalendarWidget` showing academic deadlines / statutory holidays. Two independent filter chips, side-by-side mini-grid + upcoming list on desktop (stacks on mobile), prev/next month navigation, click month header to jump back to today. Fed by two scrapers (`scrape_academic_dates.py`, `scrape_holidays.py`) → normalized in `pipeline/build_calendar.py` → consumed as `web/public/data/calendar.json`. Calendar data is **not** in the RAG corpus on purpose (date-keyed facts don't belong in semantic retrieval).
 
 **Important runtime contracts (don't break these silently):**
-- **Two top-level routes, hand-rolled router** (`web/src/lib/router.ts`): `/home` (the landing page, rendered WITHOUT the sidebar) and `/app` (the sidebar shell that hosts the chat/lookup/prereq/planning/other panels via the persisted `view` flag — `view` no longer has a `'home'` member). The bare base URL `/UBCLLM/` canonicalizes to `/home`. It's a ~40-line History-API store (`navigate()`/`replaceRoute()`/`useRoute()`), not react-router — too little routing to justify the dep. Route names live in the `ROUTES` constant so renaming is one line. **GitHub Pages has no SPA history-fallback**, so `vite.config.ts` has a `spa-404-fallback` plugin that copies the built `index.html` → `dist/404.html`; Pages serves that for any unmatched path and the router reads `location.pathname` to render the right route (asset URLs are base-absolute, so the copy works from any depth). Don't delete that copy or a hard refresh / direct hit on `/UBCLLM/app` will 404. The store's persist `version` was bumped to 2 with a `migrate` that maps a leftover `view: 'home'` onto `'chat'`.
 - **Retrieval modes + boosts in `topK`** (`web/src/lib/retrieve.ts`): three modes (A: course-code, B: program/easter via ALIASES hit, C: default semantic) with two additive boosts — a program-title-match boost for any program OR easter chunk whose title substring-matches a query token, and a course-keyword boost for course chunks (only) when the query says "course"/"class". Mode A uses string-contains-on-asked-code as the structural signal (no score boost), so the literal course always lands in the result regardless of MiniLM's clustering blindspot for course numbers. Easter chunks ride the program-title boost (since it reflects real topical alignment) but deliberately do NOT ride the course-keyword boost (which is unconditional on kind and would let easters win against on-topic courses for unrelated queries).
 - **MLCEngine runs in a Web Worker** (`web/src/lib/llm.worker.ts` + `web/src/lib/llm.ts`): `CreateWebWorkerMLCEngine` keeps the GPUDevice + model pipeline owned by a worker process so brief tab-visibility / page-lifecycle events don't trigger device-lost → `engine.unload()` → "Buffer was unmapped" / "Model not loaded" cascades. `streamChat` still serializes calls via a shared promise tail + `resetChat()` to avoid the in-process buffer race, and on a stale-engine error it terminates the worker and respawns one (see `discardEngine()`).
 - **Same MiniLM both sides**: `pipeline/chunk_and_embed.py` uses `sentence-transformers/all-MiniLM-L6-v2`; `web/src/lib/embed.ts` uses `Xenova/all-MiniLM-L6-v2`. Same weights, different distributions — both must be normalized so dot product == cosine.

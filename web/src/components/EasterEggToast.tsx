@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useEasterEggs } from '../store/easterEggs'
 import { playSfx } from '../lib/sfx'
+import { SparklesIcon } from './icons'
 
 // SFX timeline lifted from the old sidebar counter:
 //   t=0     eggFound + eggWind kick off (entrance + pad)
@@ -181,8 +182,9 @@ export function EasterEggToast() {
       }}
       className="pointer-events-none fixed bottom-10 left-1/2 z-50 rounded-lg border-2 border-highlight-fg bg-surface px-6 py-3 shadow-lg shadow-black/40"
     >
-      <p className="text-center text-sm font-semibold tracking-wide text-highlight-fg">
-        🎉 Easter Egg Found!
+      <p className="flex items-center justify-center gap-1.5 text-sm font-semibold tracking-wide text-highlight-fg">
+        <SparklesIcon className="w-4 h-4 text-highlight" />
+        Easter Egg Found!
       </p>
       <p className="mt-1 text-center font-mono text-xs text-fg-muted">
         {/* Wrapper is relative + inline-block so the rings + sparks

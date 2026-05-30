@@ -1,12 +1,12 @@
 // Calendar data types + helpers for the home-page CalendarWidget.
 //
 // The payload at `<base>/data/calendar.json` is built offline by
-// `pipeline/build_calendar.py` from the three scrapers under
-// `scraper/output/`. It is intentionally separate from the RAG corpus
+// `pipeline/build_calendar.py` from the academic-dates + holidays
+// scrapers under `scraper/output/`. It is intentionally separate from the RAG corpus
 // (`chunks.json`) — date-keyed facts shouldn't be retrievable by
 // semantic search.
 
-export type CalendarCategory = 'academic' | 'holiday' | 'event'
+export type CalendarCategory = 'academic' | 'holiday'
 
 export interface CalendarItem {
   id: string
@@ -16,7 +16,6 @@ export interface CalendarItem {
   endDate?: string
   url?: string
   description?: string
-  image?: string
 }
 
 export interface CalendarPayload {

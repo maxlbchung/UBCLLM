@@ -51,7 +51,7 @@ function isNoneOrEmpty(value: string | undefined): boolean {
 }
 
 function normalize(query: string): string {
-  const m = query.toUpperCase().match(/^([A-Z]{2,5})(?:_V)?\s*(\d{2,4}[A-Z]?)$/)
+  const m = query.toUpperCase().match(/^([A-Z]{2,4})(?:_V)?\s*(\d{2,4}[A-Z]?)$/)
   if (!m) return query.toUpperCase().replace(/\s+/g, ' ').trim()
   return `${m[1]} ${m[2]}`
 }

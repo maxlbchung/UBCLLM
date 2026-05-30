@@ -5,8 +5,10 @@ import {
   type Chunk,
   type ParsedCourse,
 } from '../lib/retrieve'
+import { parseQuery, type ParsedQuery } from '../lib/courseQuery'
 import { ABCD_EASTER_ID, useEasterEggs } from '../store/easterEggs'
 import { playSfx } from '../lib/sfx'
+import { ExternalLinkIcon } from './icons'
 
 // Wrap every (case-insensitive) occurrence of `keyword` inside `text` with a
 // <mark> so the keyword filter's match site is visible in the title /
@@ -40,82 +42,9 @@ function highlightKeyword(text: string, keyword: string): ReactNode {
   return <Fragment>{parts}</Fragment>
 }
 
-type ParsedQuery =
-  | { kind: 'none' }
-  | { kind: 'exact'; code: string }
-  | { kind: 'subject'; subject: string }
-  | { kind: 'filter'; subject: string; digit: number; op: '=' | '+' | '-' }
-  | { kind: 'invalidFilter'; reason: string }
-
-/**
- * Parse a lookup-bar input into one of:
- *   - exact:   "CPSC 110" / "CPSC 22" → code-shaped query (1–4 digits).
- *              lookup() resolves these in two stages: first index.get(code)
- *              for a complete code, falling back to a prefix scan over
- *              `codes` so partial numbers ("CPSC 22") surface CPSC 220,
- *              221, 226, … as an expandable list.
- *   - subject: "CPSC"                → all courses in that subject
- *   - filter:  "CPSC 100 =" / "+" / "-" → all courses in subject whose first
- *              digit equals / is ≥ / is < the query's first digit
- *
- * "+" includes the boundary digit; "-" excludes it. So `200 +` covers 2xx
- * upward, `250 -` covers 1xx only, `100 =` is exactly 1xx.
- *
- * Filters are only accepted when the number is in X00 form (the canonical
- * level boundary — 100, 200, …). A trailing operator on any other number
- * yields an `invalidFilter` so the UI can explain instead of silently
- * dropping the query.
- */
-function parseQuery(raw: string): ParsedQuery {
-  const q = raw.toUpperCase().trim()
-  if (!q) return { kind: 'none' }
-
-  // Trailing operator means the user is asking for a level filter.
-  const opMatch = q.match(/^(.+?)\s*([=+\-])$/)
-  if (opMatch) {
-    const prefix = opMatch[1].trim()
-    const op = opMatch[2] as '=' | '+' | '-'
-    const filterMatch = prefix.match(/^([A-Z]{2,5})(?:_V)?\s*(\d)00$/)
-    if (filterMatch) {
-      return {
-        kind: 'filter',
-        subject: filterMatch[1],
-        digit: Number(filterMatch[2]),
-        op,
-      }
-    }
-    return {
-      kind: 'invalidFilter',
-      reason:
-        'Filters need the X00 form, e.g. CPSC 100 =, DSCI 200 +, WRDS 100 -.',
-    }
-  }
-
-  // Code-shape input: subject + 1–4 digits, optional letter suffix. The
-  // 1-digit lower bound is what powers partial-prefix lookups (e.g.
-  // "CPSC 2" → all CPSC 2xx/2xxx). lookup() resolves the exact branch by
-  // first trying index.get(code); on miss it falls back to a prefix scan
-  // over `codes`, so this regex doesn't need a separate `partial` kind.
-  const exactMatch = q.match(/^([A-Z]{2,5})(?:_V)?\s*(\d{1,4}[A-Z]?)$/)
-  if (exactMatch) {
-    return { kind: 'exact', code: `${exactMatch[1]} ${exactMatch[2]}` }
-  }
-
-  // Subject regex accepts 1–5 letters so single-letter inputs ("C") route
-  // into the subject branch and ride the loose-prefix fallback there
-  // ("courses starting with C"). Without this, "C" falls through to
-  // parseQuery's `none` branch and — when a keyword filter is active —
-  // gets interpreted as a keyword-only scan, which surfaces every course
-  // whose title or description contains the letter "c" (e.g. BAIT/ECON
-  // courses mentioning "computing"). Routing to subject keeps the code
-  // field anchored to code-prefix matching at all input lengths.
-  const subjectMatch = q.match(/^([A-Z]{1,5})(?:_V)?$/)
-  if (subjectMatch) {
-    return { kind: 'subject', subject: subjectMatch[1] }
-  }
-
-  return { kind: 'none' }
-}
+// parseQuery + ParsedQuery now live in lib/courseQuery.ts so the planner's
+// mini-lookup can share the same code/subject/filter conventions. Imported
+// at the top of this file.
 
 // Hidden easter — typed "ABCD" in the lookup bar surfaces this as the only
 // match. No real UBC subject code is ABCD, so this can't collide with a
@@ -145,6 +74,12 @@ function describeFilter(p: Extract<ParsedQuery, { kind: 'filter' }>): string {
   return `${p.subject} courses below the ${lvl} level`
 }
 
+// Human-readable label for the course-level dropdown filter. `4` is the
+// open-ended 400+ bucket; 1–3 are the exact hundreds.
+function levelLabel(level: number): string {
+  return level === 4 ? '400+ level' : `${level}00 level`
+}
+
 // Cap on keyword-only result sets. The corpus has ~9,450 courses; a generic
 // keyword like "the" would render every chunk into the DOM and freeze the
 // browser. 200 leaves enough room for sharper queries to land their full
@@ -155,11 +90,17 @@ export function CourseLookup() {
   const [index, setIndex] = useState<Map<string, Chunk> | null>(null)
   const [query, setQuery] = useState('')
   const [keyword, setKeyword] = useState('')
+  // Course-level filter: null = all levels, 1/2/3 = exact 100/200/300,
+  // 4 = the open-ended 400+ bucket. Narrows every result branch alongside
+  // the code + keyword inputs (see `matchesLevel` in the search effect).
+  const [level, setLevel] = useState<number | null>(null)
   const [course, setCourse] = useState<ParsedCourse | null>(null)
   const [matches, setMatches] = useState<Chunk[]>([])
   const [matchHeading, setMatchHeading] = useState<string>('')
   const [error, setError] = useState<string | null>(null)
   const [suggestions, setSuggestions] = useState<string[]>([])
+  const [codeHelpOpen, setCodeHelpOpen] = useState(false)
+  const [keywordHelpOpen, setKeywordHelpOpen] = useState(false)
   // Course codes currently expanded inline in the subject/filter list.
   // Multi-value: opening a new block does not collapse previous ones; the
   // only way to collapse a block is to click it again. Reset to empty on
@@ -207,17 +148,34 @@ export function CourseLookup() {
 
     const kw = keyword.trim().toLowerCase()
     const hasKw = kw.length > 0
+    const hasLevel = level !== null
     const matchesKw = (chunk: Chunk) => {
       if (!hasKw) return true
       return searchCorpus.get(chunk.id)?.includes(kw) ?? false
     }
+    // Course-level predicate. Codes are "SUBJ 110" form, so the level is
+    // the first digit of the number. `4` is the open-ended 400+ bucket.
+    const matchesLevel = (chunk: Chunk) => {
+      if (level === null) return true
+      const num = chunk.code?.split(' ')[1]
+      if (!num) return false
+      const d = Number(num[0])
+      if (Number.isNaN(d)) return false
+      return level === 4 ? d >= 4 : d === level
+    }
+    const keep = (chunk: Chunk) => matchesKw(chunk) && matchesLevel(chunk)
+    // Append the active level to a result heading. The keyword part is
+    // already woven into each branch's base heading, so this only adds the
+    // level segment when one is selected.
+    const withLevel = (heading: string) =>
+      level === null ? heading : `${heading} · ${levelLabel(level)}`
 
     const parsed = parseQuery(query)
 
     if (parsed.kind === 'none') {
-      // No code query. Keyword-only mode scans the full index; otherwise
-      // clear the view entirely.
-      if (!hasKw) {
+      // No code query. A keyword and/or level filter still scans the full
+      // index; with neither, clear the view entirely.
+      if (!hasKw && !hasLevel) {
         setCourse(null)
         setMatches([])
         setMatchHeading('')
@@ -227,18 +185,27 @@ export function CourseLookup() {
       const allMatches: Chunk[] = []
       for (const c of index.values()) {
         if (c.id.startsWith('easter:')) continue
-        if (matchesKw(c)) allMatches.push(c)
+        if (keep(c)) allMatches.push(c)
       }
       setCourse(null)
       setMatches(allMatches.slice(0, KEYWORD_RESULT_CAP))
+      // Level-only browsing leads with the level; a keyword query keeps the
+      // keyword as the base and rides the shared withLevel suffix.
+      const base = hasKw
+        ? withLevel(`Keyword "${keyword.trim()}"`)
+        : `${levelLabel(level!)} courses`
       setMatchHeading(
         allMatches.length > KEYWORD_RESULT_CAP
-          ? `Keyword "${keyword.trim()}" (showing first ${KEYWORD_RESULT_CAP} of ${allMatches.length.toLocaleString()})`
-          : `Keyword "${keyword.trim()}"`,
+          ? `${base} (showing first ${KEYWORD_RESULT_CAP} of ${allMatches.length.toLocaleString()})`
+          : base,
       )
       setSuggestions([])
       if (allMatches.length === 0) {
-        setError(`No courses match keyword "${keyword.trim()}".`)
+        setError(
+          hasKw
+            ? `No courses match keyword "${keyword.trim()}"${hasLevel ? ` at the ${levelLabel(level!)}` : ''}.`
+            : `No courses at the ${levelLabel(level!)}.`,
+        )
       }
       return
     }
@@ -255,6 +222,14 @@ export function CourseLookup() {
     if (parsed.kind === 'exact') {
       const chunk = index.get(parsed.code)
       if (chunk) {
+        if (!matchesLevel(chunk)) {
+          setCourse(null)
+          setMatches([])
+          setMatchHeading('')
+          setSuggestions([])
+          setError(`${parsed.code} isn't a ${levelLabel(level!)} course.`)
+          return
+        }
         if (!matchesKw(chunk)) {
           setCourse(null)
           setMatches([])
@@ -283,23 +258,27 @@ export function CourseLookup() {
         const prefixChunks = prefixHits
           .map((c) => index.get(c))
           .filter((c): c is Chunk => Boolean(c))
-          .filter(matchesKw)
+          .filter(keep)
         if (prefixChunks.length > 0) {
           setMatches(prefixChunks)
           setMatchHeading(
-            hasKw
-              ? `${parsed.code} courses matching "${keyword.trim()}"`
-              : `${parsed.code} courses`,
+            withLevel(
+              hasKw
+                ? `${parsed.code} courses matching "${keyword.trim()}"`
+                : `${parsed.code} courses`,
+            ),
           )
           setSuggestions([])
           return
         }
-        if (hasKw) {
+        if (hasKw || hasLevel) {
           setMatches([])
           setMatchHeading('')
           setSuggestions([])
           setError(
-            `No ${parsed.code} courses mention "${keyword.trim()}".`,
+            hasKw
+              ? `No ${parsed.code} courses mention "${keyword.trim()}"${hasLevel ? ` at the ${levelLabel(level!)}` : ''}.`
+              : `No ${parsed.code} courses at the ${levelLabel(level!)}.`,
           )
           return
         }
@@ -363,7 +342,7 @@ export function CourseLookup() {
     const chunks = codesForSubject
       .map((c) => index.get(c))
       .filter((c): c is Chunk => Boolean(c))
-      .filter(matchesKw)
+      .filter(keep)
 
     const baseHeading =
       parsed.kind === 'filter'
@@ -372,22 +351,26 @@ export function CourseLookup() {
           ? `Courses starting with "${parsed.subject}"`
           : `${parsed.subject} courses`
 
+    const headingWithKw = hasKw
+      ? `${baseHeading} containing "${keyword.trim()}"`
+      : baseHeading
+
     setMatches(chunks)
-    setMatchHeading(
-      hasKw ? `${baseHeading} containing "${keyword.trim()}"` : baseHeading,
-    )
+    setMatchHeading(withLevel(headingWithKw))
     setCourse(null)
     setSuggestions([])
     if (chunks.length === 0) {
       setError(
         hasKw
-          ? `No ${baseHeading.toLowerCase()} mention "${keyword.trim()}".`
-          : parsed.kind === 'filter'
-            ? `No ${describeFilter(parsed)}.`
-            : `No courses found for subject "${parsed.subject}".`,
+          ? `No ${baseHeading.toLowerCase()} mention "${keyword.trim()}"${hasLevel ? ` at the ${levelLabel(level!)}` : ''}.`
+          : hasLevel
+            ? `No ${baseHeading.toLowerCase()} at the ${levelLabel(level!)}.`
+            : parsed.kind === 'filter'
+              ? `No ${describeFilter(parsed)}.`
+              : `No courses found for subject "${parsed.subject}".`,
       )
     }
-  }, [query, keyword, index, codes, searchCorpus])
+  }, [query, keyword, level, index, codes, searchCorpus])
 
   if (!index) {
     return <div className="p-6 text-fg-faint">Loading course index…</div>
@@ -396,7 +379,7 @@ export function CourseLookup() {
   return (
     <div className="flex flex-col h-screen p-6 gap-4 max-w-3xl mx-auto w-full min-h-0">
       <header>
-        <h2 className="text-xl font-semibold">Course Lookup</h2>
+        <h2 className="text-xl font-semibold">Course Finder</h2>
         <p className="text-sm text-fg-muted">
           {codes.length.toLocaleString()} courses · UBC Vancouver
         </p>
@@ -411,57 +394,18 @@ export function CourseLookup() {
             placeholder="Course Code Search"
             className="w-full rounded bg-input border border-line-soft text-fg pl-3 pr-9 py-2 text-sm focus:outline-none focus:border-fg-faint"
           />
-          {/* Help affordance: hovering the `?` reveals the syntax cheat-sheet
-              that previously lived in the header. The wrapper carries the
-              `group` class so the popup is a `group-hover` sibling — the
-              popup is a descendant of the group so moving the cursor onto
-              the popup keeps the parent's :hover state active and prevents
-              flicker. */}
-          <div className="group absolute right-2 top-1/2 -translate-y-1/2 flex items-center">
-            <span
-              aria-label="Course code search syntax"
-              className="cursor-help select-none w-5 h-5 rounded-full border border-fg-faint text-fg-muted group-hover:text-fg group-hover:border-fg-muted flex items-center justify-center text-xs leading-none"
-            >
-              ?
-            </span>
-            <div
-              role="tooltip"
-              className="hidden group-hover:block absolute right-0 top-full mt-2 w-80 z-20 rounded border border-line-soft bg-surface p-3 text-sm text-fg-muted leading-relaxed shadow-lg"
-            >
-              <p>
-                Search course codes using this format:{' '}
-                <span className="font-mono text-fg">[CODE] [NUMBER]</span>
-              </p>
-              <p className="mt-2 text-xs text-fg-faint">Ex:</p>
-              <div className="mt-1 flex flex-wrap gap-1">
-                <span className="rounded bg-surface-raised px-1.5 py-0.5 font-mono text-xs text-fg-muted">
-                  ASTR 101
-                </span>
-                <span className="rounded bg-surface-raised px-1.5 py-0.5 font-mono text-xs text-fg-muted">
-                  DSCI 100
-                </span>
-                <span className="rounded bg-surface-raised px-1.5 py-0.5 font-mono text-xs text-fg-muted">
-                  WRDS 150
-                </span>
-              </div>
-              <p className="mt-3">
-                Filter by course level using this format:{' '}
-                <span className="font-mono text-fg">[CODE] [NUMBER] [+/-/=]</span>
-              </p>
-              <p className="mt-2 text-xs text-fg-faint">Ex:</p>
-              <div className="mt-1 flex flex-wrap gap-1">
-                <span className="rounded bg-surface-raised px-1.5 py-0.5 font-mono text-xs text-fg-muted">
-                  SCIE 100 +
-                </span>
-                <span className="rounded bg-surface-raised px-1.5 py-0.5 font-mono text-xs text-fg-muted">
-                  PHIL 400 =
-                </span>
-                <span className="rounded bg-surface-raised px-1.5 py-0.5 font-mono text-xs text-fg-muted">
-                  MATH 200 -
-                </span>
-              </div>
-            </div>
-          </div>
+          <button
+            type="button"
+            aria-label="Course code search syntax"
+            onClick={() => { setCodeHelpOpen((v) => !v); setKeywordHelpOpen(false) }}
+            className={`absolute right-2 top-1/2 -translate-y-1/2 select-none w-5 h-5 rounded-full border text-xs leading-none flex items-center justify-center transition-colors ${
+              codeHelpOpen
+                ? 'border-fg-muted text-fg bg-surface-raised'
+                : 'border-fg-faint text-fg-muted hover:text-fg hover:border-fg-muted'
+            }`}
+          >
+            ?
+          </button>
         </div>
         <div className="relative flex-1">
           <input
@@ -470,34 +414,62 @@ export function CourseLookup() {
             placeholder="Keyword Search"
             className="w-full rounded bg-input border border-line-soft text-fg pl-3 pr-9 py-2 text-sm focus:outline-none focus:border-fg-faint"
           />
-          <div className="group absolute right-2 top-1/2 -translate-y-1/2 flex items-center">
-            <span
-              aria-label="Keyword search help"
-              className="cursor-help select-none w-5 h-5 rounded-full border border-fg-faint text-fg-muted group-hover:text-fg group-hover:border-fg-muted flex items-center justify-center text-xs leading-none"
-            >
-              ?
-            </span>
-            <div
-              role="tooltip"
-              className="hidden group-hover:block absolute right-0 top-full mt-2 w-80 z-20 rounded border border-line-soft bg-surface p-3 text-sm text-fg-muted leading-relaxed shadow-lg"
-            >
-              <p>Search course titles and descriptions using key phrases.</p>
-              <p className="mt-2 text-xs text-fg-faint">Ex:</p>
-              <div className="mt-1 flex flex-wrap gap-1">
-                <span className="rounded bg-surface-raised px-1.5 py-0.5 font-mono text-xs text-fg-muted">
-                  Linear Algebra
-                </span>
-                <span className="rounded bg-surface-raised px-1.5 py-0.5 font-mono text-xs text-fg-muted">
-                  Introduction
-                </span>
-                <span className="rounded bg-surface-raised px-1.5 py-0.5 font-mono text-xs text-fg-muted">
-                  Co-op
-                </span>
-              </div>
+          <button
+            type="button"
+            aria-label="Keyword search help"
+            onClick={() => { setKeywordHelpOpen((v) => !v); setCodeHelpOpen(false) }}
+            className={`absolute right-2 top-1/2 -translate-y-1/2 select-none w-5 h-5 rounded-full border text-xs leading-none flex items-center justify-center transition-colors ${
+              keywordHelpOpen
+                ? 'border-fg-muted text-fg bg-surface-raised'
+                : 'border-fg-faint text-fg-muted hover:text-fg hover:border-fg-muted'
+            }`}
+          >
+            ?
+          </button>
+        </div>
+        <select
+          aria-label="Filter by course level"
+          value={level === null ? '' : String(level)}
+          onChange={(e) =>
+            setLevel(e.target.value === '' ? null : Number(e.target.value))
+          }
+          className="shrink-0 rounded bg-input border border-line-soft text-fg px-3 py-2 text-sm cursor-pointer focus:outline-none focus:border-fg-faint"
+        >
+          <option value="">All levels</option>
+          <option value="1">100</option>
+          <option value="2">200</option>
+          <option value="3">300</option>
+          <option value="4">400+</option>
+        </select>
+      </div>
+
+      {codeHelpOpen && (
+        <div className="rounded border border-line-soft bg-surface px-3 py-2 text-sm text-fg-muted shadow-lg flex flex-col gap-1.5">
+          <div className="flex items-center justify-between gap-4">
+            <p>
+              Format: <span className="font-mono text-fg">[CODE] [NUMBER]</span>
+            </p>
+            <div className="flex gap-1 shrink-0">
+              <span className="rounded bg-surface-raised px-1.5 py-0.5 font-mono text-xs text-fg-muted">ASTR 101</span>
+              <span className="rounded bg-surface-raised px-1.5 py-0.5 font-mono text-xs text-fg-muted">DSCI 100</span>
+              <span className="rounded bg-surface-raised px-1.5 py-0.5 font-mono text-xs text-fg-muted">WRDS 150</span>
             </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {keywordHelpOpen && (
+        <div className="rounded border border-line-soft bg-surface px-3 py-2 text-sm text-fg-muted shadow-lg">
+          <div className="flex items-center justify-between gap-4">
+            <p>Search titles and descriptions by key phrases.</p>
+            <div className="flex gap-1 shrink-0">
+              <span className="rounded bg-surface-raised px-1.5 py-0.5 font-mono text-xs text-fg-muted">Linear Algebra</span>
+              <span className="rounded bg-surface-raised px-1.5 py-0.5 font-mono text-xs text-fg-muted">Introduction</span>
+              <span className="rounded bg-surface-raised px-1.5 py-0.5 font-mono text-xs text-fg-muted">Co-op</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {error && <p className="text-sm text-danger-fg">{error}</p>}
 
@@ -640,9 +612,10 @@ function CourseCard({
         href={course.url}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-block text-xs text-link hover:underline"
+        className="inline-flex items-center gap-1 text-xs text-link hover:underline"
       >
-        UBC calendar ↗
+        UBC calendar
+        <ExternalLinkIcon className="w-3 h-3" />
       </a>
 
       <dl className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1.5 text-sm">

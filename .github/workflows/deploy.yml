@@ -43,6 +43,10 @@ jobs:
         working-directory: pipeline
         run: uv run build_calendar.py
 
+      - name: Build degree_programs.json
+        working-directory: pipeline
+        run: uv run build_programs.py
+
       # ---- Vite build ----
       - uses: actions/setup-node@v4
         with:

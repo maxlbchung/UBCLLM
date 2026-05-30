@@ -148,10 +148,32 @@ STRIP_SELECTORS = (
     "[role=navigation]",
 )
 
-# Course-code matcher — same shape as the courses.json subject regex.
+# Course-code matcher. Real UBC Vancouver subject codes are 2-4 letters
+# (AI, BA … CPSC, WRDS) — never 5+ — followed by a 3-digit number (+ optional
+# trailing letter). The `_V` campus suffix is captured and stripped.
 COURSE_CODE_RE = re.compile(
-    r"\b([A-Z]{2,5}(?:_V)?)\s?(\d{3}[A-Z]?)\b"
+    r"\b([A-Z]{2,4}(?:_V)?)\s?(\d{3}[A-Z]?)\b"
 )
+
+
+def _load_known_subjects() -> set[str] | None:
+    """Authoritative subject set, read from the committed course catalogue.
+    Used to validate extracted codes by membership rather than by a length
+    heuristic: this keeps real 2-letter subjects (AI, BA) while rejecting
+    2-letter English words ("OR", "CP") and stray tokens the regex would
+    otherwise read as codes. Returns None when courses.json isn't present
+    (fresh checkout, courses not scraped yet) so callers can fall back."""
+    try:
+        rows = json.loads(
+            (OUTPUT_DIR / "courses.json").read_text(encoding="utf-8")
+        )
+    except (OSError, json.JSONDecodeError):
+        return None
+    subs = {r["subject"] for r in rows if r.get("subject")}
+    return subs or None
+
+
+KNOWN_SUBJECTS = _load_known_subjects()
 
 # Section / kind classification (slug + title haystack). Order matters:
 # most specific first.
@@ -419,8 +441,18 @@ def extract_course_codes(text: str) -> list[str]:
         code = f"{subj_clean} {num}"
         if code in seen:
             continue
-        # Cheap noise filter: real UBC subjects are 3-5 letters.
-        if len(subj_clean) < 3:
+        # Real UBC subjects are 2-4 letters (the regex already caps at 4).
+        # The 2-letter case is ambiguous — English words ("or 300", "by
+        # 100") look like codes — so 2-letter subjects must match the course
+        # catalogue (keeps AI / BA, drops OR / CP). 3-4 letter subjects are
+        # distinctive enough to accept on shape: courses.json lags legacy /
+        # no-longer-offered subjects (GERM, HKIN, GEOB, ITST …) that program
+        # pages still cite, so gating those on it would lose real codes.
+        if (
+            len(subj_clean) == 2
+            and KNOWN_SUBJECTS is not None
+            and subj_clean not in KNOWN_SUBJECTS
+        ):
             continue
         seen.add(code)
         out.append(code)

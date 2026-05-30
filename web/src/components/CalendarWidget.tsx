@@ -13,37 +13,34 @@ import {
   type CalendarCategory,
   type CalendarItem,
 } from '../lib/calendar'
+import { ChevronDownIcon } from './icons'
 
-// Per-category color tokens. Academic and event step outside the
-// existing palette (brighter blue + violet) for visual separation —
-// applied via arbitrary Tailwind classes so we don't have to widen
-// `index.css`. Holiday stays on `bg-highlight` (amber) to ride the
-// existing theme.
+// Per-category color tokens. Academic (course deadlines) steps outside the
+// existing palette (purple) for visual separation — applied via an
+// arbitrary Tailwind class so we don't have to widen `index.css`. Holiday
+// stays on `bg-highlight` (amber) to ride the existing theme.
 const CATEGORY_DOT: Record<CalendarCategory, string> = {
-  academic: 'bg-[#60a5fa]', // tailwind blue-400 — brighter than --accent
+  academic: 'bg-[#a855f7]', // tailwind purple-500
   holiday: 'bg-highlight',
-  event: 'bg-[#a855f7]', // tailwind purple-500
 }
 
-const CATEGORY_LABEL: Record<CalendarCategory, string> = {
-  academic: 'Academic',
-  holiday: 'Holidays',
-  event: 'Events',
-}
+// Weekday column headers — single letter on narrow screens, three letters
+// once there's room.
+const WEEKDAYS_1 = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
+const WEEKDAYS_3 = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-type FilterState = Record<CalendarCategory, boolean>
-
-const DEFAULT_FILTERS: FilterState = { academic: true, holiday: true, event: true }
-
-const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
+// How many items a day cell shows before collapsing the rest behind a
+// "+N more" toggle. Keeps a busy day from blowing out its week's row
+// height until the user asks to see everything.
+const MAX_VISIBLE_PER_DAY = 3
 
 export function CalendarWidget() {
   const [items, setItems] = useState<CalendarItem[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [cursor, setCursor] = useState(() => startOfMonth(new Date()))
-  const [selected, setSelected] = useState<Date>(() => new Date())
-  const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS)
   const [pickerOpen, setPickerOpen] = useState(false)
+  // ISO dates whose "+N more" overflow is currently expanded.
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
   const pickerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -62,30 +59,30 @@ export function CalendarWidget() {
     }
   }, [])
 
-  const filteredItems = useMemo(() => {
-    if (!items) return []
-    return items.filter((it) => filters[it.category])
-  }, [items, filters])
-
   const today = useMemo(() => new Date(), [])
   const onCurrentMonth =
     cursor.getFullYear() === today.getFullYear() &&
     cursor.getMonth() === today.getMonth()
-
-  const selectedItems = useMemo(() => {
-    return filteredItems.filter((it) => itemCoversDate(it, selected))
-  }, [filteredItems, selected])
 
   const monthGrid = useMemo(
     () => buildMonthGrid(cursor.getFullYear(), cursor.getMonth()),
     [cursor],
   )
 
-  function toggle(cat: CalendarCategory) {
-    const next = !filters[cat]
-    playSfx(next ? 'toggleOn' : 'toggleOff')
-    setFilters((f) => ({ ...f, [cat]: next }))
-  }
+  // Bucket the items by the local ISO date(s) they cover, so each cell is
+  // a cheap map lookup instead of a full scan over every item.
+  const itemsByDay = useMemo(() => {
+    const map = new Map<string, CalendarItem[]>()
+    if (!items) return map
+    for (const row of monthGrid) {
+      for (const cell of row) {
+        const key = toISODate(cell)
+        const hits = items.filter((it) => itemCoversDate(it, cell))
+        if (hits.length) map.set(key, hits)
+      }
+    }
+    return map
+  }, [monthGrid, items])
 
   function shiftMonth(n: number) {
     playSfx('tab')
@@ -94,25 +91,23 @@ export function CalendarWidget() {
 
   function goToday() {
     playSfx('tab')
-    const now = new Date()
-    setCursor(startOfMonth(now))
-    setSelected(now)
-  }
-
-  function pickDay(cell: Date) {
-    playSfx('tab')
-    setSelected(cell)
-    // If the clicked cell is in the spillover for an adjacent month,
-    // slide the visible month with it so the highlight stays in view.
-    if (cell.getMonth() !== cursor.getMonth()) {
-      setCursor(startOfMonth(cell))
-    }
+    setCursor(startOfMonth(new Date()))
   }
 
   function jumpToMonth(month: Date) {
     playSfx('tab')
     setCursor(startOfMonth(month))
     setPickerOpen(false)
+  }
+
+  function toggleExpand(key: string) {
+    playSfx('tab')
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
   }
 
   // ±6 months around the visible month — total 13 entries. Reused each
@@ -143,9 +138,102 @@ export function CalendarWidget() {
 
   return (
     <section className="rounded-lg border border-line bg-surface-soft p-5">
-      <header className="flex flex-wrap items-center gap-2 mb-4">
-        <h2 className="text-sm font-semibold text-fg">Upcoming at UBC</h2>
-        <span className="text-xs text-fg-faint">Events, deadlines, holidays, and more!</span>
+      <header className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div className="flex flex-wrap items-baseline gap-2">
+          <h2 className="text-sm font-semibold text-fg">Upcoming at UBC</h2>
+          <span className="text-xs text-fg-faint">Course deadlines, holidays, and more!</span>
+        </div>
+
+        {items !== null && error === null && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => shiftMonth(-1)}
+              aria-label="Previous month"
+              className="rounded-md border border-line bg-surface hover:bg-surface-raised text-fg-muted h-7 w-7 inline-flex items-center justify-center transition-colors"
+            >
+              ‹
+            </button>
+            <div className="relative" ref={pickerRef}>
+              <button
+                type="button"
+                onClick={() => {
+                  playSfx('tab')
+                  setPickerOpen((o) => !o)
+                }}
+                aria-haspopup="listbox"
+                aria-expanded={pickerOpen}
+                className="inline-flex items-center gap-1.5 rounded-md border border-line bg-surface hover:bg-surface-raised text-sm font-medium text-fg px-3 h-7 transition-colors"
+                title="Pick a month"
+              >
+                <span className="min-w-[8ch] text-center">
+                  {formatMonthHeading(cursor)}
+                </span>
+                <span
+                  aria-hidden
+                  className={
+                    'text-fg-muted transition-transform ' +
+                    (pickerOpen ? 'rotate-180' : '')
+                  }
+                >
+                  <ChevronDownIcon className="w-3 h-3" />
+                </span>
+              </button>
+              {pickerOpen && (
+                <div
+                  role="listbox"
+                  className="absolute right-0 top-full mt-1 z-10 w-44 max-h-64 overflow-y-auto rounded-md border border-line-soft bg-surface shadow-lg p-1"
+                >
+                  {pickerMonths.map((m) => {
+                    const isVisible =
+                      m.getFullYear() === cursor.getFullYear() &&
+                      m.getMonth() === cursor.getMonth()
+                    const isThisMonth =
+                      m.getFullYear() === today.getFullYear() &&
+                      m.getMonth() === today.getMonth()
+                    return (
+                      <button
+                        key={`${m.getFullYear()}-${m.getMonth()}`}
+                        type="button"
+                        role="option"
+                        aria-selected={isVisible}
+                        onClick={() => jumpToMonth(m)}
+                        className={
+                          'w-full text-left text-xs px-3 py-1.5 rounded transition-colors ' +
+                          (isVisible
+                            ? 'bg-accent-soft text-accent-soft-fg'
+                            : 'text-fg hover:bg-surface-raised')
+                        }
+                      >
+                        {formatMonthHeading(m)}
+                        {isThisMonth && !isVisible && (
+                          <span className="ml-2 text-[0.625rem] uppercase tracking-wider text-fg-faint">
+                            today
+                          </span>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+            <button
+              onClick={() => shiftMonth(1)}
+              aria-label="Next month"
+              className="rounded-md border border-line bg-surface hover:bg-surface-raised text-fg-muted h-7 w-7 inline-flex items-center justify-center transition-colors"
+            >
+              ›
+            </button>
+            {!onCurrentMonth && (
+              <button
+                onClick={goToday}
+                className="rounded-full border border-line bg-surface hover:bg-surface-raised text-[0.625rem] uppercase tracking-wider text-fg-muted px-2.5 h-7 transition-colors"
+                title="Jump to today"
+              >
+                Jump to today
+              </button>
+            )}
+          </div>
+        )}
       </header>
 
       {items === null && error === null && (
@@ -155,304 +243,125 @@ export function CalendarWidget() {
         <p className="text-xs text-danger-fg">Could not load calendar — {error}</p>
       )}
 
+      {/* --- Full month grid: items listed under each day --- */}
       {items !== null && error === null && (
-        <div className="grid grid-cols-1 md:grid-cols-[auto_1px_1fr] gap-5">
-          {/* --- Mini month grid --- */}
-          <div>
-            <div className="flex items-center justify-center gap-2 mb-2">
-              <button
-                onClick={() => shiftMonth(-1)}
-                aria-label="Previous month"
-                className="rounded-md border border-line bg-surface hover:bg-surface-raised text-fg-muted h-7 w-7 inline-flex items-center justify-center transition-colors"
-              >
-                ‹
-              </button>
-              <div className="relative" ref={pickerRef}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    playSfx('tab')
-                    setPickerOpen((o) => !o)
-                  }}
-                  aria-haspopup="listbox"
-                  aria-expanded={pickerOpen}
-                  className="inline-flex items-center gap-1.5 rounded-md border border-line bg-surface hover:bg-surface-raised text-xs font-medium text-fg px-2.5 h-7 transition-colors"
-                  title="Pick a month"
-                >
-                  <span className="min-w-[7ch] text-center">
-                    {formatMonthHeading(cursor)}
-                  </span>
-                  <span
-                    aria-hidden
-                    className={
-                      'text-fg-muted text-[0.625rem] transition-transform ' +
-                      (pickerOpen ? 'rotate-180' : '')
-                    }
-                  >
-                    ▾
-                  </span>
-                </button>
-                {pickerOpen && (
-                  <div
-                    role="listbox"
-                    className="absolute left-1/2 top-full mt-1 -translate-x-1/2 z-10 w-44 max-h-64 overflow-y-auto rounded-md border border-line-soft bg-surface shadow-lg p-1"
-                  >
-                    {pickerMonths.map((m) => {
-                      const isVisible =
-                        m.getFullYear() === cursor.getFullYear() &&
-                        m.getMonth() === cursor.getMonth()
-                      const isThisMonth =
-                        m.getFullYear() === today.getFullYear() &&
-                        m.getMonth() === today.getMonth()
-                      return (
-                        <button
-                          key={`${m.getFullYear()}-${m.getMonth()}`}
-                          type="button"
-                          role="option"
-                          aria-selected={isVisible}
-                          onClick={() => jumpToMonth(m)}
-                          className={
-                            'w-full text-left text-xs px-3 py-1.5 rounded transition-colors ' +
-                            (isVisible
-                              ? 'bg-accent-soft text-accent-soft-fg'
-                              : 'text-fg hover:bg-surface-raised')
-                          }
-                        >
-                          {formatMonthHeading(m)}
-                          {isThisMonth && !isVisible && (
-                            <span className="ml-2 text-[0.625rem] uppercase tracking-wider text-fg-faint">
-                              today
-                            </span>
-                          )}
-                        </button>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-              <button
-                onClick={() => shiftMonth(1)}
-                aria-label="Next month"
-                className="rounded-md border border-line bg-surface hover:bg-surface-raised text-fg-muted h-7 w-7 inline-flex items-center justify-center transition-colors"
-              >
-                ›
-              </button>
-            </div>
-
-            <div className="grid w-fit grid-cols-7 gap-0.5 text-center mb-1">
-              {WEEKDAYS.map((w, i) => (
-                <span
+        <div className="rounded-lg border border-line overflow-hidden">
+            {/* Weekday header */}
+            <div className="grid grid-cols-7 bg-surface-soft border-b border-line">
+              {WEEKDAYS_3.map((w, i) => (
+                <div
                   key={`${w}-${i}`}
-                  className="h-6 w-6 inline-flex items-center justify-center text-[0.625rem] uppercase tracking-wider text-fg-faint"
+                  className="px-2 py-1.5 text-center text-[0.625rem] uppercase tracking-wider text-fg-faint"
                 >
-                  {w}
-                </span>
+                  <span className="sm:hidden">{WEEKDAYS_1[i]}</span>
+                  <span className="hidden sm:inline">{w}</span>
+                </div>
               ))}
             </div>
 
-            <div className="grid w-fit grid-cols-7 gap-0.5">
+            {/* Day cells — gap-px over a bg-line parent draws the gridlines. */}
+            <div className="grid grid-cols-7 gap-px bg-line">
               {monthGrid.flat().map((cell) => {
+                const key = toISODate(cell)
                 const inMonth = cell.getMonth() === cursor.getMonth()
                 const isToday = isSameDay(cell, today)
-                const isSelected = isSameDay(cell, selected)
-                const matches = filteredItems.filter((it) => itemCoversDate(it, cell))
-                // One dot per category present on the day, in the same
-                // order as the filter toggles — small markers don't try
-                // to convey count, just "which kinds happen today".
-                const presentCats = (
-                  ['academic', 'holiday', 'event'] as CalendarCategory[]
-                ).filter((c) => matches.some((m) => m.category === c))
-                // Layered visuals:
-                //   - today always carries a subtle lighter background
-                //     so the "where am I in time" anchor never disappears,
-                //     even when the user has picked a different day.
-                //   - the selected day overlays an accent ring + slightly
-                //     stronger fill so it reads as the active pick.
-                const base = isSelected
-                  ? 'bg-accent-soft text-accent-soft-fg ring-1 ring-accent ring-inset'
-                  : isToday
-                    ? 'bg-surface-raised text-fg'
-                    : inMonth
-                      ? 'text-fg hover:bg-surface-raised/60'
-                      : 'text-fg-faint opacity-60 hover:bg-surface-raised/40'
+                const dayItems = itemsByDay.get(key) ?? []
+                const isExp = expanded.has(key)
+                const visible = isExp
+                  ? dayItems
+                  : dayItems.slice(0, MAX_VISIBLE_PER_DAY)
+                const overflow = dayItems.length - visible.length
                 return (
-                  <button
-                    key={toISODate(cell)}
-                    type="button"
-                    onClick={() => pickDay(cell)}
-                    aria-pressed={isSelected}
-                    aria-label={`${formatFullDate(cell)}${matches.length ? `, ${matches.length} item${matches.length === 1 ? '' : 's'}` : ''}`}
-                    className={
-                      'relative h-6 w-6 inline-flex items-center justify-center text-xs leading-none rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-accent ' +
-                      base
-                    }
+                  <div
+                    key={key}
+                    className="min-h-[4.5rem] md:min-h-[6.5rem] p-1.5 flex flex-col gap-1 bg-surface"
                   >
-                    {cell.getDate()}
-                    {presentCats.length > 0 && (
+                    <div className="flex items-center justify-between">
                       <span
-                        aria-hidden
-                        className="absolute bottom-0.5 left-1/2 -translate-x-1/2 flex gap-[2px]"
+                        aria-label={formatFullDate(cell)}
+                        className={
+                          isToday
+                            ? 'inline-flex h-5 w-5 items-center justify-center rounded-full bg-accent text-accent-fg text-xs font-semibold'
+                            : 'text-xs font-medium ' +
+                              (inMonth ? 'text-fg' : 'text-fg-faint')
+                        }
                       >
-                        {presentCats.map((c) => (
-                          <span
-                            key={c}
-                            className={`block h-[3px] w-[3px] rounded-full ${CATEGORY_DOT[c]}`}
-                          />
-                        ))}
+                        {cell.getDate()}
                       </span>
-                    )}
-                  </button>
+                    </div>
+
+                    <div className="flex flex-col gap-0.5 min-w-0">
+                      {visible.map((it) => (
+                        <DayChip key={it.id} item={it} dim={!inMonth} />
+                      ))}
+                      {overflow > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => toggleExpand(key)}
+                          className="text-left text-[0.625rem] text-fg-faint hover:text-fg-muted px-1 py-0.5 rounded hover:bg-surface-raised transition-colors"
+                        >
+                          {`+${overflow} more`}
+                        </button>
+                      )}
+                      {isExp && dayItems.length > MAX_VISIBLE_PER_DAY && (
+                        <button
+                          type="button"
+                          onClick={() => toggleExpand(key)}
+                          className="text-left text-[0.625rem] text-fg-faint hover:text-fg-muted px-1 py-0.5 rounded hover:bg-surface-raised transition-colors"
+                        >
+                          Show less
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 )
               })}
             </div>
-
-            {/* Floating horizontal divider between the calendar grid
-                and the controls below — same `bg-line` rule shaved on
-                the sides so it reads as a floating separator within
-                the left column. */}
-            <div
-              aria-hidden
-              className="h-px bg-line mx-2 my-3"
-            />
-
-            {/* Toggles sit in a single-column grid sized to the widest
-                pill's natural max-content, so all three share the same
-                width without spanning the full column. */}
-            <div className="grid grid-cols-[max-content] gap-2">
-              {(['academic', 'holiday', 'event'] as CalendarCategory[]).map(
-                (cat) => (
-                  <CategoryToggle
-                    key={cat}
-                    category={cat}
-                    checked={filters[cat]}
-                    onChange={() => toggle(cat)}
-                  />
-                ),
-              )}
-            </div>
-            {!onCurrentMonth && (
-              <button
-                onClick={goToday}
-                className="self-start rounded-full border border-line bg-surface hover:bg-surface-raised text-[0.625rem] uppercase tracking-wider text-fg-muted px-2 py-0.5 transition-colors mt-3"
-                title="Jump to today"
-              >
-                Jump to today
-              </button>
-            )}
           </div>
-
-          {/* Floating vertical divider — hidden on mobile (single column).
-              `my-2` shaves a bit off the top/bottom so the line doesn't
-              touch the calendar's chrome and reads as a floating rule. */}
-          <div aria-hidden className="hidden md:block w-px bg-line my-2 self-stretch" />
-
-          {/* --- Selected-day list --- */}
-          <div>
-            <h3 className="text-xs uppercase tracking-wider text-fg-faint mb-2">
-              {formatFullDate(selected)}
-              {isSameDay(selected, today) && (
-                <span className="ml-2 text-fg-muted normal-case tracking-normal">
-                  · TODAY
-                </span>
-              )}
-            </h3>
-            {selectedItems.length === 0 ? (
-              <p className="text-xs text-fg-muted">Nothing scheduled.</p>
-            ) : (
-              <ul className="flex flex-col">
-                {selectedItems.map((it) => (
-                  <DayRow key={it.id} item={it} />
-                ))}
-              </ul>
-            )}
-          </div>
-        </div>
       )}
     </section>
   )
 }
 
-// Pill-shaped switch borrowing the geometry from OtherPage's ThemedToggle
-// (22px track, 40px wide, 14px thumb sliding left:4 → left:22). The
-// thumb takes the category color so each toggle is visually keyed to
-// the dots used in the grid + upcoming list. When off, the thumb falls
-// back to the neutral grey puck used in settings so disabled state
-// reads consistently across the app.
-const TRACK_TINT: Record<CalendarCategory, string> = {
-  academic: 'bg-[#60a5fa]/20 hover:bg-[#60a5fa]/30',
-  holiday: 'bg-highlight-soft hover:bg-[var(--highlight)]/30',
-  event: 'bg-[#a855f7]/20 hover:bg-[#a855f7]/30',
-}
-
-function CategoryToggle({
-  category,
-  checked,
-  onChange,
-}: {
-  category: CalendarCategory
-  checked: boolean
-  onChange: () => void
-}) {
-  const id = `calendar-filter-${category}`
-  return (
-    <div className="flex w-full items-center justify-between gap-2 rounded-full border border-line bg-surface px-3 py-1">
-      <label htmlFor={id} className="text-xs text-fg-muted select-none cursor-pointer">
-        {CATEGORY_LABEL[category]}
-      </label>
-      <button
-        id={id}
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        onClick={onChange}
-        className={
-          'relative h-[22px] w-[40px] rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/30 ' +
-          (checked
-            ? TRACK_TINT[category]
-            : 'bg-surface-raised hover:bg-line-soft')
-        }
-      >
-        <span
-          aria-hidden
-          className={
-            'absolute top-[4px] block h-[14px] w-[14px] rounded-full shadow-[0_1px_3px_rgba(0,0,0,0.45)] transition-[left,background-color] duration-150 ' +
-            (checked
-              ? `left-[22px] ${CATEGORY_DOT[category]}`
-              : 'left-[4px] bg-fg-muted')
-          }
-        />
-      </button>
-    </div>
-  )
-}
-
-function DayRow({ item }: { item: CalendarItem }) {
-  const body = (
-    <div className="flex items-start gap-2 py-2 px-2 -mx-2 rounded-md hover:bg-surface-raised transition-colors">
+// A single item rendered inside a day cell. Dot + truncated title; links
+// out to the source page when there's a URL. `dim` softens spillover-day
+// items so the current month still reads as the focus.
+function DayChip({ item, dim }: { item: CalendarItem; dim: boolean }) {
+  const titleAttr = item.description
+    ? `${item.title} — ${item.description}`
+    : item.title
+  const inner = (
+    <span className="flex items-start gap-1 rounded px-1 py-0.5 min-w-0">
       <span
         aria-hidden
-        className={`mt-1.5 h-1.5 w-1.5 rounded-full shrink-0 ${CATEGORY_DOT[item.category]}`}
+        className={`mt-1 h-1.5 w-1.5 rounded-full shrink-0 ${CATEGORY_DOT[item.category]}`}
       />
-      <div className="flex flex-col gap-0.5 min-w-0 flex-1">
-        <span className="text-sm font-medium leading-snug">
-          {item.title}
-        </span>
-        {item.description && (
-          <span className="text-xs text-fg-muted truncate">
-            {item.description}
-          </span>
-        )}
-      </div>
-    </div>
+      <span
+        className={
+          'min-w-0 break-words text-[0.6875rem] leading-tight ' +
+          (dim ? 'text-fg-faint' : 'text-fg-muted')
+        }
+      >
+        {item.title}
+      </span>
+    </span>
   )
   if (item.url) {
     return (
-      <li>
-        <a href={item.url} target="_blank" rel="noreferrer" className="block">
-          {body}
-        </a>
-      </li>
+      <a
+        href={item.url}
+        target="_blank"
+        rel="noreferrer"
+        title={titleAttr}
+        className="block min-w-0"
+      >
+        {inner}
+      </a>
     )
   }
-  return <li>{body}</li>
+  return (
+    <div title={titleAttr} className="min-w-0">
+      {inner}
+    </div>
+  )
 }

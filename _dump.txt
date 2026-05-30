@@ -1,0 +1,21 @@
+782|         // term index within this block.
+783|         const depthMemo = new Map<string, number>()
+784|         const depthIn = (c: string, stack = new Set<string>()): number => {
+785|           const cached = depthMemo.get(c)
+786|           if (cached != null) return cached
+787|           if (stack.has(c)) return 0
+788|           stack.add(c)
+789|           let d = 0
+790|           for (const p of blockPrereqs.get(c) ?? [])
+791|             d = Math.max(d, depthIn(p, stack) + 1)
+792|           stack.delete(c)
+793|           depthMemo.set(c, d)
+794|           return d
+795|         }
+796| 
+797|         // Place shallow courses first so a prerequisite's slot is fixed before
+798|         // its dependents are placed.
+799|         const ordered = [...block.codes].sort((a, b) => depthIn(a) - depthIn(b))
+800|         for (const code of ordered) {
+801|           // Floor 1: after any prerequisite already placed (earlier block/year
+802|           // or earlier in this block). Floor 2: this course's own block-depth.

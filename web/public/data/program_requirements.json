@@ -1,0 +1,7695 @@
+{
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-education/certificate-programs/certificate-early-years-education-eyed": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-education/certificate-programs/certificate-early-years-education-eyed",
+    "categories": [
+      {
+        "name": "Required courses",
+        "credits_required": 15,
+        "options": [
+          {
+            "code": "ECED 405",
+            "credit_value": 3
+          },
+          {
+            "subject_pattern": "ECED 4",
+            "credit_value": 12
+          }
+        ]
+      }
+    ],
+    "total_credits": 15
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-education/certificate-programs/certificate-infant-development-and-supported-childcare-idsc": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-education/certificate-programs/certificate-infant-development-and-supported-childcare-idsc",
+    "categories": [
+      {
+        "name": "Required courses",
+        "credits_required": 15,
+        "options": [
+          {
+            "code": "EPSE 348",
+            "credit_value": 3
+          },
+          {
+            "code": "EPSE 406",
+            "credit_value": 3
+          },
+          {
+            "code": "ECED 439",
+            "credit_value": 3
+          },
+          {
+            "code": "ECED 440"
+          },
+          {
+            "code": "ECED 441"
+          },
+          {
+            "code": "ECED 442"
+          }
+        ]
+      }
+    ],
+    "total_credits": 15
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-education/certificate-programs/certificate-teaching-about-visual-and-material-culture": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-education/certificate-programs/certificate-teaching-about-visual-and-material-culture",
+    "categories": [
+      {
+        "name": "Required courses",
+        "credits_required": 15,
+        "options": [
+          {
+            "code": "EDCP 303",
+            "credit_value": 6
+          },
+          {
+            "code": "EDCP 304",
+            "credit_value": 6
+          },
+          {
+            "code": "EDCP 408"
+          },
+          {
+            "code": "EDCP 409"
+          }
+        ]
+      }
+    ],
+    "total_credits": 15
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-education/certificate-programs/certificate-teaching-english-second-language": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-education/certificate-programs/certificate-teaching-english-second-language",
+    "categories": [
+      {
+        "name": "Required courses",
+        "credits_required": 12,
+        "options": [
+          {
+            "code": "LLED 489"
+          },
+          {
+            "code": "LLED 478"
+          }
+        ]
+      }
+    ],
+    "total_credits": 12
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-commerce-and-business-administration/diploma-accounting-program": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-commerce-and-business-administration/diploma-accounting-program",
+    "categories": [
+      {
+        "name": "First block courses",
+        "credits_required": 45,
+        "options": [
+          {
+            "code": "BUSI 291"
+          },
+          {
+            "code": "BUSI 293"
+          },
+          {
+            "code": "BUSI 294"
+          },
+          {
+            "code": "BUSI 295"
+          },
+          {
+            "code": "BUSI 335"
+          },
+          {
+            "code": "BUSI 353"
+          },
+          {
+            "code": "BUSI 354"
+          },
+          {
+            "code": "BUSI 355"
+          },
+          {
+            "code": "BUSI 370"
+          },
+          {
+            "code": "BUSI 393"
+          },
+          {
+            "code": "BUSI 414"
+          },
+          {
+            "code": "BUSI 450"
+          },
+          {
+            "code": "BUSI 453"
+          },
+          {
+            "code": "BUSI 455"
+          },
+          {
+            "code": "BUSI 493"
+          }
+        ]
+      }
+    ],
+    "total_credits": 45
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-arts/diploma-applied-creative-non-fiction": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-arts/diploma-applied-creative-non-fiction",
+    "categories": [
+      {
+        "name": "Required courses",
+        "credits_required": 9,
+        "options": [
+          {
+            "code": "CRWR 301"
+          },
+          {
+            "code": "CRWR 405"
+          },
+          {
+            "code": "CRWR 416"
+          }
+        ]
+      }
+    ]
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/school-music/diploma-collaborative-piano-studies": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/school-music/diploma-collaborative-piano-studies",
+    "categories": [
+      {
+        "name": "First block courses",
+        "credits_required": 19,
+        "options": [
+          {
+            "code": "MUSC 170"
+          },
+          {
+            "code": "MUSC 442"
+          },
+          {
+            "code": "MUSC 512"
+          },
+          {
+            "code": "MUSC 443"
+          },
+          {
+            "code": "MUSC 468"
+          },
+          {
+            "code": "MUSC 561"
+          },
+          {
+            "code": "MUSC 593"
+          }
+        ]
+      },
+      {
+        "name": "Second block courses",
+        "credits_required": 10,
+        "options": [
+          {
+            "code": "MUSC 131"
+          },
+          {
+            "code": "MUSC 271"
+          },
+          {
+            "code": "MUSC 135"
+          },
+          {
+            "code": "MUSC 235"
+          },
+          {
+            "code": "MUSC 333"
+          },
+          {
+            "code": "MUSC 433"
+          },
+          {
+            "code": "MUSC 365"
+          },
+          {
+            "code": "MUSC 465"
+          }
+        ]
+      }
+    ]
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-applied-science/bachelor-applied-science/minor-commerce": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-applied-science/bachelor-applied-science/minor-commerce",
+    "categories": [
+      {
+        "name": "First block courses",
+        "credits_required": 15,
+        "options": [
+          {
+            "code": "COMR 457"
+          },
+          {
+            "code": "COMR 465"
+          },
+          {
+            "code": "COMR 329"
+          },
+          {
+            "code": "COMR 458"
+          },
+          {
+            "code": "COMR 473"
+          },
+          {
+            "code": "ECON 310"
+          },
+          {
+            "code": "ECON 101"
+          },
+          {
+            "code": "ECON 311"
+          },
+          {
+            "code": "ECON 102"
+          }
+        ]
+      }
+    ],
+    "total_credits": 24
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-applied-science/bachelor-applied-science/minor-entrepreneurship": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-applied-science/bachelor-applied-science/minor-entrepreneurship",
+    "categories": [
+      {
+        "name": "First block courses",
+        "credits_required": 9,
+        "options": [
+          {
+            "code": "COMR 280"
+          },
+          {
+            "code": "COMR 382"
+          },
+          {
+            "code": "COMR 387"
+          }
+        ]
+      },
+      {
+        "name": "Second block courses",
+        "credits_required": 18,
+        "options": [
+          {
+            "code": "APSC 486"
+          },
+          {
+            "code": "COMR 497"
+          }
+        ],
+        "notes": "plus 9 credits of electives"
+      }
+    ],
+    "total_credits": 24
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-applied-science/bachelor-applied-science/minor-honours-mathematics": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-applied-science/bachelor-applied-science/minor-honours-mathematics",
+    "categories": [
+      {
+        "name": "First block courses",
+        "credits_required": 24,
+        "options": [
+          {
+            "code": "MATH 300"
+          },
+          {
+            "code": "MATH 305"
+          },
+          {
+            "code": "MATH 320"
+          },
+          {
+            "code": "MATH 301"
+          },
+          {
+            "code": "MATH 321"
+          },
+          {
+            "code": "MATH 322"
+          },
+          {
+            "code": "MATH 400"
+          }
+        ],
+        "notes": "plus 12 credits of electives"
+      }
+    ],
+    "total_credits": 24
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-education/certificate-programs/undergraduate-certificate-adult-learning-and-education": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-education/certificate-programs/undergraduate-certificate-adult-learning-and-education",
+    "categories": [
+      {
+        "name": "First block courses",
+        "credits_required": 15,
+        "options": [
+          {
+            "code": "ADHE 327"
+          },
+          {
+            "code": "ADHE 329"
+          },
+          {
+            "code": "ADHE 330"
+          },
+          {
+            "code": "ADHE 412"
+          },
+          {
+            "code": "ADHE 328"
+          },
+          {
+            "code": "EDST 493"
+          }
+        ]
+      }
+    ]
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-commerce-and-business-administration/bachelor-business-real-estate": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-commerce-and-business-administration/bachelor-business-real-estate",
+    "categories": [
+      {
+        "name": "First block courses",
+        "credits_required": 27,
+        "options": [
+          {
+            "code": "BUSI 111"
+          },
+          {
+            "code": "BUSI 121"
+          },
+          {
+            "code": "BUSI 221"
+          },
+          {
+            "code": "BUSI 300"
+          },
+          {
+            "code": "BUSI 330"
+          },
+          {
+            "code": "BUSI 331"
+          },
+          {
+            "code": "BUSI 400"
+          },
+          {
+            "code": "BUSI 401"
+          }
+        ]
+      },
+      {
+        "name": "Second block courses",
+        "credits_required": 39,
+        "options": [
+          {
+            "code": "BUSI 352"
+          },
+          {
+            "code": "BUSI 433"
+          },
+          {
+            "code": "BUSI 441"
+          },
+          {
+            "code": "BUSI 442"
+          },
+          {
+            "code": "BUSI 443"
+          },
+          {
+            "code": "BUSI 444"
+          },
+          {
+            "code": "BUSI 445"
+          },
+          {
+            "code": "BUSI 446"
+          },
+          {
+            "code": "BUSI 451"
+          },
+          {
+            "code": "BUSI 452"
+          },
+          {
+            "code": "BUSI 460"
+          }
+        ]
+      }
+    ]
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-commerce-and-business-administration/bachelor-commerce/business-and-computer-science-combined-major": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-commerce-and-business-administration/bachelor-commerce/business-and-computer-science-combined-major",
+    "categories": [
+      {
+        "name": "First block courses",
+        "credits_required": 32,
+        "options": [
+          {
+            "code": "ECON 101"
+          },
+          {
+            "code": "ECON 102"
+          },
+          {
+            "code": "MATH 100"
+          },
+          {
+            "code": "MATH 101"
+          },
+          {
+            "code": "COMM 101"
+          },
+          {
+            "code": "COMM 105"
+          },
+          {
+            "code": "COMM 192"
+          },
+          {
+            "code": "COMM 196"
+          },
+          {
+            "code": "CPSC 110"
+          },
+          {
+            "code": "CPSC 121"
+          }
+        ]
+      },
+      {
+        "name": "Second block courses",
+        "credits_required": 34,
+        "options": [
+          {
+            "code": "COMM 202"
+          },
+          {
+            "code": "COMM 190"
+          },
+          {
+            "code": "COMM 191"
+          },
+          {
+            "code": "COMM 293"
+          },
+          {
+            "code": "COMM 294"
+          },
+          {
+            "code": "COMM 295"
+          },
+          {
+            "code": "COMM 298"
+          },
+          {
+            "code": "COMM 205"
+          },
+          {
+            "code": "CPSC 210"
+          },
+          {
+            "code": "CPSC 213"
+          },
+          {
+            "code": "CPSC 221"
+          }
+        ]
+      },
+      {
+        "name": "Third block courses",
+        "credits_required": 25,
+        "options": [
+          {
+            "code": "COMM 296"
+          },
+          {
+            "code": "COMM 203"
+          },
+          {
+            "code": "COMM 396"
+          },
+          {
+            "code": "COMM 438"
+          },
+          {
+            "code": "COMM 393"
+          },
+          {
+            "code": "COMM 204"
+          },
+          {
+            "code": "CPSC 304"
+          },
+          {
+            "code": "CPSC 310"
+          },
+          {
+            "code": "CPSC 320"
+          }
+        ]
+      },
+      {
+        "name": "Fourth block courses",
+        "credits_required": 30,
+        "options": [
+          {
+            "code": "COMM 335"
+          },
+          {
+            "code": "COMM 436"
+          },
+          {
+            "code": "COMM 393"
+          },
+          {
+            "code": "COMM 204"
+          },
+          {
+            "code": "COMM 394"
+          },
+          {
+            "code": "COMM 336"
+          },
+          {
+            "code": "COMM 338"
+          },
+          {
+            "code": "COMM 435"
+          },
+          {
+            "code": "COMM 439"
+          },
+          {
+            "code": "COMM 456"
+          },
+          {
+            "code": "COMM 491"
+          }
+        ],
+        "notes": "plus 6 credits of electives"
+      }
+    ],
+    "total_credits": 96
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-commerce-and-business-administration/bachelor-commerce/degree-requirements": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-commerce-and-business-administration/bachelor-commerce/degree-requirements",
+    "categories": [
+      {
+        "name": "First Year courses",
+        "credits_required": 30,
+        "options": [
+          {
+            "code": "ECON 101"
+          },
+          {
+            "code": "ECON 102"
+          },
+          {
+            "code": "COMM 101"
+          },
+          {
+            "code": "COMM 105"
+          },
+          {
+            "code": "COMM 190"
+          },
+          {
+            "code": "COMM 191"
+          },
+          {
+            "code": "COMM 192"
+          },
+          {
+            "code": "COMM 196"
+          },
+          {
+            "code": "MATH 100"
+          }
+        ],
+        "notes": "plus 3 credits of electives"
+      },
+      {
+        "name": "Second Year courses",
+        "credits_required": 31,
+        "options": [
+          {
+            "code": "COMM 202"
+          },
+          {
+            "code": "COMM 203"
+          },
+          {
+            "code": "COMM 204"
+          },
+          {
+            "code": "COMM 205"
+          },
+          {
+            "code": "COMM 293"
+          },
+          {
+            "code": "COMM 294"
+          },
+          {
+            "code": "COMM 295"
+          },
+          {
+            "code": "COMM 296"
+          },
+          {
+            "code": "COMM 298"
+          }
+        ],
+        "notes": "plus 6 credits of electives"
+      },
+      {
+        "name": "Third Year courses",
+        "credits_required": 30,
+        "options": [
+          {
+            "code": "COMM 393"
+          },
+          {
+            "code": "COMM 394"
+          },
+          {
+            "code": "COMM 396"
+          }
+        ],
+        "notes": "plus 15 credits of electives"
+      },
+      {
+        "name": "Fourth Year courses",
+        "credits_required": 30,
+        "options": [
+          {
+            "code": "COMM 491"
+          }
+        ],
+        "notes": "plus 18 credits of electives"
+      }
+    ],
+    "total_credits": 121
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-education/bachelor-education/degree-requirements-elementary-middle-years-teacher-education": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-education/bachelor-education/degree-requirements-elementary-middle-years-teacher-education",
+    "categories": [
+      {
+        "name": "First block courses",
+        "credits_required": 60,
+        "options": [
+          {
+            "code": "EDUC 315"
+          },
+          {
+            "code": "EDUC 321"
+          },
+          {
+            "code": "EDUC 418"
+          },
+          {
+            "code": "EDUC 430"
+          },
+          {
+            "code": "EDUC 440"
+          },
+          {
+            "code": "EDUC 450"
+          },
+          {
+            "code": "EDUC 451"
+          },
+          {
+            "code": "EDUC 452"
+          },
+          {
+            "code": "EDCP 301"
+          },
+          {
+            "code": "EDCP 308"
+          },
+          {
+            "code": "EDCP 320"
+          },
+          {
+            "code": "EDCP 331"
+          },
+          {
+            "code": "EDCP 349"
+          },
+          {
+            "code": "EPSE 308"
+          },
+          {
+            "code": "EPSE 310"
+          },
+          {
+            "code": "EPSE 317"
+          },
+          {
+            "code": "EDST 401"
+          },
+          {
+            "code": "EDST 403"
+          },
+          {
+            "code": "EDST 404"
+          },
+          {
+            "code": "LLED 350"
+          },
+          {
+            "code": "LLED 351"
+          },
+          {
+            "code": "LLED 352"
+          },
+          {
+            "code": "LLED 353"
+          }
+        ]
+      }
+    ],
+    "total_credits": 60
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-education/bachelor-education/degree-requirements-indigenous-teacher-education": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-education/bachelor-education/degree-requirements-indigenous-teacher-education",
+    "categories": [
+      {
+        "name": "First block courses",
+        "credits_required": 15,
+        "options": [
+          {
+            "code": "EDUC 140"
+          },
+          {
+            "code": "EDUC 141"
+          },
+          {
+            "code": "EDUC 143"
+          },
+          {
+            "code": "EDUC 240"
+          },
+          {
+            "code": "EDUC 244"
+          },
+          {
+            "code": "EDUC 344"
+          }
+        ]
+      },
+      {
+        "name": "Second block courses",
+        "credits_required": 151,
+        "options": [
+          {
+            "code": "LLED 336"
+          },
+          {
+            "code": "EDUC 442"
+          },
+          {
+            "code": "EPSE 317"
+          },
+          {
+            "code": "EDCP 301"
+          },
+          {
+            "code": "EDCP 308"
+          },
+          {
+            "code": "EDCP 320"
+          },
+          {
+            "code": "EDCP 331"
+          },
+          {
+            "code": "EDCP 340"
+          },
+          {
+            "code": "EDCP 349"
+          },
+          {
+            "code": "EDUC 315"
+          },
+          {
+            "code": "EDUC 321"
+          },
+          {
+            "code": "EPSE 308"
+          },
+          {
+            "code": "EPSE 310"
+          },
+          {
+            "code": "LLED 350"
+          },
+          {
+            "code": "LLED 351"
+          },
+          {
+            "code": "LLED 352"
+          },
+          {
+            "code": "LLED 353"
+          },
+          {
+            "code": "EDST 401"
+          },
+          {
+            "code": "EDST 403"
+          },
+          {
+            "code": "EDST 404"
+          },
+          {
+            "code": "EDUC 418"
+          },
+          {
+            "code": "EDUC 430"
+          },
+          {
+            "code": "EDUC 440"
+          },
+          {
+            "code": "EDUC 450"
+          },
+          {
+            "code": "EDUC 451"
+          },
+          {
+            "code": "EDUC 452"
+          }
+        ]
+      },
+      {
+        "name": "Third block courses",
+        "credits_required": 13,
+        "options": [
+          {
+            "code": "EDUC 140"
+          },
+          {
+            "code": "EDUC 141"
+          },
+          {
+            "code": "EDUC 143"
+          },
+          {
+            "code": "EDUC 240"
+          },
+          {
+            "code": "EDUC 244"
+          }
+        ]
+      },
+      {
+        "name": "Fourth block courses",
+        "credits_required": 6,
+        "options": [
+          {
+            "code": "EDUC 344"
+          },
+          {
+            "code": "LLED 336"
+          },
+          {
+            "code": "EDUC 442"
+          }
+        ]
+      },
+      {
+        "name": "Fifth block courses",
+        "credits_required": 54,
+        "options": [
+          {
+            "code": "EDUC 315"
+          },
+          {
+            "code": "EDUC 421"
+          },
+          {
+            "code": "EPSE 308"
+          },
+          {
+            "code": "EPSE 310"
+          },
+          {
+            "code": "EPSE 317"
+          },
+          {
+            "code": "LLED 360"
+          },
+          {
+            "code": "LLED 361"
+          },
+          {
+            "code": "EDST 401"
+          },
+          {
+            "code": "EDST 403"
+          },
+          {
+            "code": "EDST 404"
+          },
+          {
+            "code": "EDUC 430"
+          },
+          {
+            "code": "EDUC 440"
+          },
+          {
+            "code": "EDUC 450"
+          },
+          {
+            "code": "EDUC 451"
+          },
+          {
+            "code": "EDUC 452"
+          }
+        ],
+        "notes": "plus 6 credits of electives"
+      },
+      {
+        "name": "Sixth block courses",
+        "credits_required": 15,
+        "options": [
+          {
+            "code": "EDUC 143"
+          },
+          {
+            "code": "EDUC 244"
+          },
+          {
+            "code": "EDUC 140"
+          },
+          {
+            "code": "EDUC 141"
+          },
+          {
+            "code": "EDUC 240"
+          },
+          {
+            "code": "EDUC 344"
+          },
+          {
+            "code": "EDCP 362"
+          },
+          {
+            "code": "LLED 336"
+          }
+        ]
+      }
+    ],
+    "total_credits": 166
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-education/bachelor-education/degree-requirements-secondary-teacher-education": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-education/bachelor-education/degree-requirements-secondary-teacher-education",
+    "categories": [
+      {
+        "name": "First block courses",
+        "credits_required": 48,
+        "options": [
+          {
+            "code": "EDUC 315"
+          },
+          {
+            "code": "EDUC 421"
+          },
+          {
+            "code": "EDUC 430"
+          },
+          {
+            "code": "EDUC 440"
+          },
+          {
+            "code": "EDUC 450"
+          },
+          {
+            "code": "EDUC 451"
+          },
+          {
+            "code": "EDUC 452"
+          },
+          {
+            "code": "EPSE 308"
+          },
+          {
+            "code": "EPSE 310"
+          },
+          {
+            "code": "EPSE 317"
+          },
+          {
+            "code": "EDST 401"
+          },
+          {
+            "code": "EDST 403"
+          },
+          {
+            "code": "EDST 404"
+          },
+          {
+            "code": "LLED 360"
+          },
+          {
+            "code": "LLED 361"
+          }
+        ]
+      }
+    ],
+    "total_credits": 60
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-forestry-and-environmental-stewardship/bsc-degrees-students-who-started-prior-september-2024/bsc-forest-bioeconomy-sciences-and-technology/degree-requirements": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-forestry-and-environmental-stewardship/bsc-degrees-students-who-started-prior-september-2024/bsc-forest-bioeconomy-sciences-and-technology/degree-requirements",
+    "categories": [
+      {
+        "name": "First block courses",
+        "credits_required": 32,
+        "options": [
+          {
+            "code": "BIOL 112"
+          },
+          {
+            "code": "BIOL 121"
+          },
+          {
+            "code": "CHEM 121"
+          },
+          {
+            "code": "CHEM 123"
+          },
+          {
+            "code": "CONS 101"
+          },
+          {
+            "code": "ECON 101"
+          },
+          {
+            "code": "FRST 150"
+          },
+          {
+            "code": "NRES 150"
+          },
+          {
+            "code": "ENGL 110"
+          },
+          {
+            "code": "ENGL 111"
+          },
+          {
+            "code": "GEOS 102"
+          },
+          {
+            "code": "MATH 100"
+          }
+        ],
+        "notes": "plus 3 credits of electives"
+      },
+      {
+        "name": "Second block courses",
+        "credits_required": 30,
+        "options": [
+          {
+            "code": "BEST 200"
+          },
+          {
+            "code": "BEST 201"
+          },
+          {
+            "code": "BEST 202"
+          },
+          {
+            "code": "BEST 203"
+          },
+          {
+            "code": "FRST 231"
+          },
+          {
+            "code": "WOOD 225"
+          },
+          {
+            "code": "NRES 225"
+          }
+        ],
+        "notes": "plus 9 credits of electives"
+      },
+      {
+        "name": "Third block courses",
+        "credits_required": 30,
+        "options": [
+          {
+            "code": "BEST 300"
+          },
+          {
+            "code": "BEST 301"
+          },
+          {
+            "code": "BEST 302"
+          },
+          {
+            "code": "BEST 304"
+          },
+          {
+            "code": "BEST 308"
+          },
+          {
+            "code": "FRST 302"
+          },
+          {
+            "code": "FRST 318"
+          }
+        ],
+        "notes": "plus 6 credits of electives"
+      },
+      {
+        "name": "Fourth block courses",
+        "credits_required": 30,
+        "options": [
+          {
+            "code": "BEST 400"
+          },
+          {
+            "code": "BEST 401"
+          },
+          {
+            "code": "BEST 402"
+          },
+          {
+            "code": "BEST 403"
+          },
+          {
+            "code": "CONS 425"
+          },
+          {
+            "code": "WOOD 365"
+          },
+          {
+            "code": "WOOD 461"
+          }
+        ],
+        "notes": "plus 9 credits of electives"
+      }
+    ],
+    "total_credits": 122
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-forestry-and-environmental-stewardship/bsc-degrees-students-who-started-prior-september-2024/bsc-natural-resources-conservation/degree-requirements": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-forestry-and-environmental-stewardship/bsc-degrees-students-who-started-prior-september-2024/bsc-natural-resources-conservation/degree-requirements",
+    "categories": [
+      {
+        "name": "First Year courses",
+        "credits_required": 34,
+        "options": [
+          {
+            "code": "APBI 200"
+          },
+          {
+            "code": "BIOL 121"
+          },
+          {
+            "code": "CONS 101"
+          },
+          {
+            "code": "ECON 101"
+          },
+          {
+            "code": "FRST 101"
+          },
+          {
+            "code": "ECON 102"
+          },
+          {
+            "code": "ENGL 100"
+          },
+          {
+            "code": "FRST 150"
+          },
+          {
+            "code": "GEOS 103"
+          },
+          {
+            "code": "MATH 100"
+          },
+          {
+            "code": "MATH 190"
+          }
+        ],
+        "notes": "plus 6 credits of electives"
+      },
+      {
+        "name": "Second Year courses",
+        "credits_required": 30,
+        "options": [
+          {
+            "code": "CONS 200"
+          },
+          {
+            "code": "CONS 210"
+          },
+          {
+            "code": "FRST 200"
+          },
+          {
+            "code": "NRES 200"
+          },
+          {
+            "code": "FRST 201"
+          },
+          {
+            "code": "NRES 201"
+          },
+          {
+            "code": "FRST 210"
+          },
+          {
+            "code": "NRES 210"
+          },
+          {
+            "code": "FRST 211"
+          },
+          {
+            "code": "NRES 211"
+          },
+          {
+            "code": "FRST 231"
+          },
+          {
+            "code": "NRES 231"
+          },
+          {
+            "code": "FRST 232"
+          },
+          {
+            "code": "NRES 232"
+          },
+          {
+            "code": "SOCI 101"
+          },
+          {
+            "code": "SOCI 102"
+          }
+        ],
+        "notes": "plus 3 credits of electives"
+      },
+      {
+        "name": "Third Year courses",
+        "credits_required": 30,
+        "options": [
+          {
+            "code": "CONS 330"
+          },
+          {
+            "code": "NRES 241"
+          },
+          {
+            "code": "CONS 440"
+          },
+          {
+            "code": "CONS 481"
+          },
+          {
+            "code": "FRST 318"
+          },
+          {
+            "code": "FRST 385"
+          },
+          {
+            "code": "FRST 386"
+          },
+          {
+            "code": "FRST 395"
+          },
+          {
+            "code": "SOCI 360"
+          },
+          {
+            "code": "GEOG 310"
+          }
+        ],
+        "notes": "plus 3 credits of electives"
+      },
+      {
+        "name": "Fourth Year courses",
+        "credits_required": 30,
+        "options": [
+          {
+            "code": "GEOG 310"
+          },
+          {
+            "code": "CONS 451"
+          },
+          {
+            "code": "FRST 443"
+          },
+          {
+            "code": "NRES 341"
+          },
+          {
+            "code": "FRST 495"
+          },
+          {
+            "code": "CONS 486"
+          },
+          {
+            "code": "CONS 498"
+          }
+        ]
+      }
+    ],
+    "total_credits": 61
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-forestry-and-environmental-stewardship/bsc-degrees-students-who-started-prior-september-2024/bsc-wood-products-processing/degree-requirements": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-forestry-and-environmental-stewardship/bsc-degrees-students-who-started-prior-september-2024/bsc-wood-products-processing/degree-requirements",
+    "categories": [
+      {
+        "name": "First Year courses",
+        "credits_required": 29,
+        "options": [
+          {
+            "code": "ENGL 110"
+          },
+          {
+            "code": "ENGL 111"
+          },
+          {
+            "code": "FRST 150"
+          },
+          {
+            "code": "CHEM 121"
+          },
+          {
+            "code": "CHEM 111"
+          },
+          {
+            "code": "CHEM 123"
+          },
+          {
+            "code": "MATH 101"
+          },
+          {
+            "code": "MATH 103"
+          },
+          {
+            "code": "MATH 105"
+          },
+          {
+            "code": "PHYS 131"
+          },
+          {
+            "code": "PHYS 117"
+          }
+        ],
+        "notes": "plus 9 credits of electives"
+      },
+      {
+        "name": "Second Year courses",
+        "credits_required": 30,
+        "options": [
+          {
+            "code": "ECON 101"
+          },
+          {
+            "code": "FRST 101"
+          },
+          {
+            "code": "FRST 231"
+          },
+          {
+            "code": "WOOD 225"
+          },
+          {
+            "code": "WOOD 244"
+          },
+          {
+            "code": "WOOD 245"
+          },
+          {
+            "code": "WOOD 249"
+          },
+          {
+            "code": "WOOD 276"
+          },
+          {
+            "code": "WOOD 280"
+          },
+          {
+            "code": "WOOD 282"
+          },
+          {
+            "code": "WOOD 290"
+          },
+          {
+            "code": "WOOD 292"
+          }
+        ]
+      },
+      {
+        "name": "Third Year courses",
+        "credits_required": 37,
+        "options": [
+          {
+            "code": "WOOD 305"
+          },
+          {
+            "code": "WOOD 353"
+          },
+          {
+            "code": "COMM 204"
+          },
+          {
+            "code": "WOOD 330"
+          },
+          {
+            "code": "WOOD 335"
+          },
+          {
+            "code": "WOOD 356"
+          },
+          {
+            "code": "WOOD 365"
+          },
+          {
+            "code": "WOOD 373"
+          },
+          {
+            "code": "WOOD 384"
+          },
+          {
+            "code": "WOOD 386"
+          },
+          {
+            "code": "WOOD 464"
+          },
+          {
+            "code": "WOOD 482"
+          },
+          {
+            "code": "WOOD 487"
+          }
+        ],
+        "notes": "plus 3 credits of electives"
+      },
+      {
+        "name": "Fourth Year courses",
+        "credits_required": 33,
+        "options": [
+          {
+            "code": "COMR 457"
+          },
+          {
+            "code": "WOOD 440"
+          },
+          {
+            "code": "WOOD 461"
+          },
+          {
+            "code": "WOOD 485"
+          },
+          {
+            "code": "WOOD 491"
+          },
+          {
+            "code": "WOOD 492"
+          },
+          {
+            "code": "WOOD 494"
+          },
+          {
+            "code": "WOOD 499"
+          }
+        ],
+        "notes": "plus 6 credits of electives"
+      }
+    ],
+    "total_credits": 100
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-forestry-and-environmental-stewardship/bils-bachelor-indigenous-land-stewardship/degree-requirements": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-forestry-and-environmental-stewardship/bils-bachelor-indigenous-land-stewardship/degree-requirements",
+    "categories": [
+      {
+        "name": "First Year courses",
+        "credits_required": 33,
+        "options": [
+          {
+            "code": "ILS 100"
+          },
+          {
+            "code": "ILS 101"
+          },
+          {
+            "code": "ILS 102"
+          },
+          {
+            "code": "ILS 103"
+          },
+          {
+            "code": "ILS 104"
+          },
+          {
+            "code": "ILS 105"
+          },
+          {
+            "code": "ILS 106"
+          },
+          {
+            "code": "FRST 150"
+          },
+          {
+            "code": "ILS 107"
+          },
+          {
+            "code": "ILS 108"
+          }
+        ],
+        "notes": "plus 3 credits of electives"
+      },
+      {
+        "name": "Second Year courses",
+        "credits_required": 33,
+        "options": [
+          {
+            "code": "ILS 200"
+          },
+          {
+            "code": "ILS 201"
+          },
+          {
+            "code": "FRST 232"
+          },
+          {
+            "code": "ILS 202"
+          },
+          {
+            "code": "ILS 203"
+          },
+          {
+            "code": "ILS 204"
+          },
+          {
+            "code": "ILS 205"
+          },
+          {
+            "code": "FRST 443"
+          }
+        ],
+        "notes": "plus 3 credits of electives"
+      },
+      {
+        "name": "Third Year courses",
+        "credits_required": 33,
+        "options": [
+          {
+            "code": "ILS 300"
+          },
+          {
+            "code": "ILS 301"
+          },
+          {
+            "code": "ILS 302"
+          },
+          {
+            "code": "ILS 303"
+          },
+          {
+            "code": "ILS 304"
+          },
+          {
+            "code": "FRST 305"
+          },
+          {
+            "code": "ILS 305"
+          },
+          {
+            "code": "ILS 306"
+          },
+          {
+            "code": "ILS 307"
+          },
+          {
+            "code": "ILS 308"
+          }
+        ],
+        "notes": "plus 3 credits of electives"
+      },
+      {
+        "name": "Fourth Year courses",
+        "credits_required": 30,
+        "options": [
+          {
+            "code": "ILS 400"
+          },
+          {
+            "code": "ILS 401"
+          },
+          {
+            "code": "ILS 402"
+          },
+          {
+            "code": "ILS 403"
+          }
+        ],
+        "notes": "plus 3 credits of electives"
+      }
+    ],
+    "total_credits": 129
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-forestry-and-environmental-stewardship/bsc-degrees-students-who-started-prior-september-2024/bsc-natural-resources-conservation/dual-degree-program-natural": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-forestry-and-environmental-stewardship/bsc-degrees-students-who-started-prior-september-2024/bsc-natural-resources-conservation/dual-degree-program-natural",
+    "categories": [
+      {
+        "name": "First Year courses",
+        "credits_required": 27,
+        "options": [
+          {
+            "code": "APBI 200"
+          },
+          {
+            "code": "ENGL 100"
+          },
+          {
+            "code": "FRST 150"
+          },
+          {
+            "code": "BIOL 121"
+          },
+          {
+            "code": "CONS 101"
+          },
+          {
+            "code": "ECON 101"
+          },
+          {
+            "code": "ECON 102"
+          }
+        ],
+        "notes": "plus 3 credits of electives"
+      },
+      {
+        "name": "Second Year courses",
+        "credits_required": 27,
+        "options": [
+          {
+            "code": "CONS 200"
+          },
+          {
+            "code": "CONS 210"
+          },
+          {
+            "code": "FRST 200"
+          },
+          {
+            "code": "NRES 200"
+          },
+          {
+            "code": "FRST 201"
+          },
+          {
+            "code": "NRES 201"
+          },
+          {
+            "code": "FRST 210"
+          },
+          {
+            "code": "NRES 210"
+          },
+          {
+            "code": "FRST 211"
+          },
+          {
+            "code": "NRES 211"
+          },
+          {
+            "code": "FRST 231"
+          },
+          {
+            "code": "STAT 200"
+          },
+          {
+            "code": "BIOL 300"
+          },
+          {
+            "code": "NRES 231"
+          },
+          {
+            "code": "FRST 232"
+          },
+          {
+            "code": "NRES 232"
+          },
+          {
+            "code": "SOCI 101"
+          },
+          {
+            "code": "SOCI 102"
+          }
+        ]
+      },
+      {
+        "name": "Third Year courses",
+        "credits_required": 30,
+        "options": [
+          {
+            "code": "CONS 330"
+          },
+          {
+            "code": "NRES 241"
+          },
+          {
+            "code": "GEOS 270"
+          },
+          {
+            "code": "CONS 481"
+          },
+          {
+            "code": "EDST 401"
+          },
+          {
+            "code": "FRST 318"
+          },
+          {
+            "code": "ECON 371"
+          },
+          {
+            "code": "ECON 374"
+          },
+          {
+            "code": "FRST 385"
+          },
+          {
+            "code": "FRST 386"
+          },
+          {
+            "code": "FRST 395"
+          },
+          {
+            "code": "LLED 360"
+          },
+          {
+            "code": "SOCI 360"
+          }
+        ]
+      },
+      {
+        "name": "Fourth Year courses",
+        "credits_required": 27,
+        "options": [
+          {
+            "code": "FRST 443"
+          },
+          {
+            "code": "NRES 341"
+          },
+          {
+            "code": "FRST 495"
+          },
+          {
+            "code": "CONS 425"
+          },
+          {
+            "code": "CONS 440"
+          },
+          {
+            "code": "FRST 415"
+          },
+          {
+            "code": "CONS 451"
+          },
+          {
+            "code": "CONS 486"
+          }
+        ]
+      },
+      {
+        "name": "Fifth Year courses",
+        "credits_required": 37,
+        "options": [
+          {
+            "code": "EDUC 315"
+          },
+          {
+            "code": "EDUC 421"
+          },
+          {
+            "code": "EDUC 430"
+          },
+          {
+            "code": "EDUC 450"
+          },
+          {
+            "code": "EDUC 451"
+          },
+          {
+            "code": "EDUC 452"
+          },
+          {
+            "code": "EPSE 310"
+          },
+          {
+            "code": "EDCP 352"
+          },
+          {
+            "code": "EDCP 354"
+          },
+          {
+            "code": "EPSE 308"
+          }
+        ]
+      }
+    ],
+    "total_credits": 121
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-forestry-and-environmental-stewardship/bsc-degrees-students-who-started-prior-september-2024/bsf-bachelor-science-forestry/forest-resources-management-major-0": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-forestry-and-environmental-stewardship/bsc-degrees-students-who-started-prior-september-2024/bsf-bachelor-science-forestry/forest-resources-management-major-0",
+    "categories": [
+      {
+        "name": "First Year courses",
+        "credits_required": 30,
+        "options": [
+          {
+            "code": "APBI 200"
+          },
+          {
+            "code": "ENGL 100"
+          },
+          {
+            "code": "FRST 150"
+          },
+          {
+            "code": "NRES 150"
+          },
+          {
+            "code": "BIOL 111"
+          },
+          {
+            "code": "BIOL 121"
+          },
+          {
+            "code": "CHEM 121"
+          },
+          {
+            "code": "CHEM 100"
+          },
+          {
+            "code": "CHEM 111"
+          },
+          {
+            "code": "PHYS 131"
+          },
+          {
+            "code": "PHYS 100"
+          },
+          {
+            "code": "PHYS 117"
+          },
+          {
+            "code": "ECON 101"
+          },
+          {
+            "code": "FRST 101"
+          },
+          {
+            "code": "FRST 100"
+          },
+          {
+            "code": "FRST 232"
+          },
+          {
+            "code": "NRES 232"
+          },
+          {
+            "code": "MATH 100"
+          },
+          {
+            "code": "MATH 190"
+          }
+        ],
+        "notes": "plus 3 credits of electives"
+      },
+      {
+        "name": "Second Year courses",
+        "credits_required": 31,
+        "options": [
+          {
+            "code": "CONS 200"
+          },
+          {
+            "code": "FOPR 264"
+          },
+          {
+            "code": "FRST 200"
+          },
+          {
+            "code": "NRES 200"
+          },
+          {
+            "code": "FRST 201"
+          },
+          {
+            "code": "NRES 201"
+          },
+          {
+            "code": "FRST 210"
+          },
+          {
+            "code": "NRES 210"
+          },
+          {
+            "code": "FRST 211"
+          },
+          {
+            "code": "NRES 211"
+          },
+          {
+            "code": "FRST 231"
+          },
+          {
+            "code": "NRES 231"
+          },
+          {
+            "code": "FRST 239"
+          }
+        ],
+        "notes": "plus 6 credits of electives"
+      },
+      {
+        "name": "Third Year courses",
+        "credits_required": 36,
+        "options": [
+          {
+            "code": "FRST 305"
+          },
+          {
+            "code": "FRST 307"
+          },
+          {
+            "code": "FRST 318"
+          },
+          {
+            "code": "FRST 320"
+          },
+          {
+            "code": "FRST 339"
+          },
+          {
+            "code": "FRST 385"
+          },
+          {
+            "code": "FRST 386"
+          },
+          {
+            "code": "FRST 395"
+          },
+          {
+            "code": "FRST 452"
+          },
+          {
+            "code": "WOOD 365"
+          }
+        ],
+        "notes": "plus 3 credits of electives"
+      },
+      {
+        "name": "Fourth Year courses",
+        "credits_required": 30,
+        "options": [
+          {
+            "code": "FRST 415"
+          },
+          {
+            "code": "FRST 422"
+          },
+          {
+            "code": "FRST 423"
+          },
+          {
+            "code": "FRST 497"
+          },
+          {
+            "code": "NRES 241"
+          },
+          {
+            "code": "WOOD 461"
+          }
+        ],
+        "notes": "plus 9 credits of electives"
+      }
+    ],
+    "total_credits": 127
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-forestry-and-environmental-stewardship/bsc-degrees-students-who-started-prior-september-2024/bsc-forest-bioeconomy-sciences-and-technology/minor-commerce": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-forestry-and-environmental-stewardship/bsc-degrees-students-who-started-prior-september-2024/bsc-forest-bioeconomy-sciences-and-technology/minor-commerce",
+    "categories": [
+      {
+        "name": "Required courses",
+        "credits_required": 18,
+        "options": [
+          {
+            "code": "COMR 329"
+          },
+          {
+            "code": "COMR 457"
+          },
+          {
+            "code": "COMR 465"
+          },
+          {
+            "code": "COMR 473"
+          },
+          {
+            "code": "COMR 493"
+          },
+          {
+            "code": "COMR 398"
+          },
+          {
+            "code": "COMR 458"
+          }
+        ],
+        "notes": "Pick one from the alternates at the end."
+      }
+    ]
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-forestry-and-environmental-stewardship/bsc-degrees-students-who-started-prior-september-2024/bsc-wood-products-processing/minor-commerce": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-forestry-and-environmental-stewardship/bsc-degrees-students-who-started-prior-september-2024/bsc-wood-products-processing/minor-commerce",
+    "categories": [
+      {
+        "name": "Required courses",
+        "credits_required": 18,
+        "options": [
+          {
+            "code": "COMR 329"
+          },
+          {
+            "code": "COMR 457"
+          },
+          {
+            "code": "COMR 465"
+          },
+          {
+            "code": "COMR 473"
+          },
+          {
+            "code": "COMR 493"
+          },
+          {
+            "code": "COMM 204"
+          },
+          {
+            "code": "COMR 398"
+          },
+          {
+            "code": "COMR 458"
+          }
+        ],
+        "notes": "Pick one from the alternates at the end."
+      }
+    ]
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-forestry-and-environmental-stewardship/bsc-natural-resources-students-starting-september-2024/minor-commerce": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-forestry-and-environmental-stewardship/bsc-natural-resources-students-starting-september-2024/minor-commerce",
+    "categories": [
+      {
+        "name": "First block courses",
+        "credits_required": 18,
+        "options": [
+          {
+            "code": "COMR 329"
+          },
+          {
+            "code": "COMR 457"
+          },
+          {
+            "code": "COMR 465"
+          },
+          {
+            "code": "COMR 473"
+          },
+          {
+            "code": "COMR 493"
+          },
+          {
+            "code": "COMM 204"
+          },
+          {
+            "code": "COMR 398"
+          },
+          {
+            "code": "COMR 458"
+          }
+        ]
+      }
+    ]
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-land-and-food-systems/bsc-applied-biology-apbi/applied-animal-biology-major": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-land-and-food-systems/bsc-applied-biology-apbi/applied-animal-biology-major",
+    "categories": [
+      {
+        "name": "First Year courses",
+        "credits_required": 32,
+        "options": [
+          {
+            "code": "LFS 100"
+          },
+          {
+            "code": "LFS 150"
+          },
+          {
+            "code": "WRDS 150"
+          },
+          {
+            "code": "BIOL 112"
+          },
+          {
+            "code": "BIOL 121"
+          },
+          {
+            "code": "BIOL 180"
+          },
+          {
+            "code": "CHEM 121"
+          },
+          {
+            "code": "CHEM 111"
+          },
+          {
+            "code": "CHEM 123"
+          },
+          {
+            "code": "MATH 100"
+          },
+          {
+            "code": "PHYS 131"
+          },
+          {
+            "code": "PHYS 101"
+          },
+          {
+            "code": "PHYS 106"
+          },
+          {
+            "code": "PHYS 107"
+          },
+          {
+            "code": "PHYS 117"
+          }
+        ],
+        "notes": "plus 6 credits of electives"
+      },
+      {
+        "name": "Second Year courses",
+        "credits_required": 31,
+        "options": [
+          {
+            "code": "LFS 250"
+          },
+          {
+            "code": "LFS 252"
+          },
+          {
+            "code": "FRST 231"
+          },
+          {
+            "code": "BIOL 300"
+          },
+          {
+            "code": "STAT 200"
+          },
+          {
+            "code": "BIOL 200"
+          },
+          {
+            "code": "BIOL 201"
+          },
+          {
+            "code": "CHEM 233"
+          },
+          {
+            "code": "CHEM 235"
+          },
+          {
+            "code": "MICB 211"
+          }
+        ],
+        "notes": "plus 9 credits of electives"
+      }
+    ],
+    "total_credits": 123
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-land-and-food-systems/bsc-applied-biology-apbi/applied-plant-and-soil-science-major": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-land-and-food-systems/bsc-applied-biology-apbi/applied-plant-and-soil-science-major",
+    "categories": [
+      {
+        "name": "First Year courses",
+        "credits_required": 32,
+        "options": [
+          {
+            "code": "LFS 100"
+          },
+          {
+            "code": "LFS 150"
+          },
+          {
+            "code": "WRDS 150"
+          },
+          {
+            "code": "BIOL 112"
+          },
+          {
+            "code": "BIOL 121"
+          },
+          {
+            "code": "BIOL 180"
+          },
+          {
+            "code": "CHEM 121"
+          },
+          {
+            "code": "CHEM 111"
+          },
+          {
+            "code": "CHEM 123"
+          },
+          {
+            "code": "MATH 100"
+          }
+        ],
+        "notes": "plus 9 credits of electives"
+      },
+      {
+        "name": "Second Year courses",
+        "credits_required": 31,
+        "options": [
+          {
+            "code": "ECON 101"
+          },
+          {
+            "code": "ECON 102"
+          },
+          {
+            "code": "LFS 250"
+          },
+          {
+            "code": "LFS 252"
+          },
+          {
+            "code": "FRST 231"
+          },
+          {
+            "code": "BIOL 300"
+          },
+          {
+            "code": "APBI 200"
+          },
+          {
+            "code": "BIOL 210"
+          },
+          {
+            "code": "APBI 210"
+          }
+        ],
+        "notes": "plus 12 credits of electives"
+      },
+      {
+        "name": "Third Year courses",
+        "credits_required": 30,
+        "options": [
+          {
+            "code": "LFS 350"
+          }
+        ],
+        "notes": "plus 6 credits of electives"
+      },
+      {
+        "name": "Fourth Year courses",
+        "credits_required": 30,
+        "options": [
+          {
+            "code": "LFS 450"
+          }
+        ],
+        "notes": "plus 6 credits of electives"
+      }
+    ],
+    "total_credits": 123
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-land-and-food-systems/bsc-food-and-resource-economics-fre/business-and-markets-major": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-land-and-food-systems/bsc-food-and-resource-economics-fre/business-and-markets-major",
+    "categories": [
+      {
+        "name": "First Year courses",
+        "credits_required": 31,
+        "options": [
+          {
+            "code": "LFS 100"
+          },
+          {
+            "code": "LFS 150"
+          },
+          {
+            "code": "WRDS 150"
+          },
+          {
+            "code": "BIOL 111"
+          },
+          {
+            "code": "BIOL 112"
+          },
+          {
+            "code": "BIOL 121"
+          },
+          {
+            "code": "MATH 100"
+          },
+          {
+            "code": "MATH 101"
+          },
+          {
+            "code": "ECON 101"
+          },
+          {
+            "code": "ECON 102"
+          },
+          {
+            "code": "DSCI 100"
+          }
+        ],
+        "notes": "plus 9 credits of electives"
+      },
+      {
+        "name": "Second Year courses",
+        "credits_required": 30,
+        "options": [
+          {
+            "code": "LFS 250"
+          },
+          {
+            "code": "LFS 252"
+          },
+          {
+            "code": "FRE 290"
+          },
+          {
+            "code": "FRE 306"
+          },
+          {
+            "code": "ECON 255"
+          },
+          {
+            "code": "ECON 234"
+          },
+          {
+            "code": "FRST 318"
+          }
+        ],
+        "notes": "plus 12 credits of electives"
+      }
+    ],
+    "total_credits": 61
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-land-and-food-systems/bsc-food-and-resource-economics-fre/data-analytics-major": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-land-and-food-systems/bsc-food-and-resource-economics-fre/data-analytics-major",
+    "categories": [
+      {
+        "name": "First Year courses",
+        "credits_required": 31,
+        "options": [
+          {
+            "code": "LFS 100"
+          },
+          {
+            "code": "LFS 150"
+          },
+          {
+            "code": "WRDS 150"
+          },
+          {
+            "code": "BIOL 111"
+          },
+          {
+            "code": "BIOL 112"
+          },
+          {
+            "code": "BIOL 121"
+          },
+          {
+            "code": "MATH 100"
+          },
+          {
+            "code": "MATH 101"
+          },
+          {
+            "code": "ECON 101"
+          },
+          {
+            "code": "ECON 102"
+          },
+          {
+            "code": "DSCI 100"
+          }
+        ],
+        "notes": "plus 9 credits of electives"
+      },
+      {
+        "name": "Second Year courses",
+        "credits_required": 30,
+        "options": [
+          {
+            "code": "LFS 250"
+          },
+          {
+            "code": "LFS 252"
+          },
+          {
+            "code": "FRE 290"
+          },
+          {
+            "code": "FRE 306"
+          },
+          {
+            "code": "ECON 255"
+          },
+          {
+            "code": "ECON 234"
+          },
+          {
+            "code": "FRST 318"
+          }
+        ],
+        "notes": "plus 12 credits of electives"
+      }
+    ],
+    "total_credits": 61
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-land-and-food-systems/bsc-global-resource-systems-grs/degree-requirements-and-program-options": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-land-and-food-systems/bsc-global-resource-systems-grs/degree-requirements-and-program-options",
+    "categories": [
+      {
+        "name": "First Year courses",
+        "credits_required": 32,
+        "options": [
+          {
+            "code": "LFS 100"
+          },
+          {
+            "code": "BIOL 111"
+          },
+          {
+            "code": "BIOL 112"
+          },
+          {
+            "code": "BIOL 121"
+          },
+          {
+            "code": "CHEM 121"
+          },
+          {
+            "code": "CHEM 111"
+          },
+          {
+            "code": "ECON 101"
+          },
+          {
+            "code": "LFS 101"
+          },
+          {
+            "code": "LFS 150"
+          },
+          {
+            "code": "WRDS 150"
+          }
+        ],
+        "notes": "plus 9 credits of electives"
+      },
+      {
+        "name": "Second Year courses",
+        "credits_required": 30,
+        "options": [
+          {
+            "code": "LFS 250"
+          },
+          {
+            "code": "LFS 252"
+          },
+          {
+            "code": "GRS 290"
+          }
+        ],
+        "notes": "plus 14 credits of electives"
+      }
+    ],
+    "total_credits": 62
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-land-and-food-systems/bsc-food-and-resource-economics-fre/degree-requirements-students-entering-program-202324-or-earlier": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-land-and-food-systems/bsc-food-and-resource-economics-fre/degree-requirements-students-entering-program-202324-or-earlier",
+    "categories": [
+      {
+        "name": "First Year courses",
+        "credits_required": 31,
+        "options": [
+          {
+            "code": "LFS 100"
+          },
+          {
+            "code": "LFS 150"
+          },
+          {
+            "code": "WRDS 150"
+          },
+          {
+            "code": "BIOL 112"
+          },
+          {
+            "code": "BIOL 121"
+          },
+          {
+            "code": "MATH 100"
+          },
+          {
+            "code": "MATH 101"
+          },
+          {
+            "code": "ECON 101"
+          },
+          {
+            "code": "ECON 102"
+          }
+        ],
+        "notes": "plus 12 credits of electives"
+      },
+      {
+        "name": "Second Year courses",
+        "credits_required": 30,
+        "options": [
+          {
+            "code": "LFS 250"
+          },
+          {
+            "code": "APBI 200"
+          },
+          {
+            "code": "FNH 200"
+          },
+          {
+            "code": "FNH 250"
+          },
+          {
+            "code": "FRE 290"
+          },
+          {
+            "code": "FRE 306"
+          },
+          {
+            "code": "ECON 255"
+          },
+          {
+            "code": "LFS 252"
+          },
+          {
+            "code": "ECON 301"
+          },
+          {
+            "code": "ECON 210"
+          },
+          {
+            "code": "ECON 221"
+          },
+          {
+            "code": "ECON 234"
+          },
+          {
+            "code": "ECON 302"
+          },
+          {
+            "code": "ECON 303"
+          },
+          {
+            "code": "ECON 317"
+          },
+          {
+            "code": "ECON 323"
+          },
+          {
+            "code": "ECON 339"
+          },
+          {
+            "code": "ECON 360"
+          },
+          {
+            "code": "ECON 365"
+          }
+        ],
+        "notes": "plus 3 credits of electives"
+      },
+      {
+        "name": "Third Year courses",
+        "credits_required": 30,
+        "options": [
+          {
+            "code": "LFS 350"
+          },
+          {
+            "code": "FRE 394"
+          },
+          {
+            "code": "FRE 326"
+          },
+          {
+            "code": "FRE 385"
+          },
+          {
+            "code": "FRE 474"
+          },
+          {
+            "code": "FRST 399"
+          }
+        ],
+        "notes": "plus 9 credits of electives"
+      },
+      {
+        "name": "Fourth Year courses",
+        "credits_required": 30,
+        "options": [
+          {
+            "code": "FRE 385"
+          },
+          {
+            "code": "FRE 474"
+          },
+          {
+            "code": "FRE 497"
+          },
+          {
+            "code": "FRST 399"
+          },
+          {
+            "code": "FRST 443"
+          }
+        ],
+        "notes": "plus 9 credits of electives"
+      }
+    ],
+    "total_credits": 121
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-land-and-food-systems/bsc-food-nutrition-and-health-fnh/dietetics-major": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-land-and-food-systems/bsc-food-nutrition-and-health-fnh/dietetics-major",
+    "categories": [
+      {
+        "name": "Third Year courses",
+        "credits_required": 31,
+        "options": [
+          {
+            "code": "BIOC 302"
+          },
+          {
+            "code": "FNH 345"
+          },
+          {
+            "code": "FNH 350"
+          },
+          {
+            "code": "FNH 351"
+          },
+          {
+            "code": "FNH 370"
+          },
+          {
+            "code": "FNH 371"
+          },
+          {
+            "code": "FNH 375"
+          },
+          {
+            "code": "FNH 380"
+          },
+          {
+            "code": "FNH 381"
+          },
+          {
+            "code": "FNH 398"
+          }
+        ]
+      },
+      {
+        "name": "Fourth Year courses",
+        "credits_required": 33,
+        "options": [
+          {
+            "code": "FNH 415"
+          },
+          {
+            "code": "FNH 440"
+          },
+          {
+            "code": "FNH 470"
+          },
+          {
+            "code": "FNH 473"
+          },
+          {
+            "code": "FNH 475"
+          },
+          {
+            "code": "FNH 480"
+          },
+          {
+            "code": "FNH 481"
+          },
+          {
+            "code": "LFS 350"
+          }
+        ],
+        "notes": "plus 9 credits of electives"
+      },
+      {
+        "name": "Fifth Year courses",
+        "credits_required": 24,
+        "options": [
+          {
+            "code": "FNH 482"
+          },
+          {
+            "code": "FNH 483"
+          }
+        ]
+      }
+    ],
+    "total_credits": 57
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-land-and-food-systems/bsc-food-nutrition-and-health-fnh/dual-degree-program-food-nutrition-and-health-and-education": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-land-and-food-systems/bsc-food-nutrition-and-health-fnh/dual-degree-program-food-nutrition-and-health-and-education",
+    "categories": [
+      {
+        "name": "First block courses",
+        "credits_required": 33,
+        "options": [
+          {
+            "code": "LFS 100"
+          },
+          {
+            "code": "LFS 150"
+          },
+          {
+            "code": "WRDS 150"
+          },
+          {
+            "code": "BIOL 112"
+          },
+          {
+            "code": "BIOL 121"
+          },
+          {
+            "code": "FNH 160"
+          },
+          {
+            "code": "FNH 161"
+          },
+          {
+            "code": "CHEM 121"
+          },
+          {
+            "code": "CHEM 111"
+          },
+          {
+            "code": "CHEM 123"
+          },
+          {
+            "code": "MATH 100"
+          },
+          {
+            "code": "PSYC 100"
+          },
+          {
+            "code": "SOCI 100"
+          }
+        ]
+      },
+      {
+        "name": "Second block courses",
+        "credits_required": 31,
+        "options": [
+          {
+            "code": "LFS 250"
+          },
+          {
+            "code": "LFS 252"
+          },
+          {
+            "code": "FNH 200"
+          },
+          {
+            "code": "FNH 250"
+          },
+          {
+            "code": "CHEM 233"
+          },
+          {
+            "code": "CHEM 235"
+          },
+          {
+            "code": "BIOL 200"
+          },
+          {
+            "code": "SOCI 200"
+          },
+          {
+            "code": "SOCI 240"
+          },
+          {
+            "code": "ENGL 110"
+          },
+          {
+            "code": "ENGL 120"
+          },
+          {
+            "code": "ENGL 121"
+          },
+          {
+            "code": "BIOL 201"
+          }
+        ]
+      },
+      {
+        "name": "Third block courses",
+        "credits_required": 27,
+        "options": [
+          {
+            "code": "LFS 350"
+          },
+          {
+            "code": "FNH 313"
+          },
+          {
+            "code": "FNH 342"
+          },
+          {
+            "code": "EDST 401"
+          },
+          {
+            "code": "LLED 360"
+          },
+          {
+            "code": "EPSE 317"
+          }
+        ],
+        "notes": "plus 9 credits of electives"
+      },
+      {
+        "name": "Fourth block courses",
+        "credits_required": 31,
+        "options": [
+          {
+            "code": "EDCP 491"
+          },
+          {
+            "code": "EPSE 308"
+          },
+          {
+            "code": "FNH 350"
+          },
+          {
+            "code": "FNH 351"
+          },
+          {
+            "code": "FNH 403"
+          }
+        ],
+        "notes": "plus 15 credits of electives"
+      },
+      {
+        "name": "Fifth block courses",
+        "credits_required": 12,
+        "options": [
+          {
+            "code": "EDST 403"
+          },
+          {
+            "code": "EDST 404"
+          },
+          {
+            "code": "EDUC 430"
+          },
+          {
+            "code": "EDUC 440"
+          },
+          {
+            "code": "LLED 361"
+          }
+        ],
+        "notes": "plus 3 credits of electives"
+      },
+      {
+        "name": "Sixth block courses",
+        "credits_required": 29,
+        "options": [
+          {
+            "code": "EDUC 315"
+          },
+          {
+            "code": "EDUC 421"
+          },
+          {
+            "code": "EDUC 450"
+          },
+          {
+            "code": "EDUC 451"
+          },
+          {
+            "code": "EPSE 310"
+          },
+          {
+            "code": "EDCP 391"
+          },
+          {
+            "code": "EDCP 492"
+          },
+          {
+            "code": "EDCP 493"
+          },
+          {
+            "code": "EDCP 494"
+          },
+          {
+            "code": "EDCP 498"
+          }
+        ]
+      }
+    ],
+    "total_credits": 136
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-land-and-food-systems/bsc-food-nutrition-and-health-fnh/food-market-analysis-major": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-land-and-food-systems/bsc-food-nutrition-and-health-fnh/food-market-analysis-major",
+    "categories": [
+      {
+        "name": "First Year courses",
+        "credits_required": 32,
+        "options": [
+          {
+            "code": "LFS 100"
+          },
+          {
+            "code": "LFS 150"
+          },
+          {
+            "code": "BIOL 112"
+          },
+          {
+            "code": "BIOL 121"
+          },
+          {
+            "code": "BIOL 140"
+          },
+          {
+            "code": "CHEM 121"
+          },
+          {
+            "code": "CHEM 111"
+          },
+          {
+            "code": "CHEM 123"
+          },
+          {
+            "code": "MATH 102"
+          },
+          {
+            "code": "MATH 103"
+          },
+          {
+            "code": "ECON 101"
+          },
+          {
+            "code": "LFS 101"
+          },
+          {
+            "code": "ECON 102"
+          }
+        ]
+      },
+      {
+        "name": "Second Year courses",
+        "credits_required": 30,
+        "options": [
+          {
+            "code": "LFS 250"
+          },
+          {
+            "code": "LFS 252"
+          },
+          {
+            "code": "BIOL 200"
+          },
+          {
+            "code": "CHEM 233"
+          },
+          {
+            "code": "FNH 200"
+          },
+          {
+            "code": "FNH 250"
+          },
+          {
+            "code": "FRE 295"
+          },
+          {
+            "code": "ECON 301"
+          },
+          {
+            "code": "FRE 306"
+          }
+        ],
+        "notes": "plus 3 credits of electives"
+      },
+      {
+        "name": "Third Year courses",
+        "credits_required": 30,
+        "options": [
+          {
+            "code": "LFS 350"
+          },
+          {
+            "code": "FRE 374"
+          },
+          {
+            "code": "ECON 371"
+          },
+          {
+            "code": "FRE 302"
+          },
+          {
+            "code": "FRE 340"
+          },
+          {
+            "code": "FRE 385"
+          },
+          {
+            "code": "ECON 325"
+          }
+        ],
+        "notes": "plus 21 credits of electives"
+      },
+      {
+        "name": "Fourth Year courses",
+        "credits_required": 30,
+        "options": [
+          {
+            "code": "FNH 403"
+          },
+          {
+            "code": "FRE 402"
+          },
+          {
+            "code": "FRE 420"
+          },
+          {
+            "code": "FRE 460"
+          },
+          {
+            "code": "FRE 474"
+          },
+          {
+            "code": "FRE 490"
+          }
+        ],
+        "notes": "plus 24 credits of electives"
+      }
+    ],
+    "total_credits": 122
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-land-and-food-systems/bsc-food-nutrition-and-health-fnh/food-science-major": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-land-and-food-systems/bsc-food-nutrition-and-health-fnh/food-science-major",
+    "categories": [
+      {
+        "name": "First Year courses",
+        "credits_required": 33,
+        "options": [
+          {
+            "code": "LFS 100"
+          },
+          {
+            "code": "LFS 150"
+          },
+          {
+            "code": "WRDS 150"
+          },
+          {
+            "code": "BIOL 112"
+          },
+          {
+            "code": "BIOL 121"
+          },
+          {
+            "code": "FNH 160"
+          },
+          {
+            "code": "FNH 161"
+          },
+          {
+            "code": "CHEM 121"
+          },
+          {
+            "code": "CHEM 111"
+          },
+          {
+            "code": "CHEM 123"
+          },
+          {
+            "code": "MATH 100"
+          },
+          {
+            "code": "MATH 101"
+          },
+          {
+            "code": "PHYS 131"
+          }
+        ]
+      },
+      {
+        "name": "Second Year courses",
+        "credits_required": 31,
+        "options": [
+          {
+            "code": "LFS 250"
+          },
+          {
+            "code": "LFS 252"
+          },
+          {
+            "code": "FNH 200"
+          },
+          {
+            "code": "FNH 250"
+          },
+          {
+            "code": "CHEM 205"
+          },
+          {
+            "code": "CHEM 233"
+          },
+          {
+            "code": "CHEM 235"
+          },
+          {
+            "code": "BIOL 200"
+          },
+          {
+            "code": "BIOL 201"
+          },
+          {
+            "code": "MICB 211"
+          }
+        ]
+      },
+      {
+        "name": "Third Year courses",
+        "credits_required": 31,
+        "options": [
+          {
+            "code": "BIOC 302"
+          },
+          {
+            "code": "FNH 300"
+          },
+          {
+            "code": "FNH 301"
+          },
+          {
+            "code": "FNH 302"
+          },
+          {
+            "code": "FNH 303"
+          },
+          {
+            "code": "FNH 309"
+          },
+          {
+            "code": "FNH 313"
+          },
+          {
+            "code": "FNH 325"
+          },
+          {
+            "code": "FNH 326"
+          },
+          {
+            "code": "MICB 353"
+          }
+        ],
+        "notes": "plus 3 credits of electives"
+      },
+      {
+        "name": "Fourth Year courses",
+        "credits_required": 30,
+        "options": [
+          {
+            "code": "FNH 403"
+          },
+          {
+            "code": "FNH 404"
+          },
+          {
+            "code": "FNH 425"
+          },
+          {
+            "code": "FNH 499"
+          },
+          {
+            "code": "ECON 101"
+          },
+          {
+            "code": "ECON 310"
+          },
+          {
+            "code": "LFS 101"
+          },
+          {
+            "code": "FNH 415"
+          },
+          {
+            "code": "FNH 300"
+          }
+        ],
+        "notes": "plus 15 credits of electives"
+      }
+    ],
+    "total_credits": 125
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-land-and-food-systems/bsc-applied-biology-apbi/food-and-environment-major": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-land-and-food-systems/bsc-applied-biology-apbi/food-and-environment-major",
+    "categories": [
+      {
+        "name": "First Year courses",
+        "credits_required": 32,
+        "options": [
+          {
+            "code": "LFS 100"
+          },
+          {
+            "code": "LFS 150"
+          },
+          {
+            "code": "BIOL 112"
+          },
+          {
+            "code": "BIOL 121"
+          },
+          {
+            "code": "BIOL 140"
+          },
+          {
+            "code": "MATH 102"
+          }
+        ],
+        "notes": "plus 17 credits of electives"
+      },
+      {
+        "name": "Second Year courses",
+        "credits_required": 30,
+        "options": [
+          {
+            "code": "ECON 101"
+          },
+          {
+            "code": "ECON 102"
+          },
+          {
+            "code": "LFS 250"
+          },
+          {
+            "code": "LFS 252"
+          },
+          {
+            "code": "FRST 231"
+          },
+          {
+            "code": "BIOL 300"
+          },
+          {
+            "code": "APBI 200"
+          },
+          {
+            "code": "APBI 260"
+          }
+        ],
+        "notes": "plus 9 credits of electives"
+      },
+      {
+        "name": "Third Year courses",
+        "credits_required": 30,
+        "options": [
+          {
+            "code": "LFS 350"
+          },
+          {
+            "code": "APBI 360"
+          },
+          {
+            "code": "APBI 361"
+          }
+        ],
+        "notes": "plus 21 credits of electives"
+      },
+      {
+        "name": "Fourth Year courses",
+        "credits_required": 30,
+        "options": [
+          {
+            "code": "LFS 450"
+          },
+          {
+            "code": "APBI 460"
+          }
+        ],
+        "notes": "plus 3 credits of electives"
+      }
+    ],
+    "total_credits": 122
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-land-and-food-systems/bsc-food-nutrition-and-health-fnh/food-and-nutritional-sciences-double-major": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-land-and-food-systems/bsc-food-nutrition-and-health-fnh/food-and-nutritional-sciences-double-major",
+    "categories": [
+      {
+        "name": "First Year courses",
+        "credits_required": 33,
+        "options": [
+          {
+            "code": "LFS 100"
+          },
+          {
+            "code": "LFS 150"
+          },
+          {
+            "code": "WRDS 150"
+          },
+          {
+            "code": "BIOL 112"
+          },
+          {
+            "code": "BIOL 121"
+          },
+          {
+            "code": "FNH 160"
+          },
+          {
+            "code": "FNH 161"
+          },
+          {
+            "code": "CHEM 121"
+          },
+          {
+            "code": "CHEM 111"
+          },
+          {
+            "code": "CHEM 123"
+          },
+          {
+            "code": "MATH 100"
+          },
+          {
+            "code": "MATH 101"
+          },
+          {
+            "code": "PHYS 131"
+          }
+        ]
+      },
+      {
+        "name": "Second Year courses",
+        "credits_required": 31,
+        "options": [
+          {
+            "code": "BIOL 200"
+          },
+          {
+            "code": "BIOL 201"
+          },
+          {
+            "code": "CHEM 205"
+          },
+          {
+            "code": "CHEM 233"
+          },
+          {
+            "code": "CHEM 235"
+          },
+          {
+            "code": "FNH 200"
+          },
+          {
+            "code": "FNH 250"
+          },
+          {
+            "code": "LFS 250"
+          },
+          {
+            "code": "LFS 252"
+          },
+          {
+            "code": "MICB 211"
+          }
+        ]
+      },
+      {
+        "name": "Third Year courses",
+        "credits_required": 31,
+        "options": [
+          {
+            "code": "BIOC 302"
+          },
+          {
+            "code": "BIOL 234"
+          },
+          {
+            "code": "FNH 300"
+          },
+          {
+            "code": "FNH 301"
+          },
+          {
+            "code": "FNH 302"
+          },
+          {
+            "code": "FNH 303"
+          },
+          {
+            "code": "FNH 309"
+          },
+          {
+            "code": "FNH 313"
+          },
+          {
+            "code": "FNH 325"
+          },
+          {
+            "code": "FNH 326"
+          },
+          {
+            "code": "MICB 353"
+          }
+        ]
+      },
+      {
+        "name": "Fourth Year courses",
+        "credits_required": 31,
+        "options": [
+          {
+            "code": "FNH 350"
+          },
+          {
+            "code": "FNH 351"
+          },
+          {
+            "code": "FNH 371"
+          },
+          {
+            "code": "FNH 398"
+          },
+          {
+            "code": "FNH 403"
+          },
+          {
+            "code": "FNH 404"
+          },
+          {
+            "code": "FNH 425"
+          },
+          {
+            "code": "FNH 499"
+          },
+          {
+            "code": "FNH 451"
+          },
+          {
+            "code": "FNH 477"
+          }
+        ]
+      },
+      {
+        "name": "Fifth Year courses",
+        "credits_required": 15,
+        "options": [
+          {
+            "code": "FNH 370"
+          },
+          {
+            "code": "LFS 350"
+          },
+          {
+            "code": "ECON 101"
+          },
+          {
+            "code": "ECON 310"
+          },
+          {
+            "code": "LFS 101"
+          },
+          {
+            "code": "FNH 415"
+          },
+          {
+            "code": "FNH 300"
+          }
+        ],
+        "notes": "plus 6 credits of electives"
+      }
+    ],
+    "total_credits": 141
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-land-and-food-systems/bsc-food-nutrition-and-health-fnh/food-nutrition-and-health-major": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-land-and-food-systems/bsc-food-nutrition-and-health-fnh/food-nutrition-and-health-major",
+    "categories": [
+      {
+        "name": "First Year courses",
+        "credits_required": 30,
+        "options": [
+          {
+            "code": "LFS 100"
+          },
+          {
+            "code": "LFS 150"
+          },
+          {
+            "code": "WRDS 150"
+          },
+          {
+            "code": "BIOL 112"
+          },
+          {
+            "code": "BIOL 121"
+          },
+          {
+            "code": "FNH 160"
+          },
+          {
+            "code": "FNH 161"
+          },
+          {
+            "code": "CHEM 121"
+          },
+          {
+            "code": "CHEM 111"
+          },
+          {
+            "code": "CHEM 123"
+          },
+          {
+            "code": "MATH 100"
+          }
+        ],
+        "notes": "plus 3 credits of electives"
+      },
+      {
+        "name": "Second Year courses",
+        "credits_required": 31,
+        "options": [
+          {
+            "code": "LFS 250"
+          },
+          {
+            "code": "LFS 252"
+          },
+          {
+            "code": "FNH 200"
+          },
+          {
+            "code": "FNH 250"
+          },
+          {
+            "code": "CHEM 233"
+          },
+          {
+            "code": "CHEM 235"
+          },
+          {
+            "code": "BIOL 200"
+          },
+          {
+            "code": "BIOL 201"
+          }
+        ],
+        "notes": "plus 6 credits of electives"
+      },
+      {
+        "name": "Third Year courses",
+        "credits_required": 30,
+        "options": [
+          {
+            "code": "LFS 350"
+          },
+          {
+            "code": "FNH 313"
+          },
+          {
+            "code": "FNH 350"
+          },
+          {
+            "code": "FNH 351"
+          }
+        ],
+        "notes": "plus 18 credits of electives"
+      },
+      {
+        "name": "Fourth Year courses",
+        "credits_required": 30,
+        "options": [
+          {
+            "code": "FNH 403"
+          }
+        ],
+        "notes": "plus 21 credits of electives"
+      }
+    ],
+    "total_credits": 121
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-land-and-food-systems/bsc-food-nutrition-and-health-fnh/nutritional-sciences-major": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-land-and-food-systems/bsc-food-nutrition-and-health-fnh/nutritional-sciences-major",
+    "categories": [
+      {
+        "name": "First Year courses",
+        "credits_required": 33,
+        "options": [
+          {
+            "code": "LFS 100"
+          },
+          {
+            "code": "LFS 150"
+          },
+          {
+            "code": "WRDS 150"
+          },
+          {
+            "code": "BIOL 112"
+          },
+          {
+            "code": "BIOL 121"
+          },
+          {
+            "code": "FNH 160"
+          },
+          {
+            "code": "FNH 161"
+          },
+          {
+            "code": "CHEM 121"
+          },
+          {
+            "code": "CHEM 111"
+          },
+          {
+            "code": "CHEM 123"
+          },
+          {
+            "code": "MATH 100"
+          },
+          {
+            "code": "MATH 101"
+          },
+          {
+            "code": "PHYS 131"
+          }
+        ]
+      },
+      {
+        "name": "Second Year courses",
+        "credits_required": 31,
+        "options": [
+          {
+            "code": "LFS 250"
+          },
+          {
+            "code": "LFS 252"
+          },
+          {
+            "code": "FNH 200"
+          },
+          {
+            "code": "FNH 250"
+          },
+          {
+            "code": "CHEM 233"
+          },
+          {
+            "code": "CHEM 235"
+          },
+          {
+            "code": "CHEM 205"
+          },
+          {
+            "code": "BIOL 200"
+          },
+          {
+            "code": "BIOL 201"
+          },
+          {
+            "code": "BIOL 234"
+          }
+        ]
+      },
+      {
+        "name": "Third Year courses",
+        "credits_required": 30,
+        "options": [
+          {
+            "code": "LFS 350"
+          },
+          {
+            "code": "BIOC 302"
+          },
+          {
+            "code": "FNH 350"
+          },
+          {
+            "code": "FNH 351"
+          },
+          {
+            "code": "FNH 370"
+          },
+          {
+            "code": "FNH 371"
+          },
+          {
+            "code": "FNH 398"
+          },
+          {
+            "code": "MICB 212"
+          }
+        ],
+        "notes": "plus 6 credits of electives"
+      },
+      {
+        "name": "Fourth Year courses",
+        "credits_required": 30,
+        "options": [
+          {
+            "code": "FNH 451"
+          },
+          {
+            "code": "FNH 477"
+          },
+          {
+            "code": "ECON 101"
+          },
+          {
+            "code": "ECON 310"
+          },
+          {
+            "code": "LFS 101"
+          }
+        ],
+        "notes": "plus 21 credits of electives"
+      }
+    ],
+    "total_credits": 124
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-land-and-food-systems/bsc-applied-biology-apbi/sustainable-agriculture-and-environment-major": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-land-and-food-systems/bsc-applied-biology-apbi/sustainable-agriculture-and-environment-major",
+    "categories": [
+      {
+        "name": "First Year courses",
+        "credits_required": 32,
+        "options": [
+          {
+            "code": "LFS 100"
+          },
+          {
+            "code": "LFS 150"
+          },
+          {
+            "code": "WRDS 150"
+          },
+          {
+            "code": "BIOL 112"
+          },
+          {
+            "code": "BIOL 121"
+          },
+          {
+            "code": "BIOL 180"
+          },
+          {
+            "code": "CHEM 121"
+          },
+          {
+            "code": "CHEM 111"
+          },
+          {
+            "code": "CHEM 123"
+          },
+          {
+            "code": "MATH 100"
+          },
+          {
+            "code": "PHYS 131"
+          },
+          {
+            "code": "PHYS 101"
+          },
+          {
+            "code": "PHYS 106"
+          },
+          {
+            "code": "PHYS 107"
+          },
+          {
+            "code": "PHYS 117"
+          }
+        ],
+        "notes": "plus 6 credits of electives"
+      },
+      {
+        "name": "Second Year courses",
+        "credits_required": 31,
+        "options": [
+          {
+            "code": "LFS 250"
+          },
+          {
+            "code": "LFS 252"
+          },
+          {
+            "code": "FRST 231"
+          },
+          {
+            "code": "BIOL 300"
+          },
+          {
+            "code": "STAT 200"
+          },
+          {
+            "code": "APBI 200"
+          },
+          {
+            "code": "APBI 210"
+          },
+          {
+            "code": "APBI 244"
+          },
+          {
+            "code": "APBI 260"
+          },
+          {
+            "code": "BIOL 200"
+          }
+        ],
+        "notes": "plus 3 credits of electives"
+      },
+      {
+        "name": "Third Year courses",
+        "credits_required": 27,
+        "options": [
+          {
+            "code": "LFS 350"
+          },
+          {
+            "code": "APBI 460"
+          },
+          {
+            "code": "LFS 450"
+          },
+          {
+            "code": "LFS 496"
+          },
+          {
+            "code": "APBI 314"
+          },
+          {
+            "code": "APBI 351"
+          },
+          {
+            "code": "APBI 405"
+          },
+          {
+            "code": "APBI 360"
+          },
+          {
+            "code": "ECON 310"
+          }
+        ],
+        "notes": "plus 12 credits of electives"
+      },
+      {
+        "name": "Fourth Year courses",
+        "credits_required": 30,
+        "options": [
+          {
+            "code": "APBI 402"
+          },
+          {
+            "code": "APBI 401"
+          },
+          {
+            "code": "APBI 412"
+          },
+          {
+            "code": "APBI 422"
+          },
+          {
+            "code": "APBI 442"
+          },
+          {
+            "code": "APBI 463"
+          },
+          {
+            "code": "APBI 403"
+          },
+          {
+            "code": "APBI 406"
+          },
+          {
+            "code": "APBI 443"
+          },
+          {
+            "code": "APBI 462"
+          },
+          {
+            "code": "APBI 475"
+          },
+          {
+            "code": "APBI 301"
+          }
+        ],
+        "notes": "plus 21 credits of electives"
+      }
+    ],
+    "total_credits": 93
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-medicine/bachelor-medical-laboratory-science/degree-requirements": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-medicine/bachelor-medical-laboratory-science/degree-requirements",
+    "categories": [
+      {
+        "name": "Third Year courses",
+        "credits_required": 25,
+        "options": [
+          {
+            "code": "PATH 305"
+          },
+          {
+            "code": "PATH 306"
+          },
+          {
+            "code": "PATH 309"
+          },
+          {
+            "code": "PATH 310"
+          },
+          {
+            "code": "PATH 311"
+          },
+          {
+            "code": "PATH 312"
+          },
+          {
+            "code": "PATH 313"
+          },
+          {
+            "code": "PATH 314"
+          },
+          {
+            "code": "PATH 315"
+          },
+          {
+            "code": "PATH 316"
+          },
+          {
+            "code": "CHEM 315"
+          },
+          {
+            "code": "PATH 375"
+          }
+        ]
+      },
+      {
+        "name": "Fourth Year courses",
+        "credits_required": 30,
+        "options": [
+          {
+            "code": "BIOL 300"
+          },
+          {
+            "code": "PATH 405"
+          },
+          {
+            "code": "PATH 408"
+          },
+          {
+            "code": "PATH 409"
+          },
+          {
+            "code": "PATH 410"
+          },
+          {
+            "code": "PATH 411"
+          },
+          {
+            "code": "PATH 412"
+          },
+          {
+            "code": "PATH 413"
+          },
+          {
+            "code": "PATH 414"
+          },
+          {
+            "code": "PATH 415"
+          }
+        ]
+      }
+    ],
+    "total_credits": 30
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-science/bachelor-science/combined-major-science": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-science/bachelor-science/combined-major-science",
+    "categories": [
+      {
+        "name": "First block courses",
+        "credits_required": 12,
+        "options": [
+          {
+            "code": "MATH 100"
+          },
+          {
+            "code": "MATH 102"
+          },
+          {
+            "code": "MATH 104"
+          },
+          {
+            "code": "MATH 120"
+          },
+          {
+            "code": "MATH 180"
+          },
+          {
+            "code": "MATH 184"
+          },
+          {
+            "code": "MATH 101"
+          },
+          {
+            "code": "MATH 103"
+          },
+          {
+            "code": "MATH 105"
+          },
+          {
+            "code": "MATH 121"
+          },
+          {
+            "code": "SCIE 113"
+          }
+        ],
+        "notes": "plus 3 credits of electives"
+      },
+      {
+        "name": "Second block courses",
+        "credits_required": 15,
+        "options": [
+          {
+            "code": "STAT 200"
+          },
+          {
+            "code": "SCIE 300"
+          }
+        ],
+        "notes": "plus 9 credits of electives"
+      }
+    ]
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-science/bachelor-science/minor-options": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-science/bachelor-science/minor-options",
+    "categories": [
+      {
+        "name": "Required courses",
+        "credits_required": 18,
+        "options": [
+          {
+            "code": "COMR 329"
+          },
+          {
+            "code": "COMR 457"
+          },
+          {
+            "code": "COMR 465"
+          },
+          {
+            "code": "COMR 473"
+          },
+          {
+            "code": "COMR 493"
+          },
+          {
+            "code": "COMR 398"
+          },
+          {
+            "code": "COMR 458"
+          }
+        ],
+        "notes": "Pick one from the alternates at the end."
+      }
+    ]
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/school-architecture-and-landscape-architecture/bachelor-design-architecture-landscape-architecture-and-urbanism/degree-requirements": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/school-architecture-and-landscape-architecture/bachelor-design-architecture-landscape-architecture-and-urbanism/degree-requirements",
+    "categories": [
+      {
+        "name": "First block courses",
+        "credits_required": 45,
+        "options": [
+          {
+            "code": "DES 201"
+          },
+          {
+            "code": "DES 202"
+          },
+          {
+            "code": "DES 211"
+          },
+          {
+            "code": "DES 212"
+          },
+          {
+            "code": "DES 231"
+          },
+          {
+            "code": "DES 232"
+          },
+          {
+            "code": "DES 320"
+          }
+        ],
+        "notes": "plus 15 credits of electives"
+      },
+      {
+        "name": "Second block courses",
+        "credits_required": 36,
+        "options": [
+          {
+            "code": "DES 301"
+          },
+          {
+            "code": "DES 302"
+          },
+          {
+            "code": "DES 330"
+          },
+          {
+            "code": "DES 421"
+          }
+        ],
+        "notes": "plus 9 credits of electives"
+      },
+      {
+        "name": "Third block courses",
+        "credits_required": 36,
+        "options": [
+          {
+            "code": "DES 401"
+          },
+          {
+            "code": "DES 422"
+          },
+          {
+            "code": "DES 430"
+          },
+          {
+            "code": "DES 445"
+          }
+        ],
+        "notes": "plus 9 credits of electives"
+      }
+    ],
+    "total_credits": 132
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/school-nursing/bachelor-science-nursing/degree-requirements": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/school-nursing/bachelor-science-nursing/degree-requirements",
+    "categories": [
+      {
+        "name": "First block courses",
+        "credits_required": 17,
+        "options": [
+          {
+            "code": "NURS 300"
+          },
+          {
+            "code": "NURS 330"
+          },
+          {
+            "code": "NURS 310"
+          },
+          {
+            "code": "NURS 321"
+          },
+          {
+            "code": "NURS 360"
+          },
+          {
+            "code": "NURS 352"
+          }
+        ]
+      },
+      {
+        "name": "Second block courses",
+        "credits_required": 51,
+        "options": [
+          {
+            "code": "NURS 353"
+          },
+          {
+            "code": "NURS 331"
+          },
+          {
+            "code": "NURS 354"
+          },
+          {
+            "code": "NURS 322"
+          },
+          {
+            "code": "NURS 351"
+          },
+          {
+            "code": "NURS 303"
+          },
+          {
+            "code": "NURS 344"
+          },
+          {
+            "code": "NURS 301"
+          },
+          {
+            "code": "NURS 323"
+          },
+          {
+            "code": "NURS 363"
+          },
+          {
+            "code": "NURS 365"
+          },
+          {
+            "code": "NURS 350"
+          },
+          {
+            "code": "NURS 362"
+          },
+          {
+            "code": "NURS 345"
+          },
+          {
+            "code": "NURS 346"
+          },
+          {
+            "code": "NURS 401"
+          },
+          {
+            "code": "NURS 366"
+          },
+          {
+            "code": "NURS 361"
+          }
+        ]
+      },
+      {
+        "name": "Third block courses",
+        "credits_required": 13,
+        "options": [
+          {
+            "code": "NURS 430"
+          },
+          {
+            "code": "NURS 402"
+          },
+          {
+            "code": "NURS 427"
+          }
+        ]
+      }
+    ]
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/school-social-work/bachelor-social-work/degree-requirements": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/school-social-work/bachelor-social-work/degree-requirements",
+    "categories": [
+      {
+        "name": "Fourth Year courses",
+        "credits_required": 18,
+        "options": [
+          {
+            "code": "SOWK 400"
+          },
+          {
+            "code": "SOWK 405"
+          },
+          {
+            "code": "SOWK 415"
+          },
+          {
+            "code": "SOWK 416"
+          },
+          {
+            "code": "SOWK 420"
+          }
+        ]
+      }
+    ],
+    "total_credits": 66
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/vancouver-school-economics/bachelor-international-economics/degree-requirements-students-who-enter-program-202324-or-earlier": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/vancouver-school-economics/bachelor-international-economics/degree-requirements-students-who-enter-program-202324-or-earlier",
+    "categories": [
+      {
+        "name": "First block courses",
+        "credits_required": 90,
+        "options": [
+          {
+            "code": "ECON 101"
+          },
+          {
+            "code": "ECON 102"
+          },
+          {
+            "code": "ECON 227"
+          },
+          {
+            "code": "COEC 293"
+          },
+          {
+            "code": "WRDS 150"
+          },
+          {
+            "code": "WRDS 151"
+          },
+          {
+            "code": "MATH 100"
+          },
+          {
+            "code": "MATH 101"
+          },
+          {
+            "code": "ECON 315"
+          },
+          {
+            "code": "ECON 316"
+          },
+          {
+            "code": "ECON 309"
+          },
+          {
+            "code": "ECON 327"
+          },
+          {
+            "code": "ECON 328"
+          },
+          {
+            "code": "ECON 255"
+          },
+          {
+            "code": "ECON 317"
+          },
+          {
+            "code": "ECON 370"
+          },
+          {
+            "code": "COEC 371"
+          },
+          {
+            "code": "ECON 493"
+          },
+          {
+            "code": "ECON 494"
+          },
+          {
+            "code": "COEC 294"
+          },
+          {
+            "code": "COEC 365"
+          },
+          {
+            "code": "COEC 370"
+          },
+          {
+            "code": "COEC 377"
+          },
+          {
+            "code": "COEC 387"
+          },
+          {
+            "code": "COEC 437"
+          },
+          {
+            "code": "COEC 491"
+          },
+          {
+            "code": "COEC 497"
+          },
+          {
+            "code": "COEC 498"
+          },
+          {
+            "code": "ECON 441"
+          },
+          {
+            "code": "ECON 442"
+          },
+          {
+            "code": "ECON 455"
+          },
+          {
+            "code": "ECON 456"
+          },
+          {
+            "code": "COEC 475"
+          }
+        ],
+        "notes": "plus 18 credits of electives"
+      }
+    ],
+    "total_credits": 120
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/vancouver-school-economics/bachelor-international-economics/degree-requirements-students-who-enter-program-202425-or-later": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/vancouver-school-economics/bachelor-international-economics/degree-requirements-students-who-enter-program-202425-or-later",
+    "categories": [
+      {
+        "name": "First block courses",
+        "credits_required": 90,
+        "options": [
+          {
+            "code": "ECON 101"
+          },
+          {
+            "code": "ECON 102"
+          },
+          {
+            "code": "ECON 227"
+          },
+          {
+            "code": "COEC 293"
+          },
+          {
+            "code": "WRDS 150"
+          },
+          {
+            "code": "WRDS 151"
+          },
+          {
+            "code": "MATH 100"
+          },
+          {
+            "code": "MATH 101"
+          },
+          {
+            "code": "ECON 315"
+          },
+          {
+            "code": "ECON 316"
+          },
+          {
+            "code": "ECON 309"
+          },
+          {
+            "code": "ECON 327"
+          },
+          {
+            "code": "ECON 328"
+          },
+          {
+            "code": "ECON 241"
+          },
+          {
+            "code": "ECON 255"
+          },
+          {
+            "code": "ECON 317"
+          },
+          {
+            "code": "ECON 370"
+          },
+          {
+            "code": "COEC 371"
+          },
+          {
+            "code": "ECON 493"
+          },
+          {
+            "code": "ECON 494"
+          },
+          {
+            "code": "COEC 294"
+          },
+          {
+            "code": "COEC 365"
+          },
+          {
+            "code": "COEC 370"
+          },
+          {
+            "code": "COEC 377"
+          },
+          {
+            "code": "COEC 387"
+          },
+          {
+            "code": "COEC 437"
+          },
+          {
+            "code": "COEC 491"
+          },
+          {
+            "code": "COEC 497"
+          },
+          {
+            "code": "COEC 498"
+          },
+          {
+            "code": "ECON 441"
+          },
+          {
+            "code": "ECON 442"
+          },
+          {
+            "code": "ECON 455"
+          },
+          {
+            "code": "ECON 456"
+          },
+          {
+            "code": "COEC 475"
+          }
+        ],
+        "notes": "plus 18 credits of electives"
+      }
+    ],
+    "total_credits": 120
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-arts/bachelor-arts/degree-requirements-students-who-enter-program-202425-or-later": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-arts/bachelor-arts/degree-requirements-students-who-enter-program-202425-or-later",
+    "categories": [
+      {
+        "name": "Writing Component (Writing and Research Requirement)",
+        "credits_required": 3,
+        "options": [
+          {
+            "code": "ASTU 100"
+          },
+          {
+            "code": "ASTU 101"
+          },
+          {
+            "code": "CAP 100"
+          },
+          {
+            "code": "ENGL 100"
+          },
+          {
+            "code": "WRDS 150"
+          },
+          {
+            "code": "WRDS 151"
+          },
+          {
+            "code": "WRDS 350"
+          }
+        ],
+        "notes": "Take one of the listed courses (3 credits). Must be completed before reaching Year 3 standing. The Arts One program also satisfies this requirement."
+      },
+      {
+        "name": "Ways of Knowing Breadth Requirement",
+        "credits_required": 18,
+        "options": [],
+        "notes": "Six 3-credit courses spanning specified Faculty of Arts breadth areas. See Faculty of Arts Calendar pages for the approved list."
+      },
+      {
+        "name": "Outside Requirement",
+        "credits_required": 30,
+        "options": [],
+        "notes": "Minimum 30 credits outside the primary specialization (waived for students completing two majors / two honours / a Major+Honours combination)."
+      },
+      {
+        "name": "Upper-level Requirement",
+        "credits_required": 48,
+        "options": [],
+        "notes": "At least 48 credits in courses numbered 300+. (Up to 60 for some Honours options — see Calendar.)"
+      },
+      {
+        "name": "Arts Credit Minimum Requirement",
+        "credits_required": 72,
+        "options": [],
+        "notes": "Minimum 72 of the 120 BA credits must be in Arts subjects."
+      }
+    ],
+    "total_credits": 120
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-arts/bachelor-arts/degree-requirements-students-who-enter-program-202324-or-earlier": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-arts/bachelor-arts/degree-requirements-students-who-enter-program-202324-or-earlier",
+    "categories": [
+      {
+        "name": "Writing Component (Writing and Research Requirement)",
+        "credits_required": 3,
+        "options": [
+          {
+            "code": "ASTU 100"
+          },
+          {
+            "code": "ASTU 101"
+          },
+          {
+            "code": "CAP 100"
+          },
+          {
+            "code": "ENGL 100"
+          },
+          {
+            "code": "WRDS 150"
+          },
+          {
+            "code": "WRDS 151"
+          },
+          {
+            "code": "WRDS 350"
+          }
+        ],
+        "notes": "Take one of the listed courses (3 credits). Arts One also satisfies the Writing Component."
+      },
+      {
+        "name": "Language Requirement",
+        "credits_required": 0,
+        "options": [],
+        "notes": "Demonstrated competence in a language other than English (typically Grade-11 BC or equivalent in a single language). May be satisfied by language coursework at UBC."
+      },
+      {
+        "name": "Science Requirement",
+        "credits_required": 6,
+        "options": [],
+        "notes": "6 credits of approved Science courses (see the Faculty of Arts list of approved Science Requirement courses)."
+      },
+      {
+        "name": "Literature Requirement",
+        "credits_required": 3,
+        "options": [],
+        "notes": "3 credits of an approved literature course (typically ENGL or a literature course in another language)."
+      },
+      {
+        "name": "Outside Requirement",
+        "credits_required": 30,
+        "options": [],
+        "notes": "Minimum 30 credits outside the primary specialization (waived for two majors / two honours / Major+Honours combinations)."
+      },
+      {
+        "name": "Upper-level Requirement",
+        "credits_required": 48,
+        "options": [],
+        "notes": "At least 48 credits numbered 300+. Higher thresholds apply to some Honours options."
+      },
+      {
+        "name": "Arts Credit Minimum Requirement",
+        "credits_required": 72,
+        "options": [],
+        "notes": "Minimum 72 of the 120 BA credits must be in Arts subjects."
+      }
+    ],
+    "total_credits": 120
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-arts/bachelor-fine-arts/degree-requirements": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-arts/bachelor-fine-arts/degree-requirements",
+    "categories": [
+      {
+        "name": "Writing Component (Writing and Research Requirement)",
+        "credits_required": 3,
+        "options": [
+          {
+            "code": "ASTU 100"
+          },
+          {
+            "code": "ASTU 101"
+          },
+          {
+            "code": "CAP 100"
+          },
+          {
+            "code": "ENGL 100"
+          },
+          {
+            "code": "WRDS 150"
+          },
+          {
+            "code": "WRDS 151"
+          },
+          {
+            "code": "WRDS 350"
+          }
+        ],
+        "notes": "Take one of the listed courses (3 credits). Arts One also satisfies the Writing Component."
+      },
+      {
+        "name": "Outside Requirement",
+        "credits_required": 30,
+        "options": [],
+        "notes": "Single-major / single-Honours BFA students need 30 credits outside their specialization. Waived for two majors / two honours / Major+Honours combinations."
+      },
+      {
+        "name": "Upper-level Requirement",
+        "credits_required": 48,
+        "options": [],
+        "notes": "At least 48 credits numbered 300+. Higher thresholds (54/60/66/84) apply to certain BFA options — see Calendar."
+      },
+      {
+        "name": "Arts Credit Minimum Requirement",
+        "credits_required": 72,
+        "options": [],
+        "notes": "Minimum 72 of the 120 BFA credits must be Arts credit (except when the specialization requires more than 48 credits outside Arts)."
+      }
+    ],
+    "total_credits": 120
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-arts/bachelor-media-studies/degree-requirements-students-entering-program-202324-or-later": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-arts/bachelor-media-studies/degree-requirements-students-entering-program-202324-or-later",
+    "categories": [
+      {
+        "name": "Writing Component",
+        "credits_required": 3,
+        "options": [
+          {
+            "code": "ASTU 100"
+          },
+          {
+            "code": "ASTU 101"
+          },
+          {
+            "code": "CAP 100"
+          },
+          {
+            "code": "ENGL 100"
+          },
+          {
+            "code": "WRDS 150"
+          },
+          {
+            "code": "WRDS 151"
+          }
+        ],
+        "notes": "Take one of the listed courses (3 credits) in first year. Arts One also satisfies this."
+      },
+      {
+        "name": "First-Year Core Courses",
+        "credits_required": 9,
+        "options": [
+          {
+            "code": "MDIA 150",
+            "credit_value": 3
+          },
+          {
+            "code": "ARTH 101"
+          },
+          {
+            "code": "CINE 100"
+          },
+          {
+            "code": "CPSC 100"
+          },
+          {
+            "code": "CPSC 107"
+          },
+          {
+            "code": "CPSC 121"
+          },
+          {
+            "code": "CPSC 210"
+          },
+          {
+            "code": "CRWR 206"
+          },
+          {
+            "code": "CRWR 208"
+          },
+          {
+            "code": "DES 200"
+          },
+          {
+            "code": "FIPR 101"
+          },
+          {
+            "code": "INFO 100"
+          },
+          {
+            "code": "JRNL 100"
+          },
+          {
+            "code": "MDIA 100"
+          },
+          {
+            "code": "THFL 200"
+          },
+          {
+            "code": "VISA 110"
+          }
+        ],
+        "notes": "MDIA 150 (3) plus two courses chosen from the listed gateway courses. Transfer students who cannot register in MDIA 150 take three of the gateway courses instead."
+      },
+      {
+        "name": "Media Studies Core Courses",
+        "credits_required": 18,
+        "options": [
+          {
+            "code": "MDIA 290",
+            "credit_value": 3
+          },
+          {
+            "code": "MDIA 300",
+            "credit_value": 3
+          },
+          {
+            "code": "MDIA 350",
+            "credit_value": 3
+          },
+          {
+            "code": "MDIA 450",
+            "credit_value": 6
+          },
+          {
+            "code": "MDIA 490",
+            "credit_value": 3
+          }
+        ]
+      },
+      {
+        "name": "B.M.S. Disciplinary Core Courses",
+        "credits_required": 21,
+        "options": [
+          {
+            "code": "ARTH 227",
+            "credit_value": 3
+          },
+          {
+            "code": "CINE 340",
+            "credit_value": 3
+          },
+          {
+            "code": "CRWR 312",
+            "credit_value": 3
+          },
+          {
+            "code": "ENGL 232",
+            "credit_value": 3
+          },
+          {
+            "code": "GMST 274",
+            "credit_value": 3
+          },
+          {
+            "code": "INFO 250",
+            "credit_value": 3
+          },
+          {
+            "code": "JRNL 200",
+            "credit_value": 3
+          }
+        ]
+      },
+      {
+        "name": "B.M.S. Focus Areas",
+        "credits_required": 21,
+        "options": [
+          {
+            "code": "CPSC 103"
+          },
+          {
+            "code": "CPSC 110"
+          },
+          {
+            "code": "CPSC 344"
+          },
+          {
+            "code": "INFO 200"
+          },
+          {
+            "code": "INFO 419"
+          },
+          {
+            "code": "INFO 456"
+          },
+          {
+            "code": "ARTH 480"
+          },
+          {
+            "code": "CINE 240"
+          },
+          {
+            "code": "FIPR 133"
+          },
+          {
+            "code": "THFL 312"
+          },
+          {
+            "code": "VISA 241"
+          },
+          {
+            "code": "CRWR 213"
+          },
+          {
+            "code": "CRWR 302"
+          },
+          {
+            "code": "CRWR 308"
+          },
+          {
+            "code": "CRWR 310"
+          },
+          {
+            "code": "ENGL 332"
+          },
+          {
+            "code": "JRNL 201"
+          },
+          {
+            "code": "JRNL 440"
+          }
+        ],
+        "notes": "15 credits from one Focus Area (Information Design / Visual / Narrative) plus 6 credits from the other two focus areas."
+      },
+      {
+        "name": "Research Component",
+        "credits_required": 6,
+        "options": [
+          {
+            "code": "MDIA 450",
+            "credit_value": 6
+          }
+        ],
+        "notes": "Satisfied by MDIA 450 — already counted in Media Studies Core."
+      }
+    ]
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-arts/bachelor-media-studies/degree-requirements-students-who-entered-program-20222023-or-earlier": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-arts/bachelor-media-studies/degree-requirements-students-who-entered-program-20222023-or-earlier",
+    "categories": [
+      {
+        "name": "Core Courses",
+        "credits_required": 66,
+        "options": [
+          {
+            "code": "ARTH 380"
+          },
+          {
+            "code": "ARTH 480"
+          },
+          {
+            "code": "ASTU 100"
+          },
+          {
+            "code": "CPSC 103"
+          },
+          {
+            "code": "CPSC 110"
+          },
+          {
+            "code": "CPSC 344"
+          },
+          {
+            "code": "CRWR 213"
+          },
+          {
+            "code": "CRWR 312"
+          },
+          {
+            "code": "ENGL 232"
+          },
+          {
+            "code": "ENGL 332"
+          },
+          {
+            "code": "FIPR 133"
+          },
+          {
+            "code": "CINE 100"
+          },
+          {
+            "code": "CINE 240"
+          },
+          {
+            "code": "CINE 340"
+          },
+          {
+            "code": "INFO 250"
+          },
+          {
+            "code": "INFO 419"
+          },
+          {
+            "code": "INFO 456"
+          },
+          {
+            "code": "JRNL 100"
+          },
+          {
+            "code": "JRNL 400"
+          },
+          {
+            "code": "VISA 110"
+          },
+          {
+            "code": "VISA 210"
+          },
+          {
+            "code": "VISA 241"
+          }
+        ],
+        "notes": "All Core courses are required. ARTH 480 may be substituted with JRNL 400 and vice versa; CPSC 103/110 are alternates."
+      },
+      {
+        "name": "Core Plus Electives",
+        "credits_required": 12,
+        "options": [
+          {
+            "code": "ACAM 250"
+          },
+          {
+            "code": "ACAM 350"
+          },
+          {
+            "code": "AFST 351"
+          },
+          {
+            "code": "ANTH 206"
+          },
+          {
+            "code": "ANTH 213"
+          },
+          {
+            "code": "ANTH 215"
+          },
+          {
+            "code": "ANTH 217"
+          },
+          {
+            "code": "ANTH 331"
+          },
+          {
+            "code": "ANTH 332"
+          },
+          {
+            "code": "ANTH 378"
+          },
+          {
+            "code": "ANTH 478"
+          },
+          {
+            "code": "ASIA 254"
+          },
+          {
+            "code": "ASIA 319"
+          },
+          {
+            "code": "ASIA 325"
+          },
+          {
+            "code": "ASIA 326"
+          },
+          {
+            "code": "ASIA 327"
+          },
+          {
+            "code": "ASIA 354"
+          },
+          {
+            "code": "ASIA 355"
+          },
+          {
+            "code": "ASIA 356"
+          },
+          {
+            "code": "ASIA 365"
+          },
+          {
+            "code": "ASIA 367"
+          },
+          {
+            "code": "ASIA 369"
+          },
+          {
+            "code": "ASIA 375"
+          },
+          {
+            "code": "ASIA 394"
+          },
+          {
+            "code": "ASIA 395"
+          },
+          {
+            "code": "ASIA 433"
+          },
+          {
+            "code": "ASIA 495"
+          },
+          {
+            "code": "CENS 201"
+          },
+          {
+            "code": "CENS 202"
+          },
+          {
+            "code": "CENS 308"
+          },
+          {
+            "code": "DES 200"
+          },
+          {
+            "code": "FNEL 380"
+          },
+          {
+            "code": "FNIS 100"
+          },
+          {
+            "code": "FNIS 210"
+          },
+          {
+            "code": "FNIS 220"
+          },
+          {
+            "code": "FNIS 454"
+          },
+          {
+            "code": "GEOG 250"
+          },
+          {
+            "code": "GEOG 374"
+          },
+          {
+            "code": "GEOG 450"
+          },
+          {
+            "code": "GRSJ 101"
+          },
+          {
+            "code": "GRSJ 304"
+          },
+          {
+            "code": "GRSJ 307"
+          },
+          {
+            "code": "HIST 109"
+          },
+          {
+            "code": "HIST 494"
+          },
+          {
+            "code": "LIBR 541"
+          },
+          {
+            "code": "LIBR 555"
+          },
+          {
+            "code": "LIBR 556"
+          },
+          {
+            "code": "MUSC 119"
+          },
+          {
+            "code": "MUSC 320"
+          },
+          {
+            "code": "MUSC 419"
+          },
+          {
+            "code": "MUSC 420"
+          },
+          {
+            "code": "PHIL 120"
+          },
+          {
+            "code": "PHIL 250"
+          },
+          {
+            "code": "PHIL 339"
+          },
+          {
+            "code": "PHIL 375"
+          },
+          {
+            "code": "PSYC 216"
+          },
+          {
+            "code": "PSYC 325"
+          },
+          {
+            "code": "THTR 205"
+          },
+          {
+            "code": "THTR 250"
+          },
+          {
+            "code": "URST 200"
+          },
+          {
+            "code": "WRDS 250"
+          },
+          {
+            "code": "WRDS 360"
+          },
+          {
+            "code": "POLI 380"
+          },
+          {
+            "code": "SOCI 328"
+          },
+          {
+            "code": "STAT 200"
+          },
+          {
+            "code": "STAT 203"
+          }
+        ],
+        "notes": "Minimum 12 credits chosen from the Core Plus list. At least 3 of those credits must be at the 300 level or higher. Subject-wide entries (e.g. \"any course in ARTH\") are not enumerated here — see the Calendar."
+      }
+    ]
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-science/bachelor-science/bsc-specialization-specific-courses-required-sufficient-progress": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-science/bachelor-science/bsc-specialization-specific-courses-required-sufficient-progress",
+    "categories": [
+      {
+        "name": "Atmospheric Science — Major (0167) — required by 78 attempted credits",
+        "credits_required": 0,
+        "options": [
+          {
+            "code": "ATSC 201"
+          },
+          {
+            "code": "GEOS 200"
+          }
+        ],
+        "notes": "These specific courses must be completed within the first 78 attempted credits to remain in the specialization. Failure requires withdrawal from the Faculty of Science. Where the prose says \"one of\" or \"three of\", treat the listed options as alternatives."
+      },
+      {
+        "name": "Atmospheric Science — Honours (0429) — required by 78 attempted credits",
+        "credits_required": 0,
+        "options": [
+          {
+            "code": "ATSC 201"
+          }
+        ],
+        "notes": "These specific courses must be completed within the first 78 attempted credits to remain in the specialization. Failure requires withdrawal from the Faculty of Science. Where the prose says \"one of\" or \"three of\", treat the listed options as alternatives."
+      },
+      {
+        "name": "Behavioural Neuroscience / Cognitive Systems — Cognition and Brain (1225) — required by 78 attempted credits",
+        "credits_required": 0,
+        "options": [
+          {
+            "code": "COGS 200"
+          }
+        ],
+        "notes": "These specific courses must be completed within the first 78 attempted credits to remain in the specialization. Failure requires withdrawal from the Faculty of Science. Where the prose says \"one of\" or \"three of\", treat the listed options as alternatives."
+      },
+      {
+        "name": "Biochemistry — Major (0244) — required by 78 attempted credits",
+        "credits_required": 0,
+        "options": [
+          {
+            "code": "BIOL 200"
+          },
+          {
+            "code": "BIOC 203"
+          },
+          {
+            "code": "CHEM 203"
+          },
+          {
+            "code": "CHEM 213"
+          },
+          {
+            "code": "CHEM 245"
+          }
+        ],
+        "notes": "These specific courses must be completed within the first 78 attempted credits to remain in the specialization. Failure requires withdrawal from the Faculty of Science. Where the prose says \"one of\" or \"three of\", treat the listed options as alternatives."
+      },
+      {
+        "name": "Biochemistry — Major (0244) — upper-level required by 108 attempted credits",
+        "credits_required": 0,
+        "options": [
+          {
+            "code": "BIOC 301"
+          },
+          {
+            "code": "BIOC 303"
+          },
+          {
+            "code": "BIOC 304"
+          },
+          {
+            "code": "BIOC 306"
+          }
+        ],
+        "notes": "These upper-level specific courses must be completed within the first 108 attempted credits to remain in the specialization."
+      },
+      {
+        "name": "Biochemistry and Chemistry — Combined Major (3382) — required by 78 attempted credits",
+        "credits_required": 0,
+        "options": [
+          {
+            "code": "BIOL 200"
+          },
+          {
+            "code": "BIOC 203"
+          },
+          {
+            "code": "CHEM 203"
+          },
+          {
+            "code": "CHEM 213"
+          },
+          {
+            "code": "CHEM 245"
+          }
+        ],
+        "notes": "These specific courses must be completed within the first 78 attempted credits to remain in the specialization. Failure requires withdrawal from the Faculty of Science. Where the prose says \"one of\" or \"three of\", treat the listed options as alternatives."
+      },
+      {
+        "name": "Biochemistry and Chemistry — Combined Major (3382) — upper-level required by 108 attempted credits",
+        "credits_required": 0,
+        "options": [
+          {
+            "code": "BIOC 301"
+          },
+          {
+            "code": "BIOC 303"
+          }
+        ],
+        "notes": "These upper-level specific courses must be completed within the first 108 attempted credits to remain in the specialization."
+      },
+      {
+        "name": "Biochemistry — Honours (0186) — required by 78 attempted credits",
+        "credits_required": 0,
+        "options": [
+          {
+            "code": "BIOL 200"
+          },
+          {
+            "code": "BIOC 203"
+          },
+          {
+            "code": "CHEM 203"
+          },
+          {
+            "code": "CHEM 213"
+          },
+          {
+            "code": "CHEM 245"
+          }
+        ],
+        "notes": "These specific courses must be completed within the first 78 attempted credits to remain in the specialization. Failure requires withdrawal from the Faculty of Science. Where the prose says \"one of\" or \"three of\", treat the listed options as alternatives."
+      },
+      {
+        "name": "Biochemistry — Honours (0186) — upper-level required by 108 attempted credits",
+        "credits_required": 0,
+        "options": [
+          {
+            "code": "BIOC 301"
+          },
+          {
+            "code": "BIOC 303"
+          },
+          {
+            "code": "BIOC 304"
+          },
+          {
+            "code": "BIOC 306"
+          }
+        ],
+        "notes": "These upper-level specific courses must be completed within the first 108 attempted credits to remain in the specialization."
+      },
+      {
+        "name": "Biochemistry and Chemistry — Combined Honours (0565) — required by 78 attempted credits",
+        "credits_required": 0,
+        "options": [
+          {
+            "code": "BIOL 200"
+          },
+          {
+            "code": "BIOC 203"
+          },
+          {
+            "code": "CHEM 203"
+          },
+          {
+            "code": "CHEM 211"
+          },
+          {
+            "code": "CHEM 213"
+          },
+          {
+            "code": "CHEM 245"
+          }
+        ],
+        "notes": "These specific courses must be completed within the first 78 attempted credits to remain in the specialization. Failure requires withdrawal from the Faculty of Science. Where the prose says \"one of\" or \"three of\", treat the listed options as alternatives."
+      },
+      {
+        "name": "Biochemistry and Chemistry — Combined Honours (0565) — upper-level required by 108 attempted credits",
+        "credits_required": 0,
+        "options": [
+          {
+            "code": "BIOC 301"
+          },
+          {
+            "code": "BIOC 303"
+          },
+          {
+            "code": "CHEM 313"
+          },
+          {
+            "code": "CHEM 330"
+          }
+        ],
+        "notes": "These upper-level specific courses must be completed within the first 108 attempted credits to remain in the specialization."
+      },
+      {
+        "name": "Biology — Animal Biology Honours (0054) — required by 78 attempted credits",
+        "credits_required": 0,
+        "options": [
+          {
+            "code": "CHEM 233"
+          },
+          {
+            "code": "BIOL 200"
+          },
+          {
+            "code": "BIOL 230"
+          },
+          {
+            "code": "BIOL 233"
+          },
+          {
+            "code": "BIOL 234"
+          },
+          {
+            "code": "BIOL 260"
+          },
+          {
+            "code": "BIOL 204"
+          },
+          {
+            "code": "BIOL 205"
+          }
+        ],
+        "notes": "These specific courses must be completed within the first 78 attempted credits to remain in the specialization. Failure requires withdrawal from the Faculty of Science. Where the prose says \"one of\" or \"three of\", treat the listed options as alternatives."
+      },
+      {
+        "name": "Biology — Animal Biology Honours (0054) — upper-level required by 108 attempted credits",
+        "credits_required": 0,
+        "options": [
+          {
+            "code": "BIOL 300"
+          }
+        ],
+        "notes": "These upper-level specific courses must be completed within the first 108 attempted credits to remain in the specialization."
+      },
+      {
+        "name": "Biology — Major (3095) — required by 78 attempted credits",
+        "credits_required": 0,
+        "options": [
+          {
+            "code": "CHEM 233"
+          },
+          {
+            "code": "BIOL 200"
+          },
+          {
+            "code": "BIOL 230"
+          },
+          {
+            "code": "BIOL 233"
+          },
+          {
+            "code": "BIOL 234"
+          },
+          {
+            "code": "BIOL 260"
+          },
+          {
+            "code": "BIOL 203"
+          },
+          {
+            "code": "BIOL 204"
+          },
+          {
+            "code": "BIOL 205"
+          },
+          {
+            "code": "BIOL 209"
+          },
+          {
+            "code": "BIOL 210"
+          },
+          {
+            "code": "MICB 201"
+          }
+        ],
+        "notes": "These specific courses must be completed within the first 78 attempted credits to remain in the specialization. Failure requires withdrawal from the Faculty of Science. Where the prose says \"one of\" or \"three of\", treat the listed options as alternatives."
+      },
+      {
+        "name": "Biology — Major (3095) — upper-level required by 108 attempted credits",
+        "credits_required": 0,
+        "options": [
+          {
+            "code": "BIOL 300"
+          }
+        ],
+        "notes": "These upper-level specific courses must be completed within the first 108 attempted credits to remain in the specialization."
+      },
+      {
+        "name": "Biology — Honours (3195) — required by 78 attempted credits",
+        "credits_required": 0,
+        "options": [
+          {
+            "code": "CHEM 233"
+          },
+          {
+            "code": "BIOL 200"
+          },
+          {
+            "code": "BIOL 230"
+          },
+          {
+            "code": "BIOL 233"
+          },
+          {
+            "code": "BIOL 234"
+          },
+          {
+            "code": "BIOL 260"
+          },
+          {
+            "code": "BIOL 203"
+          },
+          {
+            "code": "BIOL 204"
+          },
+          {
+            "code": "BIOL 205"
+          },
+          {
+            "code": "BIOL 209"
+          },
+          {
+            "code": "BIOL 210"
+          },
+          {
+            "code": "MICB 201"
+          }
+        ],
+        "notes": "These specific courses must be completed within the first 78 attempted credits to remain in the specialization. Failure requires withdrawal from the Faculty of Science. Where the prose says \"one of\" or \"three of\", treat the listed options as alternatives."
+      },
+      {
+        "name": "Biology — Honours (3195) — upper-level required by 108 attempted credits",
+        "credits_required": 0,
+        "options": [
+          {
+            "code": "BIOL 300"
+          }
+        ],
+        "notes": "These upper-level specific courses must be completed within the first 108 attempted credits to remain in the specialization."
+      },
+      {
+        "name": "Cell and Developmental Biology — Honours (0405) — required by 78 attempted credits",
+        "credits_required": 0,
+        "options": [
+          {
+            "code": "BIOL 200"
+          },
+          {
+            "code": "CHEM 233"
+          },
+          {
+            "code": "BIOL 201"
+          },
+          {
+            "code": "BIOL 230"
+          },
+          {
+            "code": "BIOL 233"
+          },
+          {
+            "code": "BIOL 234"
+          },
+          {
+            "code": "BIOL 260"
+          },
+          {
+            "code": "BIOL 203"
+          },
+          {
+            "code": "BIOL 204"
+          },
+          {
+            "code": "BIOL 205"
+          },
+          {
+            "code": "BIOL 209"
+          },
+          {
+            "code": "BIOL 210"
+          },
+          {
+            "code": "MICB 201"
+          }
+        ],
+        "notes": "These specific courses must be completed within the first 78 attempted credits to remain in the specialization. Failure requires withdrawal from the Faculty of Science. Where the prose says \"one of\" or \"three of\", treat the listed options as alternatives."
+      },
+      {
+        "name": "Cell and Developmental Biology — Honours (0405) — upper-level required by 108 attempted credits",
+        "credits_required": 0,
+        "options": [
+          {
+            "code": "BIOL 300"
+          }
+        ],
+        "notes": "These upper-level specific courses must be completed within the first 108 attempted credits to remain in the specialization."
+      },
+      {
+        "name": "Computer Science and Biology — Combined Major (1370) — required by 78 attempted credits",
+        "credits_required": 0,
+        "options": [
+          {
+            "code": "BIOL 200"
+          },
+          {
+            "code": "BIOL 233"
+          },
+          {
+            "code": "BIOL 234"
+          },
+          {
+            "code": "CHEM 233"
+          }
+        ],
+        "notes": "These specific courses must be completed within the first 78 attempted credits to remain in the specialization. Failure requires withdrawal from the Faculty of Science. Where the prose says \"one of\" or \"three of\", treat the listed options as alternatives."
+      },
+      {
+        "name": "Computer Science and Biology — Combined Major (1370) — upper-level required by 108 attempted credits",
+        "credits_required": 0,
+        "options": [
+          {
+            "code": "BIOL 300"
+          }
+        ],
+        "notes": "These upper-level specific courses must be completed within the first 108 attempted credits to remain in the specialization."
+      },
+      {
+        "name": "Computer Science and Biology — Combined Honours (1460) — required by 78 attempted credits",
+        "credits_required": 0,
+        "options": [
+          {
+            "code": "BIOL 200"
+          },
+          {
+            "code": "BIOL 233"
+          },
+          {
+            "code": "BIOL 234"
+          },
+          {
+            "code": "CHEM 233"
+          }
+        ],
+        "notes": "These specific courses must be completed within the first 78 attempted credits to remain in the specialization. Failure requires withdrawal from the Faculty of Science. Where the prose says \"one of\" or \"three of\", treat the listed options as alternatives."
+      },
+      {
+        "name": "Conservation Biology — Honours (0583) — required by 78 attempted credits",
+        "credits_required": 0,
+        "options": [
+          {
+            "code": "CHEM 233"
+          },
+          {
+            "code": "BIOL 200"
+          },
+          {
+            "code": "BIOL 230"
+          },
+          {
+            "code": "BIOL 233"
+          },
+          {
+            "code": "BIOL 234"
+          },
+          {
+            "code": "BIOL 260"
+          },
+          {
+            "code": "BIOL 204"
+          },
+          {
+            "code": "BIOL 205"
+          },
+          {
+            "code": "BIOL 209"
+          },
+          {
+            "code": "BIOL 210"
+          },
+          {
+            "code": "BIOL 320"
+          },
+          {
+            "code": "BIOL 321"
+          },
+          {
+            "code": "BIOL 324"
+          }
+        ],
+        "notes": "These specific courses must be completed within the first 78 attempted credits to remain in the specialization. Failure requires withdrawal from the Faculty of Science. Where the prose says \"one of\" or \"three of\", treat the listed options as alternatives."
+      },
+      {
+        "name": "Conservation Biology — Honours (0583) — upper-level required by 108 attempted credits",
+        "credits_required": 0,
+        "options": [
+          {
+            "code": "BIOL 300"
+          }
+        ],
+        "notes": "These upper-level specific courses must be completed within the first 108 attempted credits to remain in the specialization."
+      },
+      {
+        "name": "Ecology — Honours (0045) — required by 78 attempted credits",
+        "credits_required": 0,
+        "options": [
+          {
+            "code": "CHEM 233"
+          },
+          {
+            "code": "BIOL 200"
+          },
+          {
+            "code": "BIOL 230"
+          },
+          {
+            "code": "BIOL 233"
+          },
+          {
+            "code": "BIOL 234"
+          },
+          {
+            "code": "BIOL 260"
+          },
+          {
+            "code": "BIOL 204"
+          },
+          {
+            "code": "BIOL 205"
+          },
+          {
+            "code": "BIOL 209"
+          },
+          {
+            "code": "BIOL 210"
+          },
+          {
+            "code": "MICB 201"
+          }
+        ],
+        "notes": "These specific courses must be completed within the first 78 attempted credits to remain in the specialization. Failure requires withdrawal from the Faculty of Science. Where the prose says \"one of\" or \"three of\", treat the listed options as alternatives."
+      },
+      {
+        "name": "Ecology — Honours (0045) — upper-level required by 108 attempted credits",
+        "credits_required": 0,
+        "options": [
+          {
+            "code": "BIOL 300"
+          }
+        ],
+        "notes": "These upper-level specific courses must be completed within the first 108 attempted credits to remain in the specialization."
+      },
+      {
+        "name": "Evolutionary Biology — Honours (0983) — required by 78 attempted credits",
+        "credits_required": 0,
+        "options": [
+          {
+            "code": "CHEM 233"
+          },
+          {
+            "code": "BIOL 200"
+          },
+          {
+            "code": "BIOL 230"
+          },
+          {
+            "code": "BIOL 233"
+          },
+          {
+            "code": "BIOL 234"
+          },
+          {
+            "code": "BIOL 260"
+          },
+          {
+            "code": "BIOL 203"
+          },
+          {
+            "code": "BIOL 204"
+          },
+          {
+            "code": "BIOL 205"
+          },
+          {
+            "code": "BIOL 209"
+          },
+          {
+            "code": "BIOL 210"
+          },
+          {
+            "code": "MICB 201"
+          }
+        ],
+        "notes": "These specific courses must be completed within the first 78 attempted credits to remain in the specialization. Failure requires withdrawal from the Faculty of Science. Where the prose says \"one of\" or \"three of\", treat the listed options as alternatives."
+      },
+      {
+        "name": "Evolutionary Biology — Honours (0983) — upper-level required by 108 attempted credits",
+        "credits_required": 0,
+        "options": [
+          {
+            "code": "BIOL 300"
+          }
+        ],
+        "notes": "These upper-level specific courses must be completed within the first 108 attempted credits to remain in the specialization."
+      },
+      {
+        "name": "Marine Biology — Honours (0518) — required by 78 attempted credits",
+        "credits_required": 0,
+        "options": [
+          {
+            "code": "CHEM 233"
+          },
+          {
+            "code": "BIOL 200"
+          },
+          {
+            "code": "BIOL 230"
+          },
+          {
+            "code": "BIOL 233"
+          },
+          {
+            "code": "BIOL 234"
+          },
+          {
+            "code": "BIOL 260"
+          },
+          {
+            "code": "BIOL 205"
+          },
+          {
+            "code": "BIOL 209"
+          }
+        ],
+        "notes": "These specific courses must be completed within the first 78 attempted credits to remain in the specialization. Failure requires withdrawal from the Faculty of Science. Where the prose says \"one of\" or \"three of\", treat the listed options as alternatives."
+      },
+      {
+        "name": "Marine Biology — Honours (0518) — upper-level required by 108 attempted credits",
+        "credits_required": 0,
+        "options": [
+          {
+            "code": "BIOL 300"
+          }
+        ],
+        "notes": "These upper-level specific courses must be completed within the first 108 attempted credits to remain in the specialization."
+      },
+      {
+        "name": "Plant Biology — Honours (0372) — required by 78 attempted credits",
+        "credits_required": 0,
+        "options": [
+          {
+            "code": "CHEM 233"
+          },
+          {
+            "code": "BIOL 200"
+          },
+          {
+            "code": "BIOL 230"
+          },
+          {
+            "code": "BIOL 233"
+          },
+          {
+            "code": "BIOL 234"
+          },
+          {
+            "code": "BIOL 260"
+          },
+          {
+            "code": "BIOL 209"
+          },
+          {
+            "code": "BIOL 210"
+          }
+        ],
+        "notes": "These specific courses must be completed within the first 78 attempted credits to remain in the specialization. Failure requires withdrawal from the Faculty of Science. Where the prose says \"one of\" or \"three of\", treat the listed options as alternatives."
+      },
+      {
+        "name": "Plant Biology — Honours (0372) — upper-level required by 108 attempted credits",
+        "credits_required": 0,
+        "options": [
+          {
+            "code": "BIOL 300"
+          }
+        ],
+        "notes": "These upper-level specific courses must be completed within the first 108 attempted credits to remain in the specialization."
+      },
+      {
+        "name": "Cellular, Anatomical and Physiological Sciences — Major (3992) — required by 78 attempted credits",
+        "credits_required": 0,
+        "options": [
+          {
+            "code": "BIOL 200"
+          },
+          {
+            "code": "BIOL 201"
+          },
+          {
+            "code": "CAPS 205"
+          },
+          {
+            "code": "CAPS 206"
+          },
+          {
+            "code": "CHEM 233"
+          },
+          {
+            "code": "CHEM 235"
+          },
+          {
+            "code": "CHEM 203"
+          },
+          {
+            "code": "CHEM 205"
+          }
+        ],
+        "notes": "These specific courses must be completed within the first 78 attempted credits to remain in the specialization. Failure requires withdrawal from the Faculty of Science. Where the prose says \"one of\" or \"three of\", treat the listed options as alternatives."
+      },
+      {
+        "name": "Cellular, Anatomical and Physiological Sciences — Major (3992) — upper-level required by 108 attempted credits",
+        "credits_required": 0,
+        "options": [
+          {
+            "code": "BIOC 302"
+          },
+          {
+            "code": "CAPS 303"
+          }
+        ],
+        "notes": "These upper-level specific courses must be completed within the first 108 attempted credits to remain in the specialization."
+      }
+    ],
+    "total_credits": 0
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-arts/certificate-climate-studies-and-action": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-arts/certificate-climate-studies-and-action",
+    "categories": [
+      {
+        "name": "Climate Science",
+        "credits_required": 3,
+        "options": [
+          {
+            "code": "EOSC 112"
+          },
+          {
+            "code": "EOSC 340"
+          },
+          {
+            "code": "EOSC 345"
+          },
+          {
+            "code": "EOSC 440"
+          },
+          {
+            "code": "GEOS 102"
+          }
+        ],
+        "notes": "One course (3 credits)."
+      },
+      {
+        "name": "Climate Emergency",
+        "credits_required": 3,
+        "options": [
+          {
+            "code": "GEOG 202"
+          },
+          {
+            "code": "GEOG 312"
+          },
+          {
+            "code": "ENST 312"
+          }
+        ],
+        "notes": "One course (3 credits). Forestry students may substitute CONS 210."
+      },
+      {
+        "name": "Climate Justice",
+        "credits_required": 3,
+        "options": [
+          {
+            "code": "GEOG 302"
+          }
+        ]
+      },
+      {
+        "name": "Elective",
+        "credits_required": 3,
+        "options": [
+          {
+            "code": "BEST 401"
+          },
+          {
+            "code": "CONS 310"
+          },
+          {
+            "code": "CONS 425"
+          },
+          {
+            "code": "ENST 312"
+          },
+          {
+            "code": "ENVR 410"
+          },
+          {
+            "code": "EOSC 340"
+          },
+          {
+            "code": "EOSC 345"
+          },
+          {
+            "code": "EOSC 440"
+          },
+          {
+            "code": "GEOG 312"
+          },
+          {
+            "code": "GEOS 408"
+          },
+          {
+            "code": "NURS 290"
+          },
+          {
+            "code": "POLI 351"
+          }
+        ],
+        "notes": "One course (3 credits). Cannot double-count a course used for another category."
+      },
+      {
+        "name": "Climate Action",
+        "credits_required": 6,
+        "options": [
+          {
+            "code": "ENVR 201"
+          },
+          {
+            "code": "ENVR 301"
+          },
+          {
+            "code": "ENVR 302"
+          },
+          {
+            "code": "ENVR 401"
+          },
+          {
+            "code": "GEOG 402"
+          },
+          {
+            "code": "ENVR 402"
+          }
+        ],
+        "notes": "6 credits total. Two credits from ENVR 201+ENVR 301 or ENVR 302, plus four credits from ENVR 401+GEOG 402 or ENVR 401+ENVR 402."
+      }
+    ],
+    "total_credits": 18
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-arts/certificate-dechinta-community-and-land-based-research": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-arts/certificate-dechinta-community-and-land-based-research",
+    "categories": [
+      {
+        "name": "Certificate Requirements",
+        "credits_required": 15,
+        "options": [
+          {
+            "code": "INLB 210",
+            "credit_value": 3
+          },
+          {
+            "code": "INLB 310",
+            "credit_value": 3
+          },
+          {
+            "code": "INLB 220",
+            "credit_value": 3
+          },
+          {
+            "code": "INLB 320",
+            "credit_value": 3
+          }
+        ],
+        "notes": "INLB 210 OR 310 (3 credits) plus INLB 220 OR 320 (3 credits), then 9 additional credits of INLB courses or pre-approved related-area courses."
+      }
+    ],
+    "total_credits": 15
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-arts/certificate-general-arts-studies-experiential-learning-through-social-justice": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-arts/certificate-general-arts-studies-experiential-learning-through-social-justice",
+    "categories": [
+      {
+        "name": "Certificate Requirements",
+        "credits_required": 9,
+        "options": [],
+        "notes": "Open only to Fraser Valley Institute (FVI) students; complete at least 9 UBC course credits at FVI. Specific courses rotate yearly — see Geography dept. listings."
+      }
+    ],
+    "total_credits": 9
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-arts/diploma-art-history": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-arts/diploma-art-history",
+    "categories": [
+      {
+        "name": "ARTH 300 Seminar",
+        "credits_required": 3,
+        "options": [
+          {
+            "code": "ARTH 300"
+          }
+        ]
+      },
+      {
+        "name": "Focused-area Art History courses (300+)",
+        "credits_required": 15,
+        "options": [
+          {
+            "subject_pattern": "ARTH 3"
+          },
+          {
+            "subject_pattern": "ARTH 4"
+          }
+        ],
+        "notes": "15 credits of ARTH numbered 300+ in a geographical/chronological/thematic area of focus."
+      },
+      {
+        "name": "Other Art History courses (300+)",
+        "credits_required": 9,
+        "options": [
+          {
+            "subject_pattern": "ARTH 3"
+          },
+          {
+            "subject_pattern": "ARTH 4"
+          }
+        ],
+        "notes": "9 credits in ARTH 300+ outside the chosen 15-credit focus area."
+      },
+      {
+        "name": "400-level Art History seminar",
+        "credits_required": 3,
+        "options": [
+          {
+            "subject_pattern": "ARTH 4"
+          }
+        ],
+        "notes": "3 credits in a 400-level ARTH seminar."
+      }
+    ],
+    "total_credits": 30
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-arts/diploma-film-production": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-arts/diploma-film-production",
+    "categories": [
+      {
+        "name": "First Year required courses",
+        "credits_required": 24,
+        "options": [
+          {
+            "code": "CINE 100",
+            "credit_value": 3
+          },
+          {
+            "code": "FIPR 230",
+            "credit_value": 3
+          },
+          {
+            "code": "FIPR 233",
+            "credit_value": 3
+          },
+          {
+            "code": "FIPR 234",
+            "credit_value": 3
+          },
+          {
+            "code": "CRWR 206",
+            "credit_value": 3
+          },
+          {
+            "code": "CRWR 216",
+            "credit_value": 3
+          }
+        ],
+        "notes": "Plus 6 credits from CINE 200-level or higher."
+      },
+      {
+        "name": "Second Year required courses",
+        "credits_required": 27,
+        "options": [
+          {
+            "code": "FIPR 333",
+            "credit_value": 3
+          },
+          {
+            "code": "FIPR 337",
+            "credit_value": 3
+          },
+          {
+            "code": "FIPR 330"
+          },
+          {
+            "code": "FIPR 399"
+          },
+          {
+            "code": "FIPR 434"
+          },
+          {
+            "code": "FIPR 435"
+          },
+          {
+            "code": "FIPR 436"
+          },
+          {
+            "code": "FIPR 437"
+          },
+          {
+            "code": "FIPR 439"
+          },
+          {
+            "code": "CINE 300"
+          },
+          {
+            "code": "CINE 331"
+          },
+          {
+            "code": "CINE 332"
+          },
+          {
+            "code": "CINE 334"
+          },
+          {
+            "code": "CINE 336"
+          },
+          {
+            "code": "CINE 338"
+          },
+          {
+            "code": "CINE 430"
+          },
+          {
+            "code": "CINE 432"
+          },
+          {
+            "code": "CINE 434"
+          },
+          {
+            "code": "CINE 436"
+          },
+          {
+            "code": "CINE 438"
+          },
+          {
+            "code": "ASIA 354"
+          },
+          {
+            "code": "ASIA 355"
+          },
+          {
+            "code": "ASIA 356"
+          },
+          {
+            "code": "MUSC 345"
+          },
+          {
+            "code": "THTR 443"
+          }
+        ],
+        "notes": "FIPR 333 + FIPR 337 plus 15 credits from listed FIPR 330/399/434–439 and at least 6 Cinema Studies credits from the listed CINE / cross-listed courses."
+      },
+      {
+        "name": "Screenwriting Option (optional)",
+        "credits_required": 6,
+        "options": [
+          {
+            "code": "CRWR 406"
+          },
+          {
+            "code": "CRWR 409"
+          }
+        ],
+        "notes": "6–12 additional credits in CRWR 406/409 by portfolio. CRWR 414 is also listed in the Calendar but is not currently offered."
+      }
+    ],
+    "total_credits": 60
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-arts/diploma-linguistics": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-arts/diploma-linguistics",
+    "categories": [
+      {
+        "name": "Core LING courses",
+        "credits_required": 6,
+        "options": [
+          {
+            "code": "LING 300"
+          },
+          {
+            "code": "LING 311"
+          },
+          {
+            "code": "LING 313"
+          },
+          {
+            "code": "LING 327"
+          }
+        ],
+        "notes": "6 credits from the listed LING courses."
+      },
+      {
+        "name": "Upper-level LING coursework",
+        "credits_required": 24,
+        "options": [
+          {
+            "subject_pattern": "LING 3"
+          },
+          {
+            "subject_pattern": "LING 4"
+          }
+        ],
+        "notes": "24 additional credits at 300+; up to 6 may be from upper-level courses in related areas (see Linguistics dept)."
+      }
+    ],
+    "total_credits": 30
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-science/diploma-meteorology": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-science/diploma-meteorology",
+    "categories": [
+      {
+        "name": "Typical Diploma program",
+        "credits_required": 30,
+        "options": [
+          {
+            "code": "ATSC 201"
+          },
+          {
+            "code": "ATSC 212"
+          },
+          {
+            "code": "ATSC 301"
+          },
+          {
+            "code": "ATSC 303"
+          },
+          {
+            "code": "ATSC 404"
+          },
+          {
+            "code": "ATSC 405"
+          },
+          {
+            "code": "GEOS 300"
+          },
+          {
+            "code": "GEOS 304"
+          },
+          {
+            "code": "ATSC 409"
+          },
+          {
+            "code": "CHEM 302"
+          },
+          {
+            "code": "EOSC 340"
+          },
+          {
+            "code": "EOSC 352"
+          },
+          {
+            "code": "EOSC 372"
+          },
+          {
+            "code": "GEOS 400"
+          },
+          {
+            "code": "GEOS 401"
+          },
+          {
+            "code": "GEOS 402"
+          },
+          {
+            "code": "PHYS 314"
+          }
+        ],
+        "notes": "Minimum 30 credits at 300+ in atmospheric science, planned with the Associate Chair. Typical core: ATSC 201, 212, 301, 303, 404, 405; GEOS 300, 304; plus 12 credits from the listed electives. Up to 12 credits exemption for prior coursework; total load not to exceed 42 credits."
+      }
+    ]
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/school-music/diploma-music-performance": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/school-music/diploma-music-performance",
+    "categories": [
+      {
+        "name": "Individual performance instruction",
+        "credits_required": 8,
+        "options": [
+          {
+            "subject_pattern": "MUSC 4"
+          },
+          {
+            "subject_pattern": "MUSC 5"
+          }
+        ],
+        "notes": "At least 8 credits of individual performance instruction at the appropriate level."
+      },
+      {
+        "name": "Suitable ensembles",
+        "credits_required": 8,
+        "options": [
+          {
+            "code": "MUSC 550"
+          },
+          {
+            "code": "MUSC 539"
+          },
+          {
+            "code": "MUSC 561"
+          },
+          {
+            "subject_pattern": "MUSC 55"
+          },
+          {
+            "subject_pattern": "MUSC 56"
+          }
+        ],
+        "notes": "At least 8 credits of suitable ensembles. Orchestral instrumentalists must take MUSC 550 + two small ensembles (MUSC 556–569). Opera students must take MUSC 539. Pianists must take MUSC 561."
+      }
+    ],
+    "total_credits": 30
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-science/undergraduate-certificate-earth-ocean-and-atmospheric-sciences": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-science/undergraduate-certificate-earth-ocean-and-atmospheric-sciences",
+    "categories": [
+      {
+        "name": "The Geosphere",
+        "credits_required": 3,
+        "options": [
+          {
+            "code": "EOSC 310"
+          },
+          {
+            "code": "EOSC 311"
+          }
+        ]
+      },
+      {
+        "name": "The Atmosphere and Hydrosphere",
+        "credits_required": 3,
+        "options": [
+          {
+            "code": "ATSC 313"
+          },
+          {
+            "code": "EOSC 314"
+          },
+          {
+            "code": "EOSC 340"
+          },
+          {
+            "code": "EOSC 345"
+          }
+        ]
+      },
+      {
+        "name": "The Biosphere",
+        "credits_required": 3,
+        "options": [
+          {
+            "code": "EOSC 315"
+          },
+          {
+            "code": "EOSC 326"
+          },
+          {
+            "code": "GEOS 303"
+          },
+          {
+            "code": "GEOS 306"
+          },
+          {
+            "code": "GEOS 307"
+          }
+        ]
+      }
+    ],
+    "total_credits": 9
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-forestry-and-environmental-stewardship/undergraduate-certificate-geomatics-environmental-management-gem": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-forestry-and-environmental-stewardship/undergraduate-certificate-geomatics-environmental-management-gem",
+    "categories": [
+      {
+        "name": "Core courses",
+        "credits_required": 9,
+        "options": [
+          {
+            "code": "NRES 241"
+          },
+          {
+            "code": "NRES 341"
+          },
+          {
+            "code": "NRES 441"
+          }
+        ],
+        "notes": "Non-Forestry students may substitute GEOS 270 + GEOS 373 for NRES 241 + NRES 341."
+      },
+      {
+        "name": "Elective courses",
+        "credits_required": 6,
+        "options": [],
+        "notes": "6 credits from the approved electives list (maintained on the GEM Certificate website — not enumerated here)."
+      }
+    ],
+    "total_credits": 15
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-arts/undergraduate-certificate-data-and-models-political-science": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-arts/undergraduate-certificate-data-and-models-political-science",
+    "categories": [
+      {
+        "name": "Required courses",
+        "credits_required": 12,
+        "options": [
+          {
+            "code": "POLI 310",
+            "credit_value": 3
+          },
+          {
+            "code": "POLI 380",
+            "credit_value": 3
+          },
+          {
+            "code": "POLI 381",
+            "credit_value": 3
+          },
+          {
+            "code": "POLI 482",
+            "credit_value": 3
+          }
+        ],
+        "notes": "ECON 221 or ECON 421 may substitute for POLI 310. ECON 325 may substitute for POLI 380. A 75% minimum in POLI 310/380/381 is required to register in POLI 482."
+      }
+    ],
+    "total_credits": 12
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-arts/undergraduate-certificate-french-translation": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-arts/undergraduate-certificate-french-translation",
+    "categories": [
+      {
+        "name": "Required courses",
+        "credits_required": 15,
+        "options": [
+          {
+            "code": "FREN 352",
+            "credit_value": 3
+          },
+          {
+            "code": "FREN 357",
+            "credit_value": 3
+          },
+          {
+            "code": "FREN 457",
+            "credit_value": 3
+          },
+          {
+            "code": "RMST 317",
+            "credit_value": 3
+          },
+          {
+            "code": "RMST 417",
+            "credit_value": 3
+          }
+        ]
+      },
+      {
+        "name": "Elective",
+        "credits_required": 3,
+        "options": [
+          {
+            "code": "FREN 353"
+          },
+          {
+            "code": "FREN 370"
+          },
+          {
+            "code": "FREN 450"
+          },
+          {
+            "code": "FREN 451"
+          },
+          {
+            "code": "FREN 460"
+          },
+          {
+            "code": "FREN 470"
+          },
+          {
+            "code": "FREN 472"
+          },
+          {
+            "code": "FREN 474"
+          },
+          {
+            "code": "FREN 476"
+          },
+          {
+            "code": "FREN 477"
+          },
+          {
+            "code": "FREN 496"
+          }
+        ],
+        "notes": "3 credits of any of the listed FREN courses."
+      }
+    ],
+    "total_credits": 18
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-education/certificate-programs/certificate-health-wellness": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-education/certificate-programs/certificate-health-wellness",
+    "categories": [
+      {
+        "name": "Core courses",
+        "credits_required": 9,
+        "options": [
+          {
+            "code": "EDCP 325",
+            "credit_value": 3
+          },
+          {
+            "code": "EDCP 326",
+            "credit_value": 3
+          },
+          {
+            "code": "EDCP 327",
+            "credit_value": 3
+          }
+        ]
+      },
+      {
+        "name": "Electives",
+        "credits_required": 6,
+        "options": [
+          {
+            "code": "CNPS 363"
+          },
+          {
+            "code": "CNPS 427"
+          },
+          {
+            "code": "EDCP 497"
+          },
+          {
+            "code": "FNH 355"
+          },
+          {
+            "code": "FMST 314"
+          },
+          {
+            "code": "FMST 316"
+          },
+          {
+            "code": "SOCI 312"
+          },
+          {
+            "code": "EDCP 362"
+          }
+        ],
+        "notes": "Two 3-credit electives from any two of: Counselling Psychology & Career Planning (CNPS 363/427, EDCP 497); Healthy Living (FNH 355; Kinesiology dept electives — see Calendar); Relationship (FMST 314, FMST 316, SOCI 312); First Nations (EDCP 362)."
+      }
+    ],
+    "total_credits": 15
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-education/certificate-programs/undergraduate-certificate-textile-studies": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-education/certificate-programs/undergraduate-certificate-textile-studies",
+    "categories": [
+      {
+        "name": "UBC required courses",
+        "credits_required": 15,
+        "options": [
+          {
+            "code": "EDCP 304",
+            "credit_value": 6
+          },
+          {
+            "code": "EDCP 492",
+            "credit_value": 3
+          },
+          {
+            "code": "EDCP 498",
+            "credit_value": 3
+          }
+        ],
+        "notes": "Three UBC courses (EDCP 362B section + EDCP 304 + EDCP 492 + EDCP 498) plus two KPU courses (FSDP 9012, 9017, 9007, 9019, 9004 — KPU codes not validated against UBC course list)."
+      }
+    ],
+    "total_credits": 15
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-medicine/bachelor-midwifery/degree-requirements": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-medicine/bachelor-midwifery/degree-requirements",
+    "categories": [
+      {
+        "name": "Year 1 courses (2025+ cohort)",
+        "credits_required": 32,
+        "options": [
+          {
+            "code": "MIDW 101",
+            "credit_value": 3
+          },
+          {
+            "code": "MIDW 102",
+            "credit_value": 3
+          },
+          {
+            "code": "MIDW 103",
+            "credit_value": 3
+          },
+          {
+            "code": "MIDW 104",
+            "credit_value": 3
+          },
+          {
+            "code": "MIDW 106",
+            "credit_value": 3
+          },
+          {
+            "code": "MIDW 107",
+            "credit_value": 3
+          },
+          {
+            "code": "MIDW 108",
+            "credit_value": 5
+          },
+          {
+            "code": "MIDW 115",
+            "credit_value": 3
+          },
+          {
+            "code": "MIDW 120",
+            "credit_value": 3
+          },
+          {
+            "code": "MIDW 125",
+            "credit_value": 3
+          }
+        ]
+      },
+      {
+        "name": "Year 2 courses",
+        "credits_required": 34,
+        "options": [
+          {
+            "code": "MIDW 200",
+            "credit_value": 6
+          },
+          {
+            "code": "MIDW 201",
+            "credit_value": 9
+          },
+          {
+            "code": "MIDW 210",
+            "credit_value": 3
+          },
+          {
+            "code": "MIDW 215",
+            "credit_value": 1
+          },
+          {
+            "code": "MIDW 230",
+            "credit_value": 6
+          },
+          {
+            "code": "MIDW 240",
+            "credit_value": 9
+          }
+        ]
+      },
+      {
+        "name": "Year 3 courses (2025+ cohort)",
+        "credits_required": 42,
+        "options": [
+          {
+            "code": "MIDW 305",
+            "credit_value": 6
+          },
+          {
+            "code": "MIDW 320",
+            "credit_value": 11
+          },
+          {
+            "code": "MIDW 322",
+            "credit_value": 8
+          },
+          {
+            "code": "MIDW 326",
+            "credit_value": 2
+          },
+          {
+            "code": "MIDW 328",
+            "credit_value": 3
+          },
+          {
+            "code": "MIDW 355",
+            "credit_value": 8
+          },
+          {
+            "code": "MIDW 365",
+            "credit_value": 4
+          }
+        ]
+      },
+      {
+        "name": "Year 4 courses",
+        "credits_required": 32,
+        "options": [
+          {
+            "code": "MIDW 405",
+            "credit_value": 3
+          },
+          {
+            "code": "MIDW 420",
+            "credit_value": 12
+          },
+          {
+            "code": "MIDW 435",
+            "credit_value": 4
+          },
+          {
+            "code": "MIDW 440",
+            "credit_value": 13
+          }
+        ]
+      }
+    ],
+    "total_credits": 140
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-pharmaceutical-sciences/bachelor-pharmaceutical-sciences/degree-requirements": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-pharmaceutical-sciences/bachelor-pharmaceutical-sciences/degree-requirements",
+    "categories": [
+      {
+        "name": "Year 1 mandatory courses (2025+ cohort)",
+        "credits_required": 30,
+        "options": [
+          {
+            "code": "BIOL 112",
+            "credit_value": 3
+          },
+          {
+            "code": "BIOL 153",
+            "credit_value": 6
+          },
+          {
+            "code": "BIOL 155",
+            "credit_value": 6
+          },
+          {
+            "code": "CHEM 111",
+            "credit_value": 4
+          },
+          {
+            "code": "CHEM 121",
+            "credit_value": 4
+          },
+          {
+            "code": "CHEM 123",
+            "credit_value": 4
+          },
+          {
+            "code": "WRDS 150",
+            "credit_value": 3
+          },
+          {
+            "code": "MATH 100",
+            "credit_value": 3
+          },
+          {
+            "code": "MATH 102",
+            "credit_value": 3
+          },
+          {
+            "code": "MATH 104",
+            "credit_value": 3
+          },
+          {
+            "code": "MATH 120",
+            "credit_value": 3
+          },
+          {
+            "code": "MATH 180",
+            "credit_value": 3
+          },
+          {
+            "code": "MATH 184",
+            "credit_value": 3
+          },
+          {
+            "code": "MATH 101",
+            "credit_value": 3
+          },
+          {
+            "code": "MATH 103",
+            "credit_value": 3
+          },
+          {
+            "code": "MATH 105",
+            "credit_value": 3
+          },
+          {
+            "code": "MATH 121",
+            "credit_value": 3
+          },
+          {
+            "code": "PHAR 180",
+            "credit_value": 1
+          }
+        ],
+        "notes": "BIOL 112 + (BIOL 153 OR 155) + (CHEM 111 OR 121) + CHEM 123 + WRDS 150 + first-term math + second-term math + PHAR 180 + 3 credits elective."
+      },
+      {
+        "name": "Year 2 mandatory courses (2025+ cohort)",
+        "credits_required": 30,
+        "options": [
+          {
+            "code": "CHEM 211",
+            "credit_value": 4
+          },
+          {
+            "code": "CHEM 233",
+            "credit_value": 3
+          },
+          {
+            "code": "CHEM 235",
+            "credit_value": 1
+          },
+          {
+            "code": "MICB 212",
+            "credit_value": 3
+          },
+          {
+            "code": "PHAR 202",
+            "credit_value": 3
+          },
+          {
+            "code": "PHAR 203",
+            "credit_value": 4
+          },
+          {
+            "code": "PHAR 204",
+            "credit_value": 3
+          },
+          {
+            "code": "PHAR 205",
+            "credit_value": 3
+          },
+          {
+            "code": "STAT 200",
+            "credit_value": 3
+          }
+        ],
+        "notes": "Plus 3 credits elective. BIOL 300 may substitute for STAT 200 for students who meet the prerequisites."
+      },
+      {
+        "name": "Year 3 mandatory courses",
+        "credits_required": 30,
+        "options": [
+          {
+            "code": "PHAR 302",
+            "credit_value": 3
+          },
+          {
+            "code": "PHAR 303",
+            "credit_value": 3
+          },
+          {
+            "code": "PHAR 304",
+            "credit_value": 5
+          },
+          {
+            "code": "PHAR 305",
+            "credit_value": 3
+          },
+          {
+            "code": "PHAR 306",
+            "credit_value": 3
+          },
+          {
+            "code": "PHAR 307",
+            "credit_value": 4
+          },
+          {
+            "code": "PHAR 308",
+            "credit_value": 3
+          },
+          {
+            "code": "PHAR 370",
+            "credit_value": 3
+          }
+        ],
+        "notes": "Honours students take an additional 3 upper-level elective credits in Year 3."
+      },
+      {
+        "name": "Year 4 — B.P.Sc. (default Course-based) option electives",
+        "credits_required": 30,
+        "options": [],
+        "notes": "30 upper-level elective credits, of which no more than 12 may be outside the Faculty of Pharmaceutical Sciences."
+      },
+      {
+        "name": "Year 4 — Experiential Option: Research (alternative)",
+        "credits_required": 30,
+        "options": [
+          {
+            "code": "PHAR 485",
+            "credit_value": 15
+          }
+        ],
+        "notes": "PHAR 485 (15) plus 15 elective credits (max 3 outside the Faculty)."
+      },
+      {
+        "name": "Year 4 — Experiential Option: Practicum (alternative)",
+        "credits_required": 30,
+        "options": [
+          {
+            "code": "PHAR 495",
+            "credit_value": 15
+          }
+        ],
+        "notes": "PHAR 495 (15) plus 15 elective credits (max 3 outside the Faculty)."
+      },
+      {
+        "name": "Year 4 — Experiential Option with Honours (alternative)",
+        "credits_required": 39,
+        "options": [
+          {
+            "code": "PHAR 485",
+            "credit_value": 15
+          },
+          {
+            "code": "PHAR 491",
+            "credit_value": 12
+          }
+        ],
+        "notes": "PHAR 485 + PHAR 491 + 12 elective credits (max 3 outside the Faculty). Requires 80% cumulative average and a defended honours thesis."
+      }
+    ],
+    "total_credits": 120
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/school-kinesiology/bachelor-kinesiology/degree-requirements": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/school-kinesiology/bachelor-kinesiology/degree-requirements",
+    "categories": [
+      {
+        "name": "Writing Requirement",
+        "credits_required": 3,
+        "options": [
+          {
+            "code": "WRDS 150"
+          }
+        ],
+        "notes": "WRDS 150 (or approved equivalent)."
+      },
+      {
+        "name": "100-level Kinesiology Core",
+        "credits_required": 18,
+        "options": [
+          {
+            "code": "KIN 110"
+          },
+          {
+            "code": "KIN 120"
+          },
+          {
+            "code": "KIN 131"
+          },
+          {
+            "code": "KIN 132"
+          },
+          {
+            "code": "KIN 150"
+          },
+          {
+            "code": "KIN 160"
+          }
+        ]
+      },
+      {
+        "name": "200-level Kinesiology Core",
+        "credits_required": 21,
+        "options": [
+          {
+            "code": "KIN 205"
+          },
+          {
+            "code": "KIN 206"
+          },
+          {
+            "code": "KIN 211"
+          },
+          {
+            "code": "KIN 216"
+          },
+          {
+            "code": "KIN 232"
+          },
+          {
+            "code": "KIN 235"
+          },
+          {
+            "code": "KIN 262"
+          }
+        ]
+      },
+      {
+        "name": "Upper-level Kinesiology credits",
+        "credits_required": 36,
+        "options": [
+          {
+            "subject_pattern": "KIN 3"
+          },
+          {
+            "subject_pattern": "KIN 4"
+          }
+        ],
+        "notes": "Minimum 36 upper-level (300+) credits in KIN. Specific requirements vary by Option (Neuromechanical & Physiological Sciences / Social & Behavioural Sciences / Multi-disciplinary Science)."
+      },
+      {
+        "name": "Upper-level credits (total across all subjects)",
+        "credits_required": 48,
+        "options": [],
+        "notes": "Minimum 48 credits at the 300+ level across the entire degree."
+      }
+    ],
+    "total_credits": 120
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/school-kinesiology/bachelor-kinesiology/minor-programs": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/school-kinesiology/bachelor-kinesiology/minor-programs",
+    "categories": [
+      {
+        "name": "Minor in Commerce — required courses",
+        "credits_required": 18,
+        "options": [
+          {
+            "code": "COMR 329"
+          },
+          {
+            "code": "COMR 457"
+          },
+          {
+            "code": "COMR 465"
+          },
+          {
+            "code": "COMR 473"
+          },
+          {
+            "code": "COMR 493"
+          },
+          {
+            "code": "COMR 398"
+          },
+          {
+            "code": "COMR 458"
+          }
+        ],
+        "notes": "Five 3-credit COMR courses plus one of COMR 398 or COMR 458. Admission requires ECON 101+102 and one of MATH 100/102/104/120/180/184."
+      },
+      {
+        "name": "Minor in Educational and Counselling Psychology and Special Education — required",
+        "credits_required": 9,
+        "options": [
+          {
+            "code": "EPSE 301"
+          },
+          {
+            "code": "EPSE 462"
+          },
+          {
+            "code": "EPSE 312"
+          }
+        ]
+      },
+      {
+        "name": "Minor in Educational and Counselling Psychology and Special Education — electives",
+        "credits_required": 9,
+        "options": [
+          {
+            "code": "EPSE 303"
+          },
+          {
+            "code": "EPSE 316"
+          },
+          {
+            "code": "EPSE 320"
+          },
+          {
+            "code": "EPSE 403"
+          },
+          {
+            "code": "EPSE 408"
+          },
+          {
+            "code": "EPSE 426"
+          },
+          {
+            "code": "EPSE 433"
+          },
+          {
+            "code": "EPSE 436"
+          },
+          {
+            "code": "EPSE 437"
+          },
+          {
+            "code": "EPSE 449"
+          }
+        ],
+        "notes": "At least three of the listed EPSE courses (typically 9 credits)."
+      },
+      {
+        "name": "Minor in Nutritional Science — required",
+        "credits_required": 9,
+        "options": [
+          {
+            "code": "FNH 250"
+          },
+          {
+            "code": "FNH 350"
+          },
+          {
+            "code": "FNH 351"
+          }
+        ],
+        "notes": "FNH 350, FNH 351 and prerequisite FNH 250 (typically 9 credits)."
+      },
+      {
+        "name": "Minor in Nutritional Science — electives",
+        "credits_required": 12,
+        "options": [
+          {
+            "code": "FNH 301"
+          },
+          {
+            "code": "FNH 355"
+          },
+          {
+            "code": "FNH 370"
+          },
+          {
+            "code": "FNH 371"
+          },
+          {
+            "code": "FNH 398"
+          },
+          {
+            "code": "FNH 402"
+          },
+          {
+            "code": "FNH 451"
+          },
+          {
+            "code": "FNH 455"
+          },
+          {
+            "code": "FNH 473"
+          },
+          {
+            "code": "FNH 474"
+          },
+          {
+            "code": "FNH 477"
+          },
+          {
+            "code": "FNH 490"
+          }
+        ],
+        "notes": "12 credits from the listed upper-level FNH courses."
+      }
+    ]
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-arts/bachelor-arts/adding-specialization-outside-faculty-arts": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-arts/bachelor-arts/adding-specialization-outside-faculty-arts",
+    "categories": [
+      {
+        "name": "Minor in Commerce — required",
+        "credits_required": 27,
+        "options": [
+          {
+            "code": "ECON 101",
+            "credit_value": 3
+          },
+          {
+            "code": "ECON 102",
+            "credit_value": 3
+          },
+          {
+            "code": "COMR 329",
+            "credit_value": 3
+          },
+          {
+            "code": "COMR 457",
+            "credit_value": 3
+          },
+          {
+            "code": "COMR 465",
+            "credit_value": 3
+          },
+          {
+            "code": "COMR 473",
+            "credit_value": 3
+          },
+          {
+            "code": "COMR 493",
+            "credit_value": 3
+          }
+        ],
+        "notes": "ECON 101+102 (or ECON 310+311); one of MATH 100/102/104/110/120/180/184; COMR 329/457/465/473/493; and one of COMR 398 or COMR 458."
+      },
+      {
+        "name": "Minor in Commerce — math prerequisite (one of)",
+        "credits_required": 3,
+        "options": [
+          {
+            "code": "MATH 100"
+          },
+          {
+            "code": "MATH 102"
+          },
+          {
+            "code": "MATH 104"
+          },
+          {
+            "code": "MATH 110"
+          },
+          {
+            "code": "MATH 120"
+          },
+          {
+            "code": "MATH 180"
+          },
+          {
+            "code": "MATH 184"
+          }
+        ]
+      },
+      {
+        "name": "Minor in Commerce — capstone (one of)",
+        "credits_required": 3,
+        "options": [
+          {
+            "code": "COMR 398"
+          },
+          {
+            "code": "COMR 458"
+          }
+        ]
+      }
+    ]
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-arts/bachelor-fine-arts/adding-specialization-outside-faculty-arts": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-arts/bachelor-fine-arts/adding-specialization-outside-faculty-arts",
+    "categories": [
+      {
+        "name": "Minor in Commerce — required",
+        "credits_required": 27,
+        "options": [
+          {
+            "code": "ECON 101",
+            "credit_value": 3
+          },
+          {
+            "code": "ECON 102",
+            "credit_value": 3
+          },
+          {
+            "code": "COMR 329",
+            "credit_value": 3
+          },
+          {
+            "code": "COMR 457",
+            "credit_value": 3
+          },
+          {
+            "code": "COMR 465",
+            "credit_value": 3
+          },
+          {
+            "code": "COMR 473",
+            "credit_value": 3
+          },
+          {
+            "code": "COMR 493",
+            "credit_value": 3
+          }
+        ],
+        "notes": "ECON 101+102 (or ECON 310+311); one of MATH 100/102/104/110/120/180/184; COMR 329/457/465/473/493; and one of COMR 398 or COMR 458."
+      },
+      {
+        "name": "Minor in Commerce — math prerequisite (one of)",
+        "credits_required": 3,
+        "options": [
+          {
+            "code": "MATH 100"
+          },
+          {
+            "code": "MATH 102"
+          },
+          {
+            "code": "MATH 104"
+          },
+          {
+            "code": "MATH 110"
+          },
+          {
+            "code": "MATH 120"
+          },
+          {
+            "code": "MATH 180"
+          },
+          {
+            "code": "MATH 184"
+          }
+        ]
+      },
+      {
+        "name": "Minor in Commerce — capstone (one of)",
+        "credits_required": 3,
+        "options": [
+          {
+            "code": "COMR 398"
+          },
+          {
+            "code": "COMR 458"
+          }
+        ]
+      }
+    ]
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/school-music/bachelor-music/degree-requirements": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/school-music/bachelor-music/degree-requirements",
+    "categories": [
+      {
+        "name": "Music History Core",
+        "credits_required": 12,
+        "options": [
+          {
+            "code": "MUSC 120",
+            "credit_value": 3
+          },
+          {
+            "code": "MUSC 121",
+            "credit_value": 3
+          },
+          {
+            "code": "MUSC 220",
+            "credit_value": 3
+          },
+          {
+            "code": "MUSC 221",
+            "credit_value": 3
+          }
+        ]
+      },
+      {
+        "name": "Aural Skills Core",
+        "credits_required": 7,
+        "options": [
+          {
+            "code": "MUSC 105",
+            "credit_value": 2
+          },
+          {
+            "code": "MUSC 106",
+            "credit_value": 2
+          },
+          {
+            "code": "MUSC 205"
+          },
+          {
+            "code": "MUSC 206"
+          }
+        ],
+        "notes": "MUSC 105 (2), MUSC 106 (2), MUSC 205 (1.5), MUSC 206 (1.5). Proficiency exams may exempt MUSC 106."
+      },
+      {
+        "name": "Music Theory Core",
+        "credits_required": 12,
+        "options": [
+          {
+            "code": "MUSC 100",
+            "credit_value": 3
+          },
+          {
+            "code": "MUSC 101",
+            "credit_value": 3
+          },
+          {
+            "code": "MUSC 200",
+            "credit_value": 3
+          },
+          {
+            "code": "MUSC 300",
+            "credit_value": 3
+          }
+        ],
+        "notes": "Strong-background students may test into MUSC 101 and exempt MUSC 100."
+      },
+      {
+        "name": "Music Technology Core",
+        "credits_required": 3,
+        "options": [
+          {
+            "code": "MUSC 119",
+            "credit_value": 3
+          }
+        ]
+      },
+      {
+        "name": "Music and Human Experience Core",
+        "credits_required": 3,
+        "options": [
+          {
+            "code": "MUSC 128",
+            "credit_value": 3
+          },
+          {
+            "code": "MUSC 165",
+            "credit_value": 3
+          }
+        ],
+        "notes": "MUSC 128 or MUSC 165. If MUSC 165 satisfies this requirement it cannot also count toward ensemble requirements."
+      },
+      {
+        "name": "Minor in Applied Music Technology — prerequisites",
+        "credits_required": 6,
+        "options": [
+          {
+            "code": "MUSC 100",
+            "credit_value": 3
+          },
+          {
+            "code": "MUSC 119",
+            "credit_value": 3
+          }
+        ]
+      },
+      {
+        "name": "Minor in Applied Music Technology — required",
+        "credits_required": 12,
+        "options": [
+          {
+            "code": "MUSC 319",
+            "credit_value": 3
+          },
+          {
+            "code": "MUSC 320",
+            "credit_value": 3
+          },
+          {
+            "code": "MUSC 419",
+            "credit_value": 3
+          },
+          {
+            "code": "MUSC 420",
+            "credit_value": 3
+          }
+        ]
+      }
+    ]
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/school-music/bachelor-arts": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/school-music/bachelor-arts",
+    "categories": [
+      {
+        "name": "MUSC courses NOT accepted for credit toward BA Music major/honours/minor",
+        "credits_required": 0,
+        "options": [
+          {
+            "code": "MUSC 103"
+          },
+          {
+            "code": "MUSC 104"
+          },
+          {
+            "code": "MUSC 321"
+          },
+          {
+            "code": "MUSC 322"
+          },
+          {
+            "code": "MUSC 324"
+          },
+          {
+            "code": "MUSC 326"
+          }
+        ],
+        "notes": "Informational: these courses are open to non-music majors but DO NOT count toward the BA major/honours/minor in Music or toward the B.Mus."
+      },
+      {
+        "name": "MUSC courses accepted for credit toward BA Music",
+        "credits_required": 0,
+        "options": [
+          {
+            "code": "MUSC 328"
+          },
+          {
+            "code": "MUSC 345"
+          },
+          {
+            "code": "MUSC 428"
+          }
+        ],
+        "notes": "Informational: these (plus certain sections of MUSC 403 and ensemble courses MUSC 150/153/154/156/157/160/163/164/165) can count toward BA Music and B.Mus."
+      }
+    ]
+  },
+  "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-applied-science/bachelor-applied-science/degree-requirements": {
+    "program_url": "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-applied-science/bachelor-applied-science/degree-requirements",
+    "categories": [
+      {
+        "name": "English Requirement",
+        "credits_required": 3,
+        "options": [
+          {
+            "code": "WRDS 150"
+          }
+        ],
+        "notes": "WRDS 150 (or equivalent) plus an approved technical-communication course (program-specific). Med-school applicants need an additional 3 credits of ENGL."
+      },
+      {
+        "name": "Complementary Studies — minimum 20 credits across seven elements",
+        "credits_required": 20,
+        "options": [],
+        "notes": "Engineering economics and project management (min 3 credits); Humanities and social sciences electives (min 6); Oral and written communication (min 6); Health and safety; Professionalism/ethics/equity/law (min 2); Impact of technology on society and Sustainable development (min 3 combined for those two). See Applied Science Engineering Academic Services for the approved course list."
+      }
+    ]
+  }
+}

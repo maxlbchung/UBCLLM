@@ -557,3 +557,148 @@ body {
   background: var(--range-thumb-hover);
   box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.18);
 }
+
+/* Home landing-page entrance. Each element fades + rises into place; the
+   Home component staggers the reveal by setting `animation-delay` inline
+   so the logo, headline, CTA, and tool cards cascade in on first paint.
+   `both` holds the from-state (opacity 0) through the delay so nothing
+   flashes before its turn. */
+@keyframes home-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.home-rise {
+  animation: home-rise 700ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Slow drift for the hero's ambient glow so the background feels alive
+   without pulling focus. */
+@keyframes home-glow-drift {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.75;
+  }
+
+  50% {
+    transform: scale(1.12);
+    opacity: 1;
+  }
+}
+
+.home-glow {
+  animation: home-glow-drift 14s ease-in-out infinite;
+}
+
+/* ── Neon wireframe landscape (Home hero background) ──────────────────────
+   A synthwave perspective grid floor that recedes to a glowing horizon and
+   scrolls toward the viewer. It recolors per theme off --accent, so the
+   "neon" follows whatever palette is active (blue / brass / green / light).
+   The scroll is a transform animation on an inner plane — NOT background-
+   position — so it runs on the compositor and never blocks the main thread
+   (which is busy driving WebGPU inference). */
+.home-landscape {
+  --grid-line: var(--accent);
+  --grid-glow: var(--accent-hover);
+}
+
+/* Sun/sky glow sitting on the horizon; its upper half bleeds up behind the
+   hero copy. Reuses .home-glow for the slow breathing drift. */
+.home-landscape-sun {
+  position: absolute;
+  left: 50%;
+  top: 60%;
+  width: 42rem;
+  height: 42rem;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle, var(--accent-soft) 0%, transparent 62%);
+}
+
+/* The bright line where floor meets sky. */
+.home-landscape-horizon {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 60%;
+  height: 2px;
+  background: var(--grid-glow);
+  opacity: 0.65;
+  box-shadow:
+    0 0 14px 2px var(--grid-glow),
+    0 0 48px 8px var(--accent-soft);
+}
+
+/* Perspective viewport for the floor — only the bottom of the hero. The top
+   fades out so the grid lines dissolve into the horizon glow rather than
+   ending on a hard edge. */
+.home-landscape-floor {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 60%;
+  bottom: 0;
+  perspective: 280px;
+  perspective-origin: 50% 0%;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 24%);
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 24%);
+}
+
+/* The plane is tilted away from the viewer: its far (top) edge meets the
+   horizon, its near (bottom) edge tips up toward the viewer. */
+.home-landscape-plane {
+  position: absolute;
+  inset: 0 -60% 0 -60%;
+  transform: rotateX(72deg);
+  transform-origin: 50% 0%;
+}
+
+.home-landscape-grid {
+  position: absolute;
+  inset: -64px 0 -40% 0;
+  background-image:
+    linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
+  background-size: 64px 64px;
+  will-change: transform;
+  animation: home-grid-scroll 2.6s linear infinite;
+}
+
+/* A blurred copy stacked behind the sharp grid → the neon bloom. */
+.home-landscape-grid--glow {
+  filter: blur(4px);
+  opacity: 0.5;
+}
+
+/* Scroll exactly one tile so the loop is seamless (the pattern repeats every
+   64px, so translateY(64px) is visually identical to translateY(0)). */
+@keyframes home-grid-scroll {
+  from {
+    transform: translateY(0);
+  }
+
+  to {
+    transform: translateY(64px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-rise {
+    animation: none;
+  }
+
+  .home-glow {
+    animation: none;
+  }
+
+  .home-landscape-grid {
+    animation: none;
+  }
+}

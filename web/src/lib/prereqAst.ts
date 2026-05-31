@@ -832,21 +832,33 @@ class Parser {
     // Labeled mode.
     const branchStart = this.pos
     const children: Expr[] = []
+    // Joiner that preceded each pushed child ('or' / 'and' / null). Lets us
+    // rebuild the branch's real boolean shape below instead of flattening
+    // every atom into one big AND — crucial when a labeled branch writes a
+    // disjunction with a bare "or" rather than "one of A, B" (e.g. BIOL 234's
+    // "(c) … one of CHEM 203 or CHEM 223 and one of BIOL 112 or BIOL 121").
+    const joiners: Array<'or' | 'and' | null> = []
     let sawBareOr = false
+    let pending: 'or' | 'and' | null = null
     while (true) {
       const t = this.peek()
       if (!t) break
       if (t.type === 'SEMI' || t.type === 'DOT') break
       if (t.type === 'OR') {
-        const next = this.peek(1)
-        if (next?.type === 'LABEL') break
-        // Bare OR within the branch — content, not a separator.
+        if (this.peek(1)?.type === 'LABEL') break
+        // Bare OR within the branch — a disjunction joiner, not a separator.
         sawBareOr = true
+        pending = 'or'
         this.consume()
         continue
       }
-      // Stray AND (and any other unexpected joiner) is swallowed by atom()'s
-      // catch-all consume-and-bail; we don't need an explicit handler here.
+      if (t.type === 'AND') {
+        // Conjunction joiner between atoms (previously swallowed silently by
+        // atom()'s catch-all; now recorded so the structure survives).
+        pending = 'and'
+        this.consume()
+        continue
+      }
       const beforePos = this.pos
       const a = this.atom()
       if (!a) {
@@ -856,6 +868,8 @@ class Parser {
         continue
       }
       children.push(a)
+      joiners.push(pending)
+      pending = null
     }
 
     if (children.length === 0 && !sawBareOr) {
@@ -878,13 +892,10 @@ class Parser {
     const hasStructural = children.some((c) => c.kind !== 'literal')
     if (sawBareOr || (hasLiteral && hasStructural)) {
       const text = this.reconstructRange(branchStart, this.pos).trim()
-      const structural = children.filter((c) => c.kind !== 'literal')
-      const subExpr: Expr | null =
-        structural.length === 0
-          ? null
-          : structural.length === 1
-            ? structural[0]
-            : { kind: 'and', children: structural }
+      // Honour the branch's real and/or structure (OR binds tighter than AND)
+      // so a "one of X or Y and one of A or B" branch evaluates as
+      // (X∨Y)∧(A∨B), not a conjunction of all four.
+      const subExpr = groupBranchChildren(children, joiners)
       return { expr: { kind: 'flattened', text, subExpr }, hasLabel }
     }
 
@@ -936,6 +947,38 @@ function tokenText(t: Token): string {
     case 'LABEL':
       return ''
   }
+}
+
+// Rebuild a labeled either-branch's boolean structure from its atoms and the
+// joiners between them. Consecutive atoms linked by "or" form a disjunction;
+// "and" (or a group boundary) starts a new conjunct — i.e. OR binds tighter
+// than AND, matching the main grammar. So a branch like
+//   "one of CHEM 203 or CHEM 223 and one of BIOL 112 or BIOL 121"
+// becomes (CHEM 203 ∨ CHEM 223) ∧ (BIOL 112 ∨ BIOL 121), not a flat AND of
+// all four. Literal prose atoms carry no logical weight here (their wording is
+// preserved in the flattened node's display text), so they're skipped.
+// Returns null when no structural atom remains.
+function groupBranchChildren(
+  children: Expr[],
+  joiners: Array<'or' | 'and' | null>,
+): Expr | null {
+  const groups: Expr[][] = []
+  for (let i = 0; i < children.length; i++) {
+    const c = children[i]
+    if (c.kind === 'literal') continue
+    if (joiners[i] === 'or' && groups.length > 0) {
+      groups[groups.length - 1].push(c)
+    } else {
+      groups.push([c])
+    }
+  }
+  if (groups.length === 0) return null
+  const conjuncts: Expr[] = groups.map((g) =>
+    g.length === 1 ? g[0] : { kind: 'or', ui: 'dropdown', children: g },
+  )
+  return conjuncts.length === 1
+    ? conjuncts[0]
+    : { kind: 'and', children: conjuncts }
 }
 
 // ---------- Normalization ----------

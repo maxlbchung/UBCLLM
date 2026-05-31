@@ -269,3 +269,19 @@ export const InfoIcon = (p: IconProps) => (
     <path d="M12 8h.01" />
   </Icon>
 )
+
+// Curved arrow looping back to the left — the universal undo glyph.
+export const UndoIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M9 14 4 9l5-5" />
+    <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H10" />
+  </Icon>
+)
+
+// Mirror of UndoIcon — curved arrow looping forward to the right.
+export const RedoIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="m15 14 5-5-5-5" />
+    <path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H14" />
+  </Icon>
+)

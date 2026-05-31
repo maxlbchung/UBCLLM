@@ -62,8 +62,10 @@ import {
   ChevronRightIcon,
   EyeOffIcon,
   InfoIcon,
+  RedoIcon,
   SparklesIcon,
   TrashIcon,
+  UndoIcon,
   type IconProps,
 } from './icons'
 
@@ -127,6 +129,8 @@ export function Planning() {
   const sidebarTab = usePlanner((s) => s.sidebarTab)
   const setSidebarTab = usePlanner((s) => s.setSidebarTab)
   const toggleSidebar = usePlanner((s) => s.toggleSidebar)
+  const undo = usePlanner((s) => s.undo)
+  const redo = usePlanner((s) => s.redo)
 
   const [courseIndex, setCourseIndex] =
     useState<Map<string, Chunk> | null>(null)
@@ -139,6 +143,36 @@ export function Planning() {
   useEffect(() => {
     void getCourseIndex().then(setCourseIndex)
   }, [])
+
+  // Keyboard shortcuts for the planner page: Ctrl/Cmd+Z undoes, Ctrl/Cmd+
+  // Shift+Z and Ctrl+Y redo. Skipped while a text field is focused so we
+  // don't hijack native editing in the rename inputs or course search.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (!(e.ctrlKey || e.metaKey)) return
+      const key = e.key.toLowerCase()
+      if (key !== 'z' && key !== 'y') return
+      const el = e.target as HTMLElement | null
+      const tag = el?.tagName
+      if (
+        tag === 'INPUT' ||
+        tag === 'TEXTAREA' ||
+        tag === 'SELECT' ||
+        el?.isContentEditable
+      ) {
+        return
+      }
+      e.preventDefault()
+      const { past, future } = usePlanner.getState()
+      if (key === 'y' || (key === 'z' && e.shiftKey)) {
+        if (future.length > 0) { redo(); playSfx('redo') }
+      } else if (past.length > 0) {
+        undo(); playSfx('undo')
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [undo, redo])
 
   const sensors = useSensors(
     // 4-px activation distance so a click on a block (e.g. to read the
@@ -558,22 +592,6 @@ function CollapsedSidebar({
   )
 }
 
-const YEAR_ORDINALS = ['first', 'second', 'third', 'fourth', 'fifth']
-
-// Map a parsed requirement-year label ("First Year", "Third and Fourth Years",
-// "Year 2") to the plan's 0-based year indices it should fill, clamped to the
-// number of years in the plan so nothing is lost off the end.
-function mapYearToPlanIndices(label: string, planYearCount: number): number[] {
-  const lower = label.toLowerCase()
-  const idxs = new Set<number>()
-  YEAR_ORDINALS.forEach((word, i) => {
-    if (lower.includes(word)) idxs.add(Math.min(i, planYearCount - 1))
-  })
-  const numMatch = lower.match(/year\s+(\d)/)
-  if (numMatch) idxs.add(Math.min(Number(numMatch[1]) - 1, planYearCount - 1))
-  return [...idxs].sort((a, b) => a - b)
-}
-
 function ActionsSection({
   years,
   validations,
@@ -590,10 +608,14 @@ function ActionsSection({
   onClearAll: () => void
 }) {
   const major = usePlanner((s) => s.major)
-  const addBlock = usePlanner((s) => s.addBlock)
+  const addBlocks = usePlanner((s) => s.addBlocks)
   const preferredCoursesPerTerm = usePlanner((s) => s.preferredCoursesPerTerm)
   const toggleIgnoreBlock = usePlanner((s) => s.toggleIgnoreBlock)
   const checkedRequirements = usePlanner((s) => s.checkedRequirements)
+  const undo = usePlanner((s) => s.undo)
+  const redo = usePlanner((s) => s.redo)
+  const canUndo = usePlanner((s) => s.past.length > 0)
+  const canRedo = usePlanner((s) => s.future.length > 0)
   const [ignoreOpen, setIgnoreOpen] = useState(false)
   const [filling, setFilling] = useState(false)
 
@@ -610,11 +632,12 @@ function ActionsSection({
     return out
   }, [years, validations])
 
-  // Fill the plan straight from the Progress checklist: place the courses each
-  // year's requirements call for, into the matching plan year. For a "one of"
-  // choice only the first listed course is added; an "all of" group adds all of
-  // them. Requirements already fulfilled — a satisfying course already in the
-  // plan, or a manual check — are skipped.
+  // Autofill in two passes: (1) place each required course as early as its
+  // prerequisites and corequisites allow, then (2) push courses back, term by
+  // term, until every term is within the preferred course load. One-of rows
+  // take the first listed course, all-of rows take every course; rows already
+  // fulfilled (a satisfying course planned, or a manual check), unknown codes,
+  // and anything already in the plan are skipped.
   async function handleAutofill() {
     if (!major) {
       window.alert('Select a major / program first.')
@@ -629,16 +652,18 @@ function ActionsSection({
         return
       }
       const checked = new Set(checkedRequirements)
+      // Existing blocks are fixed anchors — autofill never moves what the user
+      // placed by hand; it only schedules the courses it adds.
       const planned = new Set(plannedCodes)
 
-      // 1) Gather courses to place, grouped by requirement block so we can
-      //    fill year by year. One-of → first listed course; all-of → every
-      //    course. Skip fulfilled / unknown / already-planned.
-      const blocks: { years: number[]; codes: string[] }[] = []
+      // 1) Gather the courses to place — a flat list in requirement order
+      //    (lower years first, a natural tiebreaker for "as early as
+      //    possible"). One-of → first listed course; all-of → every course.
+      //    Skip rows already fulfilled / manually checked, unknown codes, and
+      //    anything already in the plan.
+      const toPlace: string[] = []
+      const willPlace = new Set<string>()
       for (const pyear of parsed.years) {
-        const blockYears = mapYearToPlanIndices(pyear.label, years.length)
-        if (blockYears.length === 0) continue
-        const blockCodes: string[] = []
         for (const item of pyear.items) {
           if (item.kind !== 'course') continue
           const key = requirementKey(req.program_url, pyear.label, item)
@@ -646,25 +671,25 @@ function ActionsSection({
           const chosen =
             item.mode === 'oneof' ? item.codes.slice(0, 1) : item.codes
           for (const code of chosen) {
-            if (!courseIndex.has(code) || planned.has(code)) continue
-            planned.add(code)
-            blockCodes.push(code)
+            if (!courseIndex.has(code)) continue
+            if (planned.has(code) || willPlace.has(code)) continue
+            willPlace.add(code)
+            toPlace.push(code)
           }
         }
-        if (blockCodes.length > 0) blocks.push({ years: blockYears, codes: blockCodes })
       }
-      if (blocks.length === 0) {
+      if (toPlace.length === 0) {
         window.alert('All requirements are already in the plan or fulfilled.')
         return
       }
 
-      // 2) Prerequisite references (codes named in a course's prereq text) that
-      //    are themselves in the plan. The `_V` campus suffix is optional in the
-      //    source text, so allow it. Then a cycle-safe topological order over
-      //    all pending courses (prereqs before dependents); within a block we
-      //    place in this order so a course's prereqs claim the earlier terms
-      //    before it does.
-      const planSet = new Set(planned)
+      // Every code that will live in the plan once we're done. Only courses
+      // actually present can constrain ordering, so prereq/coreq edges below
+      // are filtered to this set.
+      const planSet = new Set([...planned, ...willPlace])
+
+      // Every code referenced anywhere in a parsed requirement expression.
+      // Used (filtered to the plan) to wire up the push-back safety map.
       const astCodes = (e: Expr | null): string[] => {
         if (!e) return []
         switch (e.kind) {
@@ -681,159 +706,164 @@ function ActionsSection({
             return []
         }
       }
-      // A prerequisite counts as an ordering edge only when it is "critical" —
-      // the course's prereq expression is NOT satisfiable by the plan without
-      // it. This ignores alternatives ("one of …") and corequisite mentions the
-      // plan covers another way, so we don't invent dependency chains that can't
-      // fit the year (e.g. BIOL 200 names CHEM 203 only as a coreq of one
-      // branch, so it must NOT force CHEM 203 → BIOL 200).
-      // Codes in a requirement expression the plan can't satisfy without —
-      // ignores "one of …" alternatives so we don't invent impossible chains.
-      const criticalRefs = (reqText: string | null | undefined): string[] => {
-        const ast = parsePrereq(reqText)
-        if (!ast || !isSatisfied(ast, planSet)) return []
-        const refs = [...new Set(astCodes(ast))].filter((c) => planSet.has(c))
-        return refs.filter((c) => {
-          const without = new Set(planSet)
-          without.delete(c)
-          return !isSatisfied(ast, without)
-        })
-      }
-      const prereqRefs = (code: string): string[] => {
+      const prereqAstOf = (code: string): Expr | null => {
         const chunk = courseIndex.get(code)
-        if (!chunk) return []
-        return criticalRefs(parseCourseChunk(chunk).prerequisites)
+        return chunk ? parsePrereq(parseCourseChunk(chunk).prerequisites) : null
       }
-      const coreqRefs = (code: string): string[] => {
+      const coreqAstOf = (code: string): Expr | null => {
         const chunk = courseIndex.get(code)
-        if (!chunk) return []
-        return criticalRefs(parseCourseChunk(chunk).corequisites)
+        return chunk ? parsePrereq(parseCourseChunk(chunk).corequisites) : null
       }
-      // Scheduling dependencies = critical prereqs + critical coreqs. A coreq
-      // must be same-term-or-before; we treat it like a prereq (earlier term),
-      // which always satisfies that rule and keeps the scheduler simple.
-      const depRefs = (code: string): string[] => {
-        const pre = prereqRefs(code)
-        const co = coreqRefs(code).filter((c) => !pre.includes(c))
-        return [...pre, ...co]
-      }
-      // 3) Linear (year, term) slot model, seeded with the existing plan so
-      //    prereq-ordering and balancing account for courses already placed.
-      const slotGlobal = new Map<string, number>()
-      const slotLoad = new Map<number, number>()
-      let g = 0
-      years.forEach((year, y) => {
-        year.terms.forEach((_term, t) => {
-          slotGlobal.set(`${y}:${t}`, g)
-          slotLoad.set(g, 0)
-          g++
-        })
-      })
-      const codeSlot = new Map<string, number>()
-      years.forEach((year, y) => {
+
+      // Linear list of (year, term) slots in chronological order, and where
+      // each course currently sits. Existing blocks seed `slot` as anchors.
+      const slotOf: { yearIdx: number; termIdx: number }[] = []
+      const slot = new Map<string, number>()
+      years.forEach((year, y) =>
         year.terms.forEach((term, t) => {
-          const gi = slotGlobal.get(`${y}:${t}`)!
-          for (const b of term.blocks) {
-            codeSlot.set(b.code, gi)
-            slotLoad.set(gi, (slotLoad.get(gi) ?? 0) + 1)
-          }
-        })
-      })
-
-      // 4) Fill block by block in year order. Within a block, a course's
-      //    earliest term is its prerequisite-chain depth *within the block*
-      //    (ASAP scheduling): a course that is itself a prerequisite of another
-      //    course in the block is pinned to the earliest term it's eligible
-      //    for, while leaf courses (no dependents in the block) are free to
-      //    move to a later, less-loaded term to balance the load. This keeps
-      //    prereqs strictly before dependents — even when both fall in the same
-      //    requirement year — and spreads courses across terms.
-      let placed = 0
-      const orderedBlocks = [...blocks].sort(
-        (a, b) => Math.min(...a.years) - Math.min(...b.years),
+          const gi = slotOf.length
+          slotOf.push({ yearIdx: y, termIdx: t })
+          for (const b of term.blocks) slot.set(b.code, gi)
+        }),
       )
-      for (const block of orderedBlocks) {
-        const slots = block.years
-          .filter((y) => years[y])
-          .flatMap((y) =>
-            years[y].terms.map((_term, t) => ({
-              yearIdx: y,
-              termIdx: t,
-              gi: slotGlobal.get(`${y}:${t}`)!,
-            })),
-          )
-          .sort((a, b) => a.gi - b.gi)
-        if (slots.length === 0) continue
+      const lastSlot = slotOf.length - 1
+      if (lastSlot < 0) return
 
-        // Critical-prereq edges among this block's own courses, and whether a
-        // course has any dependent inside the block.
-        const blockSet = new Set(block.codes)
-        const blockPrereqs = new Map(
-          block.codes.map((c) => [
-            c,
-            depRefs(c).filter((p) => blockSet.has(p)),
-          ]),
-        )
-        const hasDependent = new Set<string>()
-        for (const c of block.codes)
-          for (const p of blockPrereqs.get(c) ?? []) hasDependent.add(p)
-
-        // Block-local longest prerequisite-chain depth → the course's earliest
-        // term index within this block.
-        const depthMemo = new Map<string, number>()
-        const depthIn = (c: string, stack = new Set<string>()): number => {
-          const cached = depthMemo.get(c)
-          if (cached != null) return cached
-          if (stack.has(c)) return 0
-          stack.add(c)
-          let d = 0
-          for (const p of blockPrereqs.get(c) ?? [])
-            d = Math.max(d, depthIn(p, stack) + 1)
-          stack.delete(c)
-          depthMemo.set(c, d)
-          return d
-        }
-
-        // Place shallow courses first so a prerequisite's slot is fixed before
-        // its dependents are placed.
-        const ordered = [...block.codes].sort((a, b) => depthIn(a) - depthIn(b))
-        for (const code of ordered) {
-          // Floor 1: after any prerequisite already placed (earlier block/year
-          // or earlier in this block). Floor 2: this course's own block-depth.
-          let minGi = 0
-          for (const p of depRefs(code)) {
-            const ps = codeSlot.get(p)
-            if (ps != null) minGi = Math.max(minGi, ps + 1)
+      // 2) PLACE AS EARLY AS POSSIBLE. To order a course we walk its prereq /
+      //    coreq AST and ask: by which term does the *plan* satisfy it? An AND
+      //    needs its latest child; an OR (an "either A, B, C") needs only its
+      //    EARLIEST satisfiable branch — so a big "or" never floats a course to
+      //    term 0 just because two of its options happen to both be planned,
+      //    and never forces it after options it doesn't need. Branches the plan
+      //    can't satisfy (a code not planned) and prose conditions ("third-year
+      //    standing") impose no ordering. `reqSlot` returns that term, or null
+      //    when nothing in the plan constrains it. Memoised + cycle-safe; an
+      //    existing anchor reports its fixed slot.
+      const earliestMemo = new Map<string, number>()
+      function reqSlot(e: Expr | null, stack: Set<string>): number | null {
+        if (!e) return null
+        switch (e.kind) {
+          case 'code':
+            return planSet.has(e.code) ? earliest(e.code, stack) : null
+          case 'and': {
+            // Need every evaluable conjunct; satisfied at the latest of them.
+            // A required conjunct the plan lacks can't be satisfied → no
+            // ordering (null) rather than an invented chain.
+            let max = -1
+            for (const c of e.children) {
+              if (c.kind === 'literal' || c.kind === 'soft') continue
+              const s = reqSlot(c, stack)
+              if (s === null) return null
+              max = Math.max(max, s)
+            }
+            return max < 0 ? null : max
           }
-          const depthFloor = Math.min(depthIn(code), slots.length - 1)
-          const eligible = slots.filter(
-            (s, i) => s.gi >= minGi && i >= depthFloor,
-          )
-          const pool = eligible.length > 0 ? eligible : [slots[slots.length - 1]]
-          // Aim for the preferred per-term load: prefer eligible terms still
-          // under it. It's a soft target, not a cap — if every eligible term is
-          // already at/over the preference, fall back to the full pool and let
-          // a term run heavy rather than drop a required course.
-          const underPref = pool.filter(
-            (s) => (slotLoad.get(s.gi) ?? 0) < preferredCoursesPerTerm,
-          )
-          const choosePool = underPref.length > 0 ? underPref : pool
-          // A course with dependents stays as early as possible (leave room for
-          // them); a leaf goes to the least-loaded eligible term to balance.
-          const target = hasDependent.has(code)
-            ? choosePool[0]
-            : [...choosePool].sort(
-                (a, b) =>
-                  (slotLoad.get(a.gi) ?? 0) - (slotLoad.get(b.gi) ?? 0) ||
-                  a.gi - b.gi,
-              )[0]
-          addBlock(years[target.yearIdx].id, target.termIdx, code)
-          codeSlot.set(code, target.gi)
-          slotLoad.set(target.gi, (slotLoad.get(target.gi) ?? 0) + 1)
-          placed++
+          case 'or': {
+            // Any one branch suffices — constrain by the earliest satisfiable.
+            let min = Infinity
+            for (const c of e.children) {
+              const s = reqSlot(c, stack)
+              if (s !== null) min = Math.min(min, s)
+            }
+            return min === Infinity ? null : min
+          }
+          case 'flattened':
+            return reqSlot(e.subExpr, stack)
+          case 'soft':
+          case 'literal':
+            return null
         }
       }
-      if (placed > 0) playSfx('autofillDone')
+      function earliest(code: string, stack = new Set<string>()): number {
+        if (slot.has(code) && !willPlace.has(code)) return slot.get(code)!
+        const cached = earliestMemo.get(code)
+        if (cached != null) return cached
+        if (stack.has(code)) return 0
+        stack.add(code)
+        let e = 0
+        const pre = reqSlot(prereqAstOf(code), stack)
+        if (pre !== null) e = Math.max(e, pre + 1) // prereqs finish earlier
+        const co = reqSlot(coreqAstOf(code), stack)
+        if (co !== null) e = Math.max(e, co) // coreqs may share the term
+        stack.delete(code)
+        e = Math.min(e, lastSlot)
+        earliestMemo.set(code, e)
+        return e
+      }
+      for (const code of toPlace) slot.set(code, earliest(code))
+
+      // Per-term course count, plus a reverse dependency map so the push-back
+      // pass never moves a course onto — or past — something that might need it
+      // first (existing blocks included). We treat any in-plan code a course
+      // references as a potential edge: conservative, so a push is only ever
+      // wrongly blocked (term left a touch heavy), never wrongly allowed.
+      const load: number[] = slotOf.map(() => 0)
+      for (const gi of slot.values()) load[gi]++
+      const dependents = new Map<
+        string,
+        { code: string; type: 'pre' | 'co' }[]
+      >()
+      const addDep = (dep: string, code: string, type: 'pre' | 'co') => {
+        const arr = dependents.get(dep) ?? []
+        arr.push({ code, type })
+        dependents.set(dep, arr)
+      }
+      for (const code of planSet) {
+        for (const p of astCodes(prereqAstOf(code)))
+          if (planSet.has(p)) addDep(p, code, 'pre')
+        for (const q of astCodes(coreqAstOf(code)))
+          if (planSet.has(q)) addDep(q, code, 'co')
+      }
+      // Moving `code` into slot `toGi` is safe only while every dependent still
+      // lands later (prereq) or no earlier (coreq).
+      const canPush = (code: string, toGi: number): boolean => {
+        for (const d of dependents.get(code) ?? []) {
+          const dGi = slot.get(d.code)
+          if (dGi == null) continue
+          if (d.type === 'pre' && dGi <= toGi) return false
+          if (d.type === 'co' && dGi < toGi) return false
+        }
+        return true
+      }
+
+      // 3) PUSH BACK TO MEET THE LIMIT. Sweep terms earliest → latest; while a
+      //    term is over the preferred load, push one course we added into the
+      //    next term (never a user-placed block), choosing one that can move
+      //    without breaking an order and has the fewest dependents (keep the
+      //    heavily-depended-on courses early). Repeat the sweep because moving
+      //    a dependent course later can open room for its prerequisite on an
+      //    earlier term. The limit is a soft target: if nothing can move, the
+      //    term is left a little heavy rather than dropping a required course.
+      let pushed = true
+      while (pushed) {
+        pushed = false
+        for (let gi = 0; gi < lastSlot; gi++) {
+          while (load[gi] > preferredCoursesPerTerm) {
+            const movable = toPlace
+              .filter((c) => slot.get(c) === gi && canPush(c, gi + 1))
+              .sort(
+                (a, b) =>
+                  (dependents.get(a)?.length ?? 0) -
+                    (dependents.get(b)?.length ?? 0) || a.localeCompare(b),
+              )
+            if (movable.length === 0) break
+            const c = movable[0]
+            slot.set(c, gi + 1)
+            load[gi]--
+            load[gi + 1]++
+            pushed = true
+          }
+        }
+      }
+
+      // Insert as one batch so the whole autofill is a single undo step.
+      addBlocks(
+        toPlace.map((code) => {
+          const { yearIdx, termIdx } = slotOf[slot.get(code)!]
+          return { yearId: years[yearIdx].id, termIdx, code }
+        }),
+      )
+      playSfx('autofillDone')
     } finally {
       setFilling(false)
     }
@@ -841,10 +871,34 @@ function ActionsSection({
 
   const btnClass =
     'flex items-center gap-1.5 rounded border border-line bg-surface-raised px-3 py-1.5 text-xs text-fg-muted hover:bg-surface hover:text-fg transition-colors text-left'
+  // Undo/Redo reuse btnClass but dim + lock when their stack is empty.
+  const disabledBtnClass = `${btnClass} disabled:opacity-40 disabled:hover:bg-surface-raised disabled:hover:text-fg-muted`
 
   return (
     <div className="flex flex-col gap-2">
       <h3 className="text-sm font-semibold text-fg">Actions</h3>
+      <div className="grid grid-cols-2 gap-1.5">
+        <button
+          type="button"
+          onClick={() => { undo(); playSfx('undo') }}
+          disabled={!canUndo}
+          title="Undo (Ctrl+Z)"
+          className={disabledBtnClass}
+        >
+          <UndoIcon className="w-3.5 h-3.5 text-accent" />
+          <span>Undo</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => { redo(); playSfx('redo') }}
+          disabled={!canRedo}
+          title="Redo (Ctrl+Shift+Z)"
+          className={disabledBtnClass}
+        >
+          <RedoIcon className="w-3.5 h-3.5 text-accent" />
+          <span>Redo</span>
+        </button>
+      </div>
       <div className="grid grid-cols-2 gap-1.5">
         <button type="button" onClick={() => { playSfx('click'); onClearAll() }} className={btnClass}>
           <TrashIcon className="w-3.5 h-3.5 text-accent" />
@@ -937,4 +991,3 @@ function resolveTermDrop(
   }
   return null
 }
-

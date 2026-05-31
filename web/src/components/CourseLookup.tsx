@@ -1,4 +1,11 @@
-import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react'
+import {
+  Fragment,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react'
 import {
   getCourseIndex,
   parseCourseChunk,
@@ -8,7 +15,7 @@ import {
 import { parseQuery, type ParsedQuery } from '../lib/courseQuery'
 import { ABCD_EASTER_ID, useEasterEggs } from '../store/easterEggs'
 import { playSfx } from '../lib/sfx'
-import { ExternalLinkIcon } from './icons'
+import { ChevronDownIcon, ExternalLinkIcon } from './icons'
 
 // Wrap every (case-insensitive) occurrence of `keyword` inside `text` with a
 // <mark> so the keyword filter's match site is visible in the title /
@@ -74,10 +81,23 @@ function describeFilter(p: Extract<ParsedQuery, { kind: 'filter' }>): string {
   return `${p.subject} courses below the ${lvl} level`
 }
 
-// Human-readable label for the course-level dropdown filter. `4` is the
-// open-ended 400+ bucket; 1–3 are the exact hundreds.
-function levelLabel(level: number): string {
+const COURSE_LEVELS = [1, 2, 3, 4] as const
+type CourseLevel = (typeof COURSE_LEVELS)[number]
+
+// Human-readable label for the course-level filter. `4` is the open-ended
+// 400+ bucket; 1–3 are the exact hundreds.
+function levelLabel(level: CourseLevel): string {
   return level === 4 ? '400+ level' : `${level}00 level`
+}
+
+function selectedLevelLabel(selected: Set<CourseLevel>): string {
+  const labels = COURSE_LEVELS.filter((level) => selected.has(level)).map(
+    levelLabel,
+  )
+  if (labels.length === 0) return 'no selected levels'
+  if (labels.length === 1) return labels[0]
+  if (labels.length === 2) return `${labels[0]} and ${labels[1]}`
+  return `${labels.slice(0, -1).join(', ')}, and ${labels.at(-1)}`
 }
 
 // Cap on keyword-only result sets. The corpus has ~9,450 courses; a generic
@@ -90,10 +110,13 @@ export function CourseLookup() {
   const [index, setIndex] = useState<Map<string, Chunk> | null>(null)
   const [query, setQuery] = useState('')
   const [keyword, setKeyword] = useState('')
-  // Course-level filter: null = all levels, 1/2/3 = exact 100/200/300,
-  // 4 = the open-ended 400+ bucket. Narrows every result branch alongside
-  // the code + keyword inputs (see `matchesLevel` in the search effect).
-  const [level, setLevel] = useState<number | null>(null)
+  // Course-level filter: all selected by default, with 1/2/3 = exact
+  // 100/200/300 and 4 = the open-ended 400+ bucket. Narrows every result
+  // branch alongside the code + keyword inputs (see `matchesLevel` in the
+  // search effect).
+  const [selectedLevels, setSelectedLevels] = useState<Set<CourseLevel>>(
+    () => new Set(COURSE_LEVELS),
+  )
   const [course, setCourse] = useState<ParsedCourse | null>(null)
   const [matches, setMatches] = useState<Chunk[]>([])
   const [matchHeading, setMatchHeading] = useState<string>('')
@@ -101,6 +124,8 @@ export function CourseLookup() {
   const [suggestions, setSuggestions] = useState<string[]>([])
   const [codeHelpOpen, setCodeHelpOpen] = useState(false)
   const [keywordHelpOpen, setKeywordHelpOpen] = useState(false)
+  const [levelMenuOpen, setLevelMenuOpen] = useState(false)
+  const levelMenuRef = useRef<HTMLDivElement | null>(null)
   // Course codes currently expanded inline in the subject/filter list.
   // Multi-value: opening a new block does not collapse previous ones; the
   // only way to collapse a block is to click it again. Reset to empty on
@@ -111,6 +136,29 @@ export function CourseLookup() {
   useEffect(() => {
     void getCourseIndex().then(setIndex)
   }, [])
+
+  useEffect(() => {
+    if (!levelMenuOpen) return
+
+    function onPointerDown(e: PointerEvent) {
+      const target = e.target
+      if (target instanceof Node && levelMenuRef.current?.contains(target)) {
+        return
+      }
+      setLevelMenuOpen(false)
+    }
+
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') setLevelMenuOpen(false)
+    }
+
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [levelMenuOpen])
 
   const codes = useMemo(
     () => (index ? Array.from(index.keys()).sort() : []),
@@ -148,7 +196,8 @@ export function CourseLookup() {
 
     const kw = keyword.trim().toLowerCase()
     const hasKw = kw.length > 0
-    const hasLevel = level !== null
+    const hasLevelFilter = selectedLevels.size !== COURSE_LEVELS.length
+    const levelSummary = selectedLevelLabel(selectedLevels)
     const matchesKw = (chunk: Chunk) => {
       if (!hasKw) return true
       return searchCorpus.get(chunk.id)?.includes(kw) ?? false
@@ -156,26 +205,26 @@ export function CourseLookup() {
     // Course-level predicate. Codes are "SUBJ 110" form, so the level is
     // the first digit of the number. `4` is the open-ended 400+ bucket.
     const matchesLevel = (chunk: Chunk) => {
-      if (level === null) return true
       const num = chunk.code?.split(' ')[1]
       if (!num) return false
       const d = Number(num[0])
       if (Number.isNaN(d)) return false
-      return level === 4 ? d >= 4 : d === level
+      const bucket = d >= 4 ? 4 : d
+      return selectedLevels.has(bucket as CourseLevel)
     }
     const keep = (chunk: Chunk) => matchesKw(chunk) && matchesLevel(chunk)
-    // Append the active level to a result heading. The keyword part is
+    // Append the active levels to a result heading. The keyword part is
     // already woven into each branch's base heading, so this only adds the
-    // level segment when one is selected.
-    const withLevel = (heading: string) =>
-      level === null ? heading : `${heading} · ${levelLabel(level)}`
+    // level segment when the default all-selected state has been narrowed.
+    const withLevels = (heading: string) =>
+      hasLevelFilter ? `${heading} · ${levelSummary}` : heading
 
     const parsed = parseQuery(query)
 
     if (parsed.kind === 'none') {
       // No code query. A keyword and/or level filter still scans the full
       // index; with neither, clear the view entirely.
-      if (!hasKw && !hasLevel) {
+      if (!hasKw && !hasLevelFilter) {
         setCourse(null)
         setMatches([])
         setMatchHeading('')
@@ -190,10 +239,10 @@ export function CourseLookup() {
       setCourse(null)
       setMatches(allMatches.slice(0, KEYWORD_RESULT_CAP))
       // Level-only browsing leads with the level; a keyword query keeps the
-      // keyword as the base and rides the shared withLevel suffix.
+      // keyword as the base and rides the shared withLevels suffix.
       const base = hasKw
-        ? withLevel(`Keyword "${keyword.trim()}"`)
-        : `${levelLabel(level!)} courses`
+        ? withLevels(`results containing "${keyword.trim()}"`)
+        : `${levelSummary} courses`
       setMatchHeading(
         allMatches.length > KEYWORD_RESULT_CAP
           ? `${base} (showing first ${KEYWORD_RESULT_CAP} of ${allMatches.length.toLocaleString()})`
@@ -203,8 +252,10 @@ export function CourseLookup() {
       if (allMatches.length === 0) {
         setError(
           hasKw
-            ? `No courses match keyword "${keyword.trim()}"${hasLevel ? ` at the ${levelLabel(level!)}` : ''}.`
-            : `No courses at the ${levelLabel(level!)}.`,
+            ? `No courses match keyword "${keyword.trim()}"${hasLevelFilter ? ` at ${levelSummary}` : ''}.`
+            : selectedLevels.size === 0
+              ? 'Select at least one level to browse courses.'
+              : `No courses at ${levelSummary}.`,
         )
       }
       return
@@ -227,7 +278,11 @@ export function CourseLookup() {
           setMatches([])
           setMatchHeading('')
           setSuggestions([])
-          setError(`${parsed.code} isn't a ${levelLabel(level!)} course.`)
+          setError(
+            selectedLevels.size === 0
+              ? 'Select at least one level to search courses.'
+              : `${parsed.code} isn't in ${levelSummary}.`,
+          )
           return
         }
         if (!matchesKw(chunk)) {
@@ -262,7 +317,7 @@ export function CourseLookup() {
         if (prefixChunks.length > 0) {
           setMatches(prefixChunks)
           setMatchHeading(
-            withLevel(
+            withLevels(
               hasKw
                 ? `${parsed.code} courses matching "${keyword.trim()}"`
                 : `${parsed.code} courses`,
@@ -271,14 +326,16 @@ export function CourseLookup() {
           setSuggestions([])
           return
         }
-        if (hasKw || hasLevel) {
+        if (hasKw || hasLevelFilter) {
           setMatches([])
           setMatchHeading('')
           setSuggestions([])
           setError(
             hasKw
-              ? `No ${parsed.code} courses mention "${keyword.trim()}"${hasLevel ? ` at the ${levelLabel(level!)}` : ''}.`
-              : `No ${parsed.code} courses at the ${levelLabel(level!)}.`,
+              ? `No ${parsed.code} courses mention "${keyword.trim()}"${hasLevelFilter ? ` at ${levelSummary}` : ''}.`
+              : selectedLevels.size === 0
+                ? 'Select at least one level to search courses.'
+                : `No ${parsed.code} courses at ${levelSummary}.`,
           )
           return
         }
@@ -356,21 +413,23 @@ export function CourseLookup() {
       : baseHeading
 
     setMatches(chunks)
-    setMatchHeading(withLevel(headingWithKw))
+    setMatchHeading(withLevels(headingWithKw))
     setCourse(null)
     setSuggestions([])
     if (chunks.length === 0) {
       setError(
         hasKw
-          ? `No ${baseHeading.toLowerCase()} mention "${keyword.trim()}"${hasLevel ? ` at the ${levelLabel(level!)}` : ''}.`
-          : hasLevel
-            ? `No ${baseHeading.toLowerCase()} at the ${levelLabel(level!)}.`
+          ? `No ${baseHeading.toLowerCase()} mention "${keyword.trim()}"${hasLevelFilter ? ` at ${levelSummary}` : ''}.`
+          : hasLevelFilter
+            ? selectedLevels.size === 0
+              ? 'Select at least one level to search courses.'
+              : `No ${baseHeading.toLowerCase()} at ${levelSummary}.`
             : parsed.kind === 'filter'
               ? `No ${describeFilter(parsed)}.`
               : `No courses found for subject "${parsed.subject}".`,
       )
     }
-  }, [query, keyword, level, index, codes, searchCorpus])
+  }, [query, keyword, selectedLevels, index, codes, searchCorpus])
 
   if (!index) {
     return <div className="p-6 text-fg-faint">Loading course index…</div>
@@ -380,12 +439,12 @@ export function CourseLookup() {
     <div className="flex flex-col h-screen p-6 gap-4 max-w-3xl mx-auto w-full min-h-0">
       <header>
         <h2 className="text-xl font-semibold">Course Finder</h2>
-        <p className="text-sm text-fg-muted">
-          {codes.length.toLocaleString()} courses · UBC Vancouver
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm text-fg-muted">
+          <p>{codes.length.toLocaleString()} courses · UBC Vancouver</p>
+        </div>
       </header>
 
-      <div className="flex gap-2">
+      <div className="flex flex-col gap-2 md:flex-row md:items-center">
         <div className="relative flex-1">
           <input
             autoFocus
@@ -427,20 +486,68 @@ export function CourseLookup() {
             ?
           </button>
         </div>
-        <select
-          aria-label="Filter by course level"
-          value={level === null ? '' : String(level)}
-          onChange={(e) =>
-            setLevel(e.target.value === '' ? null : Number(e.target.value))
-          }
-          className="shrink-0 rounded bg-input border border-line-soft text-fg px-3 py-2 text-sm cursor-pointer focus:outline-none focus:border-fg-faint"
+        <div
+          ref={levelMenuRef}
+          className="relative shrink-0"
         >
-          <option value="">All levels</option>
-          <option value="1">100</option>
-          <option value="2">200</option>
-          <option value="3">300</option>
-          <option value="4">400+</option>
-        </select>
+          <button
+            type="button"
+            aria-haspopup="true"
+            aria-expanded={levelMenuOpen}
+            aria-label="Filter by course level"
+            title="Filters"
+            onClick={() => {
+              setLevelMenuOpen((open) => !open)
+              playSfx(levelMenuOpen ? 'collapse' : 'expand')
+            }}
+            className={`flex w-24 items-center justify-between gap-2 rounded border bg-input px-3 py-2 text-sm text-fg transition-colors focus:outline-none ${
+              levelMenuOpen
+                ? 'border-fg-faint'
+                : 'border-line-soft hover:border-fg-faint'
+            }`}
+          >
+            <span>Filters</span>
+            <ChevronDownIcon
+              className={`h-4 w-4 text-fg-muted transition-transform ${
+                levelMenuOpen ? 'rotate-180' : ''
+              }`}
+            />
+          </button>
+          {levelMenuOpen && (
+            <fieldset className="absolute right-0 top-[calc(100%+0.25rem)] z-20 w-24 rounded border border-line-soft bg-surface p-2 shadow-lg">
+              <legend className="sr-only">Filter by course level</legend>
+              <div className="flex flex-col gap-1">
+                {COURSE_LEVELS.map((level) => {
+                  const checked = selectedLevels.has(level)
+                  return (
+                    <label
+                      key={level}
+                      className="inline-flex cursor-pointer select-none items-center gap-2 rounded px-2 py-1.5 text-sm text-fg hover:bg-surface-raised"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => {
+                          setSelectedLevels((prev) => {
+                            const next = new Set(prev)
+                            if (next.has(level)) next.delete(level)
+                            else next.add(level)
+                            return next
+                          })
+                          playSfx(checked ? 'toggleOff' : 'toggleOn')
+                        }}
+                        className="h-3.5 w-3.5 rounded border-line-soft bg-surface accent-accent"
+                      />
+                      <span className="tabular-nums">
+                        {level === 4 ? '400+' : `${level}00`}
+                      </span>
+                    </label>
+                  )
+                })}
+              </div>
+            </fieldset>
+          )}
+        </div>
       </div>
 
       {codeHelpOpen && (

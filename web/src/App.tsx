@@ -5,13 +5,23 @@ import { Chat } from './components/Chat'
 import { CourseLookup } from './components/CourseLookup'
 import { PrereqTree } from './components/PrereqTree'
 import { Planning } from './components/Planning'
+import { CalendarPage } from './components/CalendarPage'
 import { OtherPage } from './components/OtherPage'
 import { EasterEggToast } from './components/EasterEggToast'
-import { useConversations } from './store/conversations'
+import { useConversations, type View } from './store/conversations'
 import { useSettings } from './store/settings'
 import { DEFAULT_MODEL_SIZE, useLLMLoader } from './store/llmLoader'
 import { useMusicPlayer } from './lib/music'
 import { ROUTES, useRoute, replaceRoute } from './lib/router'
+
+const PAGE_TITLES: Record<View, string> = {
+  chat: 'Chat',
+  lookup: 'Course Finder',
+  prereq: 'Prerequisite Visualizer',
+  planning: 'Degree Planner',
+  calendar: 'Calendar',
+  other: 'Settings',
+}
 
 export default function App() {
   // Sync the active theme to <html data-theme="..."> so the CSS variable
@@ -21,6 +31,7 @@ export default function App() {
   const zoom = useSettings((s) => s.zoom)
   const startLoad = useLLMLoader((s) => s.startLoad)
   const route = useRoute()
+  const view = useConversations((s) => s.view)
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
   }, [theme])
@@ -48,6 +59,10 @@ export default function App() {
     // landing page has one stable address.
     if (route === '') replaceRoute(ROUTES.home)
   }, [route])
+  useEffect(() => {
+    const page = route === ROUTES.app ? PAGE_TITLES[view] : 'Home'
+    document.title = `Reodite - ${page}`
+  }, [route, view])
 
   // Two top-level pages: the app shell (sidebar + tool panels) on /app,
   // the standalone landing page everywhere else. Home deliberately renders
@@ -82,6 +97,9 @@ function Shell() {
         </div>
         <div className={view === 'planning' ? 'flex-1 min-h-0 flex flex-col' : 'hidden'}>
           <Planning />
+        </div>
+        <div className={view === 'calendar' ? 'flex-1 min-h-0 flex flex-col' : 'hidden'}>
+          <CalendarPage />
         </div>
         <div className={view === 'other' ? 'flex-1 min-h-0 flex flex-col' : 'hidden'}>
           <OtherPage />

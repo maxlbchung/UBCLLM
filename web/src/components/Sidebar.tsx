@@ -11,6 +11,7 @@ import { ROUTES, navigate } from '../lib/router'
 import { playSfx } from '../lib/sfx'
 import { APP_VERSION } from '../version'
 import {
+  CalendarIcon,
   ChatIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -35,6 +36,7 @@ const TOOLS: {
   { view: 'lookup', label: 'Course Finder', Icon: SearchIcon },
   { view: 'prereq', label: 'Prerequisite Visualizer', Icon: GraphIcon },
   { view: 'planning', label: 'Degree Planner', Icon: GradCapIcon },
+  { view: 'calendar', label: 'Calendar', Icon: CalendarIcon },
 ]
 
 const POPUP_WIDTH = 224 // px; matches Tailwind's w-56
@@ -237,7 +239,7 @@ export function Sidebar() {
         {/* Full-bleed footer divider, matching the expanded `-mx-3` rule. */}
         <div className="-mx-2 border-t border-line" />
 
-        {/* Other / settings */}
+        {/* Settings */}
         <button
           type="button"
           onClick={() => {
@@ -248,9 +250,9 @@ export function Sidebar() {
             'self-center h-8 w-8 flex items-center justify-center rounded ' +
             (view === 'other' ? 'bg-surface-raised' : 'hover:bg-surface')
           }
-          aria-label="Other"
+          aria-label="Settings"
           aria-current={view === 'other' ? 'page' : undefined}
-          title="Other"
+          title="Settings"
         >
           <SettingsIcon className="w-4 h-4 text-accent" />
         </button>
@@ -443,7 +445,7 @@ export function Sidebar() {
           }
         >
           <SettingsIcon className="w-4 h-4 text-accent" />
-          <span>Other</span>
+          <span>Settings</span>
         </button>
         {/* Footer line — version + copyright + license collapsed onto one
             row. PolyForm-NC is source-available but forbids commercial

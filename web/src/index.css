@@ -579,6 +579,82 @@ body {
   animation: home-rise 700ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+.home-scroll-layer {
+  bottom: calc(100dvh - var(--home-ui-bottom, 100dvh));
+  opacity: var(--home-ui-opacity, 1);
+  pointer-events: none;
+  visibility: var(--home-ui-visibility, visible);
+  transform: scale(var(--home-ui-scale, 1));
+  transform-origin: 50% 50%;
+  will-change: transform, opacity;
+}
+
+.home-scroll-layer > * {
+  pointer-events: var(--home-ui-pointer-events, auto);
+}
+
+.home-scroll-layer--hidden {
+  --home-ui-opacity: 0;
+  --home-ui-pointer-events: none;
+  --home-ui-scale: 0.72;
+  --home-ui-visibility: hidden;
+}
+
+.home-jump-nav {
+  opacity: var(--home-jump-opacity, 0);
+  pointer-events: var(--home-jump-pointer-events, none);
+  transition: opacity 180ms ease;
+}
+
+.home-jump-link {
+  --home-jump-link-active: 0;
+  color: color-mix(
+    in srgb,
+    var(--fg-faint),
+    var(--accent) calc(var(--home-jump-link-active) * 55%)
+  );
+  opacity: calc(0.42 + var(--home-jump-link-active) * 0.58);
+  transform: scale(calc(1 + var(--home-jump-link-active) * 0.18));
+  transform-origin: left center;
+  transition:
+    color 160ms ease,
+    opacity 160ms ease,
+    transform 160ms ease;
+}
+
+.home-jump-link:hover {
+  color: var(--accent);
+  opacity: 1;
+}
+
+.home-jump-link--intro {
+  --home-jump-link-active: var(--home-jump-intro-active, 1);
+}
+
+.home-jump-link--tools {
+  --home-jump-link-active: var(--home-jump-tools-active, 0);
+}
+
+.home-jump-link--about {
+  --home-jump-link-active: var(--home-jump-about-active, 0);
+}
+
+/* Tool-wheel cards (Home page). Their orbit position (transform), depth
+   (opacity), and recession (filter blur) are all set inline per-frame from the
+   wheel's active index — here we just declare the easing so each notch of
+   rotation tweens smoothly. Border/bg/shadow get a snappier ramp for hover
+   feedback on the front card. */
+.home-wheel-card {
+  transition:
+    transform 600ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 600ms ease,
+    filter 600ms ease,
+    border-color 200ms ease,
+    background-color 200ms ease,
+    box-shadow 200ms ease;
+  will-change: transform, opacity;
+}
+
 /* Slow drift for the hero's ambient glow so the background feels alive
    without pulling focus. */
 @keyframes home-glow-drift {
@@ -600,11 +676,20 @@ body {
 
 /* ── Neon wireframe landscape (Home hero background) ──────────────────────
    A synthwave perspective grid floor that recedes to a glowing horizon and
-   scrolls toward the viewer. It recolors per theme off --accent, so the
+   streams toward the viewer. It recolors per theme off --accent, so the
    "neon" follows whatever palette is active (blue / brass / green / light).
-   The scroll is a transform animation on an inner plane — NOT background-
-   position — so it runs on the compositor and never blocks the main thread
-   (which is busy driving WebGPU inference). */
+
+   The whole layer is position:fixed (set in Home.tsx) so it stays locked to
+   the viewport — the scene holds still on screen while the page scrolls past
+   it. It has no idle animation: the floor only moves when you scroll, via
+   .home-landscape-streamer translateY(var(--scroll-shift)) set from a scroll
+   listener in Home.tsx. That transform is compositor-only, so it never blocks
+   the main thread (which is busy driving WebGPU inference).
+
+   The horizon (sun + line + floor origin) is pinned to var(--horizon-y) — the
+   pixel midpoint of the gap between the hero description and the CTA, measured
+   in Home.tsx. The 60% fallback matches the pre-measurement default so there's
+   no flash before the layout effect runs. */
 .home-landscape {
   --grid-line: var(--accent);
   --grid-glow: var(--accent-hover);
@@ -615,7 +700,7 @@ body {
 .home-landscape-sun {
   position: absolute;
   left: 50%;
-  top: 60%;
+  top: var(--horizon-y, 60%);
   width: 42rem;
   height: 42rem;
   transform: translate(-50%, -50%);
@@ -627,7 +712,7 @@ body {
   position: absolute;
   left: 0;
   right: 0;
-  top: 60%;
+  top: var(--horizon-y, 60%);
   height: 2px;
   background: var(--grid-glow);
   opacity: 0.65;
@@ -636,57 +721,56 @@ body {
     0 0 48px 8px var(--accent-soft);
 }
 
-/* Perspective viewport for the floor — only the bottom of the hero. The top
-   fades out so the grid lines dissolve into the horizon glow rather than
-   ending on a hard edge. */
+/* Perspective viewport for the floor — from the horizon down. The top fades
+   out so the grid lines dissolve into the horizon glow rather than ending on a
+   hard edge. */
 .home-landscape-floor {
   position: absolute;
   left: 0;
   right: 0;
-  top: 60%;
+  top: var(--horizon-y, 60%);
   bottom: 0;
-  perspective: 280px;
+  perspective: 400px;
   perspective-origin: 50% 0%;
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 24%);
-  mask-image: linear-gradient(to bottom, transparent 0%, #000 24%);
 }
 
 /* The plane is tilted away from the viewer: its far (top) edge meets the
    horizon, its near (bottom) edge tips up toward the viewer. */
 .home-landscape-plane {
   position: absolute;
-  inset: 0 -60% 0 -60%;
-  transform: rotateX(72deg);
+  inset: 0 -80% -160% -80%;
+  transform: rotateX(76deg);
   transform-origin: 50% 0%;
+}
+
+/* Scroll-driven layer between the tilted plane and the grids: carries the
+   page-scroll offset as a composited translateY so it stacks on top of the
+   grids' idle drift without either fighting the other for the transform
+   property. --scroll-shift is updated per-frame from Home.tsx. */
+.home-landscape-streamer {
+  position: absolute;
+  inset: 0;
 }
 
 .home-landscape-grid {
   position: absolute;
-  inset: -64px 0 -40% 0;
+  /* -64px top overdraw: the scroll push translates the grid down by up to one
+     tile (64px), so paint an extra tile above the horizon to keep the grid
+     reaching it at peak shift. (No idle animation — motion is scroll-only.) */
+  inset: 0 0 -120% 0;
   background-image:
     linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
     linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
+  background-position:
+    0 var(--scroll-shift, 0px),
+    0 var(--scroll-shift, 0px);
   background-size: 64px 64px;
-  will-change: transform;
-  animation: home-grid-scroll 2.6s linear infinite;
 }
 
 /* A blurred copy stacked behind the sharp grid → the neon bloom. */
 .home-landscape-grid--glow {
   filter: blur(4px);
   opacity: 0.5;
-}
-
-/* Scroll exactly one tile so the loop is seamless (the pattern repeats every
-   64px, so translateY(64px) is visually identical to translateY(0)). */
-@keyframes home-grid-scroll {
-  from {
-    transform: translateY(0);
-  }
-
-  to {
-    transform: translateY(64px);
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -698,7 +782,7 @@ body {
     animation: none;
   }
 
-  .home-landscape-grid {
-    animation: none;
+  .home-wheel-card {
+    transition: none;
   }
 }

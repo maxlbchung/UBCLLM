@@ -34,6 +34,19 @@ export interface Year {
 
 export type PlannerSidebarTab = 'preferences' | 'progress' | 'courses'
 
+// The undoable slice of the plan — everything an Action button touches.
+// Captured by reference (these fields are always replaced immutably) so
+// snapshots are cheap and safe to keep on the history stacks.
+export interface PlanSnapshot {
+  years: Year[]
+  // Captured alongside `years` because setTermsPerYear changes both; without
+  // it an undo would restore the old term layout but leave the count field
+  // out of sync.
+  termsPerYear: number
+  ignoredBlocks: string[]
+  checkedRequirements: string[]
+}
+
 interface PlannerState {
   years: Year[]
   // Single global term count applied to every year column. Lives in the
@@ -54,11 +67,19 @@ interface PlannerState {
   // courses they won't place on the board). Keyed per program so switching
   // majors doesn't carry checks across. See toggleRequirement.
   checkedRequirements: string[]
+  // Undo / redo history of the plan slice. Session-only — excluded from
+  // persistence via `partialize`, so a reload starts with empty history.
+  past: PlanSnapshot[]
+  future: PlanSnapshot[]
 
   setYearCount: (n: number) => void
   setTermsPerYear: (n: number) => void
   setPreferredCoursesPerTerm: (n: number) => void
   addBlock: (yearId: string, termIdx: number, code: string) => void
+  // Batch insert (used by autofill) so the whole fill is a single undo step.
+  addBlocks: (
+    items: { yearId: string; termIdx: number; code: string }[],
+  ) => void
   moveBlock: (
     blockId: string,
     toYearId: string,
@@ -75,6 +96,10 @@ interface PlannerState {
   ) => void
   setSidebarTab: (tab: PlannerSidebarTab) => void
   toggleSidebar: () => void
+  // Step the plan back / forward through the history stacks. No-ops when the
+  // respective stack is empty.
+  undo: () => void
+  redo: () => void
 }
 
 export const MIN_YEARS = 3
@@ -130,6 +155,33 @@ function removeBlockEverywhere(years: Year[], blockId: string): Year[] {
   }))
 }
 
+// Cap the undo depth so a long session can't grow the history unbounded.
+const MAX_HISTORY = 100
+
+function snapshot(s: PlannerState): PlanSnapshot {
+  return {
+    years: s.years,
+    termsPerYear: s.termsPerYear,
+    ignoredBlocks: s.ignoredBlocks,
+    checkedRequirements: s.checkedRequirements,
+  }
+}
+
+// Turn a plain state patch into a *tracked* one: pushes the pre-change
+// snapshot onto the undo stack and clears the redo stack. Pass `null` for a
+// no-op so no spurious checkpoint is recorded.
+function commit(
+  s: PlannerState,
+  patch: Partial<PlannerState> | null,
+): PlannerState | Partial<PlannerState> {
+  if (!patch) return s
+  return {
+    ...patch,
+    past: [...s.past, snapshot(s)].slice(-MAX_HISTORY),
+    future: [],
+  }
+}
+
 export const usePlanner = create<PlannerState>()(
   persist(
     (set) => ({
@@ -143,6 +195,8 @@ export const usePlanner = create<PlannerState>()(
       sidebarTab: 'preferences',
       ignoredBlocks: [],
       checkedRequirements: [],
+      past: [],
+      future: [],
 
       setYearCount: (n) =>
         set((s) => {
@@ -153,12 +207,12 @@ export const usePlanner = create<PlannerState>()(
             const extra = Array.from({ length: target - current }, (_, i) =>
               buildYear(current + i, s.termsPerYear),
             )
-            return { years: [...s.years, ...extra] }
+            return commit(s, { years: [...s.years, ...extra] })
           }
           // Shrinking: trim from the tail. Blocks in removed years are
           // dropped silently — the planner shows a confirm before calling
           // this, so by the time we get here the user has agreed.
-          return { years: s.years.slice(0, target) }
+          return commit(s, { years: s.years.slice(0, target) })
         }),
 
       setTermsPerYear: (n) =>
@@ -179,7 +233,7 @@ export const usePlanner = create<PlannerState>()(
             // time we land here the user has agreed.
             return { ...y, terms: y.terms.slice(0, target) }
           })
-          return { years, termsPerYear: target }
+          return commit(s, { years, termsPerYear: target })
         }),
 
       setPreferredCoursesPerTerm: (n) =>
@@ -201,7 +255,27 @@ export const usePlanner = create<PlannerState>()(
             )
             return { ...y, terms }
           })
-          return { years }
+          return commit(s, { years })
+        }),
+
+      addBlocks: (items) =>
+        set((s) => {
+          if (items.length === 0) return s
+          // Work on a deep-enough copy (years → terms → blocks) and insert
+          // every item, so the whole batch lands as one tracked change.
+          const next = s.years.map((y) => ({
+            ...y,
+            terms: y.terms.map((t) => ({ ...t, blocks: [...t.blocks] })),
+          }))
+          let changed = false
+          for (const { yearId, termIdx, code } of items) {
+            const y = next.find((yy) => yy.id === yearId)
+            const t = y?.terms[termIdx]
+            if (!t) continue
+            t.blocks.push({ id: newId(), code })
+            changed = true
+          }
+          return commit(s, changed ? { years: next } : null)
         }),
 
       moveBlock: (blockId, toYearId, toTermIdx, toPos) =>
@@ -258,37 +332,45 @@ export const usePlanner = create<PlannerState>()(
             })
             return { ...y, terms }
           })
-          return { years: next }
+          return commit(s, { years: next })
         }),
 
       removeBlock: (blockId) =>
-        set((s) => ({
-          years: removeBlockEverywhere(s.years, blockId),
-          ignoredBlocks: s.ignoredBlocks.filter((id) => id !== blockId),
-        })),
+        set((s) =>
+          commit(s, {
+            years: removeBlockEverywhere(s.years, blockId),
+            ignoredBlocks: s.ignoredBlocks.filter((id) => id !== blockId),
+          }),
+        ),
 
       clearAllBlocks: () =>
-        set((s) => ({
-          years: s.years.map((y) => ({
-            ...y,
-            terms: y.terms.map((t) => ({ ...t, blocks: [] })),
-          })),
-          ignoredBlocks: [],
-        })),
+        set((s) =>
+          commit(s, {
+            years: s.years.map((y) => ({
+              ...y,
+              terms: y.terms.map((t) => ({ ...t, blocks: [] })),
+            })),
+            ignoredBlocks: [],
+          }),
+        ),
 
       toggleIgnoreBlock: (blockId) =>
-        set((s) => ({
-          ignoredBlocks: s.ignoredBlocks.includes(blockId)
-            ? s.ignoredBlocks.filter((id) => id !== blockId)
-            : [...s.ignoredBlocks, blockId],
-        })),
+        set((s) =>
+          commit(s, {
+            ignoredBlocks: s.ignoredBlocks.includes(blockId)
+              ? s.ignoredBlocks.filter((id) => id !== blockId)
+              : [...s.ignoredBlocks, blockId],
+          }),
+        ),
 
       toggleRequirement: (key) =>
-        set((s) => ({
-          checkedRequirements: s.checkedRequirements.includes(key)
-            ? s.checkedRequirements.filter((k) => k !== key)
-            : [...s.checkedRequirements, key],
-        })),
+        set((s) =>
+          commit(s, {
+            checkedRequirements: s.checkedRequirements.includes(key)
+              ? s.checkedRequirements.filter((k) => k !== key)
+              : [...s.checkedRequirements, key],
+          }),
+        ),
 
       setProgram: (level, value) =>
         set(() => ({ [level]: value }) as Partial<PlannerState>),
@@ -297,11 +379,48 @@ export const usePlanner = create<PlannerState>()(
 
       toggleSidebar: () =>
         set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
+
+      undo: () =>
+        set((s) => {
+          if (s.past.length === 0) return s
+          const prev = s.past[s.past.length - 1]
+          return {
+            ...prev,
+            past: s.past.slice(0, -1),
+            future: [snapshot(s), ...s.future].slice(0, MAX_HISTORY),
+          }
+        }),
+
+      redo: () =>
+        set((s) => {
+          if (s.future.length === 0) return s
+          const nxt = s.future[0]
+          return {
+            ...nxt,
+            past: [...s.past, snapshot(s)].slice(-MAX_HISTORY),
+            future: s.future.slice(1),
+          }
+        }),
     }),
     {
       name: 'ubcllm-planner',
       storage: createJSONStorage(() => localStorage),
       version: 1,
+      // The history stacks (past/future) are intentionally omitted so undo
+      // state never bloats localStorage and a reload starts with a clean
+      // history. Everything else persists exactly as before.
+      partialize: (s) => ({
+        years: s.years,
+        termsPerYear: s.termsPerYear,
+        preferredCoursesPerTerm: s.preferredCoursesPerTerm,
+        faculty: s.faculty,
+        major: s.major,
+        minor: s.minor,
+        sidebarCollapsed: s.sidebarCollapsed,
+        sidebarTab: s.sidebarTab,
+        ignoredBlocks: s.ignoredBlocks,
+        checkedRequirements: s.checkedRequirements,
+      }),
     },
   ),
 )

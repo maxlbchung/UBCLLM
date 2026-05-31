@@ -64,7 +64,7 @@ export function OtherPage() {
     <div className="h-screen min-h-0 overflow-y-auto">
     <div className="flex flex-col p-6 gap-8 max-w-3xl mx-auto w-full">
       <header>
-        <h2 className="text-xl font-semibold">Other</h2>
+        <h2 className="text-xl font-semibold">Settings</h2>
       </header>
 
       {/* Audio + Music sit side-by-side: both are sound-related so they
@@ -288,7 +288,7 @@ export function OtherPage() {
           About
         </h3>
         <p className="text-xs text-fg-muted leading-relaxed">
-          Created summer of 2026 by Max Libo Chung using Claude Opus 4.7<br></br>
+          Created summer of 2026 by Max Libo Chung using Claude and GPT<br></br>
           Qwen3.5 2B · WebGPU · MiniLM embeddings · UBC Vancouver calendar
           2026/27.
         </p>

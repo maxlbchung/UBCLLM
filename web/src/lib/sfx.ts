@@ -207,6 +207,10 @@ const PRESETS: Record<string, Tone[]> = {
     { freq: 660, type: 'sine', duration: 0.05, amp: 0.45, delay: 0.05 },
     { freq: 440, type: 'sine', duration: 0.09, amp: 0.4, delay: 0.1 },
   ],
+  // Planner: undo — short descending blip, the plan settling one step back.
+  undo: [{ freq: [560, 360], type: 'triangle', duration: 0.09, amp: 0.4 }],
+  // Planner: redo — ascending mirror of undo, one step forward again.
+  redo: [{ freq: [360, 560], type: 'triangle', duration: 0.09, amp: 0.4 }],
 }
 
 // Hard ceiling on output gain. Each preset's per-tone `amp` multiplies

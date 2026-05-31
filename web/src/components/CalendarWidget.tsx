@@ -29,18 +29,11 @@ const CATEGORY_DOT: Record<CalendarCategory, string> = {
 const WEEKDAYS_1 = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 const WEEKDAYS_3 = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-// How many items a day cell shows before collapsing the rest behind a
-// "+N more" toggle. Keeps a busy day from blowing out its week's row
-// height until the user asks to see everything.
-const MAX_VISIBLE_PER_DAY = 3
-
 export function CalendarWidget() {
   const [items, setItems] = useState<CalendarItem[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [cursor, setCursor] = useState(() => startOfMonth(new Date()))
   const [pickerOpen, setPickerOpen] = useState(false)
-  // ISO dates whose "+N more" overflow is currently expanded.
-  const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
   const pickerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -100,16 +93,6 @@ export function CalendarWidget() {
     setPickerOpen(false)
   }
 
-  function toggleExpand(key: string) {
-    playSfx('tab')
-    setExpanded((prev) => {
-      const next = new Set(prev)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
-      return next
-    })
-  }
-
   // ±6 months around the visible month — total 13 entries. Reused each
   // render; cheap enough to skip memoization (13 Date allocations).
   const pickerMonths: Date[] = []
@@ -137,14 +120,9 @@ export function CalendarWidget() {
   }, [pickerOpen])
 
   return (
-    <section className="rounded-lg border border-line bg-surface-soft p-5">
-      <header className="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <div className="flex flex-wrap items-baseline gap-2">
-          <h2 className="text-sm font-semibold text-fg">Upcoming at UBC</h2>
-          <span className="text-xs text-fg-faint">Course deadlines, holidays, and more!</span>
-        </div>
-
-        {items !== null && error === null && (
+    <section className="flex h-full min-h-0 flex-col">
+      {items !== null && error === null && (
+        <header className="flex items-center justify-center gap-2 mb-3 shrink-0">
           <div className="flex items-center gap-2">
             <button
               onClick={() => shiftMonth(-1)}
@@ -233,8 +211,8 @@ export function CalendarWidget() {
               </button>
             )}
           </div>
-        )}
-      </header>
+        </header>
+      )}
 
       {items === null && error === null && (
         <p className="text-xs text-fg-faint">Loading dates…</p>
@@ -243,11 +221,13 @@ export function CalendarWidget() {
         <p className="text-xs text-danger-fg">Could not load calendar — {error}</p>
       )}
 
-      {/* --- Full month grid: items listed under each day --- */}
+      {/* --- Full month grid: items listed under each day. flex-1 so it
+          fills the tab height; the cell grid below uses grid-rows-6 to
+          divide that height evenly across the six week rows. --- */}
       {items !== null && error === null && (
-        <div className="rounded-lg border border-line overflow-hidden">
+        <div className="flex-1 min-h-0 flex flex-col rounded-lg border border-line overflow-hidden">
             {/* Weekday header */}
-            <div className="grid grid-cols-7 bg-surface-soft border-b border-line">
+            <div className="grid grid-cols-7 bg-surface-soft border-b border-line shrink-0">
               {WEEKDAYS_3.map((w, i) => (
                 <div
                   key={`${w}-${i}`}
@@ -259,24 +239,25 @@ export function CalendarWidget() {
               ))}
             </div>
 
-            {/* Day cells — gap-px over a bg-line parent draws the gridlines. */}
-            <div className="grid grid-cols-7 gap-px bg-line">
+            {/* Day cells — gap-px over a bg-line parent draws the gridlines.
+                auto-rows-fr splits the grid height evenly across the six week
+                rows so the whole calendar always scales to fit the viewport —
+                no whole-grid scrollbar. Each cell shows its full item list and
+                scrolls inside itself only when that day's events don't fit;
+                the tight cell padding + compact chips below keep as much of
+                the cell as possible available for text before that happens. */}
+            <div className="grid grid-cols-7 auto-rows-fr gap-px bg-line flex-1 min-h-0">
               {monthGrid.flat().map((cell) => {
                 const key = toISODate(cell)
                 const inMonth = cell.getMonth() === cursor.getMonth()
                 const isToday = isSameDay(cell, today)
                 const dayItems = itemsByDay.get(key) ?? []
-                const isExp = expanded.has(key)
-                const visible = isExp
-                  ? dayItems
-                  : dayItems.slice(0, MAX_VISIBLE_PER_DAY)
-                const overflow = dayItems.length - visible.length
                 return (
                   <div
                     key={key}
-                    className="min-h-[4.5rem] md:min-h-[6.5rem] p-1.5 flex flex-col gap-1 bg-surface"
+                    className="min-h-0 min-w-0 p-1 flex flex-col gap-0.5 bg-surface overflow-hidden"
                   >
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 shrink-0">
                       <span
                         aria-label={formatFullDate(cell)}
                         className={
@@ -288,30 +269,30 @@ export function CalendarWidget() {
                       >
                         {cell.getDate()}
                       </span>
+                      {/* One colored dot per item, listed on the date line —
+                          a glanceable category summary. The titles below
+                          render as plain text (their dots moved up here). */}
+                      {dayItems.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-0.5 min-w-0">
+                          {dayItems.map((it) => (
+                            <span
+                              key={it.id}
+                              aria-hidden
+                              title={it.title}
+                              className={
+                                `h-1.5 w-1.5 rounded-full shrink-0 ${CATEGORY_DOT[it.category]} ` +
+                                (inMonth ? '' : 'opacity-50')
+                              }
+                            />
+                          ))}
+                        </div>
+                      )}
                     </div>
 
-                    <div className="flex flex-col gap-0.5 min-w-0">
-                      {visible.map((it) => (
+                    <div className="flex flex-1 min-h-0 flex-col gap-0.5 min-w-0 overflow-y-auto">
+                      {dayItems.map((it) => (
                         <DayChip key={it.id} item={it} dim={!inMonth} />
                       ))}
-                      {overflow > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => toggleExpand(key)}
-                          className="text-left text-[0.625rem] text-fg-faint hover:text-fg-muted px-1 py-0.5 rounded hover:bg-surface-raised transition-colors"
-                        >
-                          {`+${overflow} more`}
-                        </button>
-                      )}
-                      {isExp && dayItems.length > MAX_VISIBLE_PER_DAY && (
-                        <button
-                          type="button"
-                          onClick={() => toggleExpand(key)}
-                          className="text-left text-[0.625rem] text-fg-faint hover:text-fg-muted px-1 py-0.5 rounded hover:bg-surface-raised transition-colors"
-                        >
-                          Show less
-                        </button>
-                      )}
                     </div>
                   </div>
                 )
@@ -323,19 +304,17 @@ export function CalendarWidget() {
   )
 }
 
-// A single item rendered inside a day cell. Dot + truncated title; links
-// out to the source page when there's a URL. `dim` softens spillover-day
-// items so the current month still reads as the focus.
+// A single item rendered inside a day cell — just the title text (its
+// category dot now lives up on the date line). Links out to the source page
+// when there's a URL. `dim` softens spillover-day items so the current month
+// still reads as the focus. Kept padding-free vertically so more titles fit
+// in the cell before it needs to scroll.
 function DayChip({ item, dim }: { item: CalendarItem; dim: boolean }) {
   const titleAttr = item.description
     ? `${item.title} — ${item.description}`
     : item.title
   const inner = (
-    <span className="flex items-start gap-1 rounded px-1 py-0.5 min-w-0">
-      <span
-        aria-hidden
-        className={`mt-1 h-1.5 w-1.5 rounded-full shrink-0 ${CATEGORY_DOT[item.category]}`}
-      />
+    <span className="flex items-start px-1 min-w-0">
       <span
         className={
           'min-w-0 break-words text-[0.6875rem] leading-tight ' +

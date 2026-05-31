@@ -1,14 +1,21 @@
 import {
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type ComponentType,
   type WheelEvent,
 } from 'react'
 import { useConversations } from '../store/conversations'
 import { ROUTES, navigate } from '../lib/router'
 import { playSfx } from '../lib/sfx'
+import {
+  FALLBACK_HOME_BACKGROUND_SCENE,
+  loadHomeBackgroundScene,
+  type HomeBackgroundBox,
+} from '../lib/homeBackground'
 import {
   CalendarIcon,
   ChatIcon,
@@ -21,11 +28,11 @@ import {
   type IconProps,
 } from './icons'
 
-// Landing page. The model auto-loads on startup (App.tsx fires
-// useLLMLoader.startLoad unconditionally), so this page is purely a front
-// door: a calm full-screen welcome, then a spinning pseudo-3D "tool wheel" in
-// the next section that selects each destination (Ask AI + the companion tools
-// + the campus calendar).
+// Landing page. Qwen loading is intentionally deferred until the /app shell
+// opens, so this page can keep the home background isolated from WebGPU model
+// setup work. The page is a calm full-screen welcome, then a spinning pseudo-3D
+// "tool wheel" in the next section that selects each destination (Ask AI + the
+// companion tools + the campus calendar).
 //
 // Layout intent: the hero is its own full-viewport fold (min-h-screen), so the
 // tool wheel lives in the *next* section and starts just past the fold — out
@@ -103,14 +110,207 @@ const SCROLL_CUE_CLASS =
   'group flex flex-col items-center gap-1.5 text-fg-faint transition-colors hover:text-accent'
 
 const DEAD_SCROLLSPACE_CLASS = 'min-h-[60vh]'
+const CUBE_RENDER_MARGIN_TILES = 2
+const INITIAL_CUBE_TILE_RANGE = { min: -14, max: 10 }
+const HALF_CYLINDER_SHELL_MAX_HEIGHT_PX = 248
+const HALF_CYLINDER_SHELL_MAX_ARC_ANGLE_DEG = 90
 
 const SOCIAL_LINKS = [
   { label: 'GitHub', href: 'https://github.com/maxlbchung' },
+  { label: 'Discussions', href: 'https://github.com/maxlbchung/UBCLLM/discussions' },
   { label: 'YouTube', href: 'https://www.youtube.com/@libodev' },
   { label: 'Instagram', href: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ&pp=ygUIcmlja3JvbGw%3D' },
   { label: 'LinkedIn', href: 'https://www.linkedin.com/in/max-li-bo-chung/' },
   { label: 'Email', href: 'mailto:reodite@libo.dev' },
 ]
+
+function getPyramidFaceVars(
+  widthPx: number,
+  depthPx: number,
+  heightPx: number,
+) {
+  const halfWidth = Math.max(1, widthPx / 2)
+  const halfDepth = Math.max(1, depthPx / 2)
+  const frontSlant = Math.hypot(heightPx, halfDepth)
+  const sideSlant = Math.hypot(heightPx, halfWidth)
+  const frontAngle = -(Math.atan2(heightPx, halfDepth) * 180) / Math.PI
+  const sideAngle = (Math.atan2(heightPx, halfWidth) * 180) / Math.PI
+
+  return {
+    '--pyramid-front-angle': `${frontAngle.toFixed(4)}deg`,
+    '--pyramid-front-slant': `${frontSlant.toFixed(3)}px`,
+    '--pyramid-side-left-angle': `${(-sideAngle).toFixed(4)}deg`,
+    '--pyramid-side-right-angle': `${sideAngle.toFixed(4)}deg`,
+    '--pyramid-side-slant': `${sideSlant.toFixed(3)}px`,
+  } as CSSProperties
+}
+
+function getHalfCylinderShellVars(
+  baseArcAngleDeg: number,
+  heightPx: number,
+) {
+  const t = Math.max(
+    0,
+    Math.min(1, heightPx / HALF_CYLINDER_SHELL_MAX_HEIGHT_PX),
+  )
+  const easedT = t * t * (3 - 2 * t)
+  const arcAngleDeg =
+    baseArcAngleDeg +
+    (HALF_CYLINDER_SHELL_MAX_ARC_ANGLE_DEG - baseArcAngleDeg) * easedT
+  const angleRad = (arcAngleDeg * Math.PI) / 180
+  // The shell pivots from the interior diameter edge, but its free edge
+  // should meet the cap at arcAngleDeg up from the exterior diameter edge.
+  const shellWidth = Math.hypot(1 + Math.cos(angleRad), Math.sin(angleRad))
+  const shellRotationDeg = 180 - arcAngleDeg / 2
+  const shellLineWidthRatio = 1 / Math.max(0.001, Math.cos(angleRad / 2))
+
+  return {
+    '--half-cylinder-shell-left-rotation': `${-shellRotationDeg.toFixed(4)}deg`,
+    '--half-cylinder-shell-right-rotation': `${shellRotationDeg.toFixed(4)}deg`,
+    '--half-cylinder-shell-line-width-ratio':
+      shellLineWidthRatio.toFixed(8),
+    '--half-cylinder-shell-width-ratio': shellWidth.toFixed(8),
+  } as CSSProperties
+}
+
+function GridBox({
+  box,
+  halfCylinderShellArcAngleDeg,
+  tileSize,
+}: {
+  box: HomeBackgroundBox
+  halfCylinderShellArcAngleDeg: number
+  tileSize: number
+}) {
+  const kind = box.kind === 'box' ? 'cube' : box.kind ?? 'cube'
+  const widthTiles = box.widthTiles ?? 1
+  const depthTiles = box.depthTiles ?? 1
+  const widthPx = widthTiles * tileSize
+  const depthPx = depthTiles * tileSize
+  const halfCylinderHeightPx = widthPx / 2
+  const heightPx =
+    kind === 'halfCylinder' ? halfCylinderHeightPx : box.heightPx ?? tileSize
+  const hat = kind === 'cube' ? box.hat : undefined
+  const hatHeightPx =
+    hat?.kind === 'halfCylinder'
+      ? halfCylinderHeightPx
+      : hat?.heightPx ?? 0
+  const opacity = box.opacity ?? 1
+  const sideFaceClass =
+    box.xTiles <= 0
+      ? 'home-grid-box__face--right'
+      : 'home-grid-box__face--left'
+  const pyramidSide = box.xTiles <= 0 ? 'right' : 'left'
+  const halfCylinderSideClass =
+    box.xTiles <= 0
+      ? 'home-grid-box__half-cylinder--left'
+      : 'home-grid-box__half-cylinder--right'
+  const renderFaces = (
+    renderKind: 'cube' | 'pyramid' | 'tent' | 'halfCylinder',
+    includeHalfShell = true,
+  ) => {
+    if (renderKind === 'pyramid') {
+      return (
+        <>
+          <span className="home-grid-box__pyramid-anchor home-grid-box__pyramid-anchor--front">
+            <span className="home-grid-box__pyramid-face home-grid-box__pyramid-face--front" />
+          </span>
+          <span
+            className={`home-grid-box__pyramid-anchor home-grid-box__pyramid-anchor--${pyramidSide}`}
+          >
+            <span
+              className={`home-grid-box__pyramid-face home-grid-box__pyramid-face--${pyramidSide}`}
+            />
+          </span>
+        </>
+      )
+    }
+    if (renderKind === 'tent') {
+      return (
+        <>
+          <span className="home-grid-box__triangle home-grid-box__triangle--front" />
+          <span
+            className={`home-grid-box__tent-plane-anchor home-grid-box__tent-plane-anchor--${pyramidSide}`}
+          >
+            <span
+              className={`home-grid-box__tent-plane home-grid-box__tent-plane--${pyramidSide}`}
+            />
+          </span>
+        </>
+      )
+    }
+    if (renderKind === 'halfCylinder') {
+      return (
+        <>
+          <span
+            className={`home-grid-box__half-cap home-grid-box__half-cap--front ${halfCylinderSideClass}`}
+          />
+          <span
+            className={`home-grid-box__half-cap home-grid-box__half-cap--back ${halfCylinderSideClass}`}
+          />
+          {includeHalfShell && (
+            <span
+              className={`home-grid-box__half-shell-anchor ${halfCylinderSideClass}`}
+            >
+              <span
+                className={`home-grid-box__half-shell ${halfCylinderSideClass}`}
+              />
+            </span>
+          )}
+        </>
+      )
+    }
+    return (
+      <>
+        <span className="home-grid-box__face home-grid-box__face--top" />
+        <span className="home-grid-box__face home-grid-box__face--front" />
+        <span className={`home-grid-box__face ${sideFaceClass}`} />
+      </>
+    )
+  }
+
+  const boxStyle = {
+    '--box-x': `${box.xTiles * tileSize}px`,
+    '--box-y': `${box.yTiles * tileSize}px`,
+    '--box-w': `${widthPx}px`,
+    '--box-d': `${depthPx}px`,
+    '--box-h': `${heightPx}px`,
+    '--base-h': `${heightPx}px`,
+    '--hat-h': `${hatHeightPx}px`,
+    '--ground-opacity': opacity,
+    ...getPyramidFaceVars(widthPx, depthPx, heightPx),
+    ...(kind === 'halfCylinder'
+      ? getHalfCylinderShellVars(halfCylinderShellArcAngleDeg, 0)
+      : {}),
+  } as CSSProperties
+  const boxNode = (
+    <div
+      className={`home-grid-box home-grid-box--${kind}${hat ? ' home-grid-box--with-hat' : ''}`}
+      data-ground-fade-y={box.yTiles * tileSize}
+      style={boxStyle}
+    >
+      {renderFaces(kind)}
+      {hat && (
+        <div
+          className={`home-grid-box__hat home-grid-box__hat--${hat.kind}`}
+          style={{
+            ...getPyramidFaceVars(widthPx, depthPx, hatHeightPx),
+            ...(hat.kind === 'halfCylinder'
+              ? getHalfCylinderShellVars(
+                  halfCylinderShellArcAngleDeg,
+                  heightPx,
+                )
+              : {}),
+          }}
+        >
+          {renderFaces(hat.kind)}
+        </div>
+      )}
+    </div>
+  )
+
+  return boxNode
+}
 
 function SocialIcon({ label }: { label: string }) {
   const common = {
@@ -130,6 +330,13 @@ function SocialIcon({ label }: { label: string }) {
         <svg {...common} viewBox="0 0 24 24" fill="none">
           <path d="M21.5 7.2a3 3 0 0 0-2.1-2.1C17.55 4.6 12 4.6 12 4.6s-5.55 0-7.4.5a3 3 0 0 0-2.1 2.1A31 31 0 0 0 2 12a31 31 0 0 0 .5 4.8 3 3 0 0 0 2.1 2.1c1.85.5 7.4.5 7.4.5s5.55 0 7.4-.5a3 3 0 0 0 2.1-2.1A31 31 0 0 0 22 12a31 31 0 0 0-.5-4.8Z" stroke="currentColor" strokeWidth="1.8" />
           <path d="m10 15.2 5.2-3.2L10 8.8v6.4Z" fill="currentColor" />
+        </svg>
+      )
+    case 'Discussions':
+      return (
+        <svg {...common} viewBox="0 0 24 24" fill="none">
+          <path d="M5 6.5h14v9.2H9.7L5 19.5v-13Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+          <path d="M8.8 10h6.4M8.8 12.8h4.7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
         </svg>
       )
     case 'Instagram':
@@ -328,6 +535,29 @@ export function Home() {
   const setView = useConversations((s) => s.setView)
   const order = useConversations((s) => s.order)
   const setActive = useConversations((s) => s.setActive)
+  const [backgroundScene, setBackgroundScene] = useState(
+    FALLBACK_HOME_BACKGROUND_SCENE,
+  )
+  const [visibleTileRange, setVisibleTileRange] = useState(
+    INITIAL_CUBE_TILE_RANGE,
+  )
+  const {
+    boxes,
+    groundScrollFactor,
+    halfCylinderShellArcAngleDeg,
+    horizonGapPx,
+    tileSize,
+  } = backgroundScene
+  const visibleBoxes = useMemo(
+    () =>
+      boxes.filter((box) => {
+        const depthTiles = box.depthTiles ?? 1
+        const boxMinY = box.yTiles
+        const boxMaxY = box.yTiles + depthTiles
+        return boxMaxY >= visibleTileRange.min && boxMinY <= visibleTileRange.max
+      }),
+    [boxes, visibleTileRange],
+  )
 
   const blocksRef = useRef<HTMLElement>(null)
   const scrollerRef = useRef<HTMLDivElement>(null)
@@ -343,8 +573,20 @@ export function Home() {
   const ctaRef = useRef<HTMLButtonElement>(null)
   const scrollAnimRef = useRef<number | null>(null)
 
-  // Pin the synthwave horizon into the gap between the description and the
-  // "Get started" button. The whole hero stack is vertically centered, so the
+  useEffect(() => {
+    const controller = new AbortController()
+    loadHomeBackgroundScene(controller.signal)
+      .then(setBackgroundScene)
+      .catch((error) => {
+        if (!controller.signal.aborted) {
+          console.warn(error)
+        }
+      })
+    return () => controller.abort()
+  }, [])
+
+  // Pin the synthwave horizon just below the primary CTA rather than letting
+  // decorative scene content influence layout. The whole hero stack is vertically centered, so the
   // gap's screen position depends on the copy's height — measure it instead of
   // hardcoding a percentage. offsetTop/offsetHeight are immune to the entrance
   // animation's translateY (unlike getBoundingClientRect), so we read true
@@ -372,7 +614,7 @@ export function Home() {
 
     const measure = () => {
       const ctaBottom = topWithin(cta, hero) + cta.offsetHeight
-      const horizonY = ctaBottom + 96
+      const horizonY = ctaBottom + horizonGapPx
       landscape.style.setProperty('--horizon-y', `${horizonY}px`)
       scroller.style.setProperty(
         '--home-ui-bottom',
@@ -388,14 +630,13 @@ export function Home() {
       ro.disconnect()
       window.removeEventListener('resize', measure)
     }
-  }, [])
+  }, [horizonGapPx])
 
   // Drive the floor forward as the page scrolls: scrolling down streams the
-  // grid toward the viewer (the floor has no idle motion of its own). We set a
-  // CSS var that the streamer wrapper applies as a translateY (composited, so
-  // it stays off the main thread that's busy with WebGPU inference), throttled
-  // to one write per frame. The modulo keeps the offset within one tile so the
-  // wrap is seamless.
+  // grid toward the viewer (the floor has no idle motion of its own). The grid
+  // gets a one-tile modulo offset so its repeated texture wraps cleanly, while
+  // the visible ground props get the continuous offset so they do not snap back
+  // when the texture repeats.
   useEffect(() => {
     const scroller = scrollerRef.current
     const streamer = streamerRef.current
@@ -409,9 +650,8 @@ export function Home() {
     if (!scroller || !streamer || !hero || !blocks || !about || !heroUi || !toolsUi || !aboutUi || !jumpNav) return
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
 
-    const TILE = 64 // px — must match background-size of .home-landscape-grid
-    const FACTOR = 0.2 // how aggressively scroll pushes the floor forward (lower = slower)
     let ticking = false
+    let disposed = false
     const clamp01 = (n: number) => Math.max(0, Math.min(1, n))
     const smoothstep = (edge0: number, edge1: number, x: number) => {
       const t = clamp01((x - edge0) / (edge1 - edge0))
@@ -432,10 +672,70 @@ export function Home() {
       )
     }
 
+    const alignGroundGrid = () => {
+      const anchor = streamer.offsetWidth * 0.5
+      streamer.style.setProperty('--ground-grid-origin-x', `${anchor}px`)
+    }
+    const getFadeBounds = () => {
+      const streamerH = Math.max(1, streamer.clientHeight)
+      const horizonFadeStart = -tileSize
+      const horizonFadeEnd = tileSize * 1.5
+      const bottomFadeStart = Math.max(
+        horizonFadeEnd + tileSize * 4,
+        streamerH - tileSize * 6,
+      )
+      const bottomFadeEnd = bottomFadeStart + tileSize * 3
+      return {
+        bottomFadeEnd,
+        bottomFadeStart,
+        horizonFadeEnd,
+        horizonFadeStart,
+        streamerH,
+      }
+    }
+
+    const updateVisibleBoxRange = (groundOffset: number) => {
+      const { bottomFadeEnd, horizonFadeStart } = getFadeBounds()
+      const marginPx = tileSize * CUBE_RENDER_MARGIN_TILES
+      const min = Math.floor(
+        (-groundOffset + horizonFadeStart - marginPx) / tileSize,
+      )
+      const max = Math.ceil((-groundOffset + bottomFadeEnd + marginPx) / tileSize)
+      setVisibleTileRange((prev) =>
+        prev.min === min && prev.max === max ? prev : { min, max },
+      )
+    }
+
+    const updateGroundFades = (groundOffset: number) => {
+      const {
+        bottomFadeEnd,
+        bottomFadeStart,
+        horizonFadeEnd,
+        horizonFadeStart,
+        streamerH,
+      } = getFadeBounds()
+      const groundFaders = streamer.querySelectorAll<HTMLElement>(
+        '[data-ground-fade-y]',
+      )
+
+      for (const el of groundFaders) {
+        const rawY = Number(el.dataset.groundFadeY ?? 0)
+        const baseY =
+          el.dataset.groundFadeUnit === 'ratio' ? rawY * streamerH : rawY
+        const y = baseY + groundOffset
+        const fadeIn = smoothstep(horizonFadeStart, horizonFadeEnd, y)
+        const fadeOut = 1 - smoothstep(bottomFadeStart, bottomFadeEnd, y)
+        el.style.setProperty('--ground-fade', (fadeIn * fadeOut).toFixed(3))
+      }
+    }
+
     const update = () => {
+      if (disposed) return
       ticking = false
       const actualScroll = scroller.scrollTop
-      const shift = ((actualScroll * FACTOR) % TILE).toFixed(2)
+      const groundOffset = actualScroll * groundScrollFactor
+      const gridShift = (groundOffset % tileSize).toFixed(2)
+      const groundShift = groundOffset.toFixed(2)
       const viewportH = Math.max(1, scroller.clientHeight)
       const jumpIn = smoothstep(0.18, 0.32, actualScroll / viewportH)
       const sectionProgress = (section: HTMLElement) =>
@@ -459,7 +759,10 @@ export function Home() {
           : toolsOpacity >= heroOpacity
             ? 'tools'
             : 'hero'
-      streamer.style.setProperty('--scroll-shift', `${shift}px`)
+      streamer.style.setProperty('--scroll-shift', `${gridShift}px`)
+      streamer.style.setProperty('--ground-shift', `${groundShift}px`)
+      updateVisibleBoxRange(groundOffset)
+      updateGroundFades(groundOffset)
       setUi(heroUi, heroOpacity, groupScale(hero, heroOpacity), activeGroup === 'hero' ? 'auto' : 'none')
       setUi(toolsUi, toolsOpacity, groupScale(blocks, toolsOpacity), activeGroup === 'tools' ? 'auto' : 'none')
       setUi(aboutUi, aboutOpacity, groupScale(about, aboutOpacity), activeGroup === 'about' ? 'auto' : 'none')
@@ -491,10 +794,16 @@ export function Home() {
       }
     }
 
+    alignGroundGrid()
     scroller.addEventListener('scroll', onScroll, { passive: true })
+    window.addEventListener('resize', alignGroundGrid)
     update()
-    return () => scroller.removeEventListener('scroll', onScroll)
-  }, [])
+    return () => {
+      disposed = true
+      scroller.removeEventListener('scroll', onScroll)
+      window.removeEventListener('resize', alignGroundGrid)
+    }
+  }, [groundScrollFactor, tileSize])
 
   function startChat() {
     playSfx('click')
@@ -638,14 +947,30 @@ export function Home() {
           ref={landscapeRef}
           aria-hidden
           className="home-landscape pointer-events-none fixed inset-0 overflow-hidden"
+          style={
+            {
+              '--home-tile-size': `${tileSize}px`,
+            } as CSSProperties
+          }
         >
           <div className="home-landscape-sun home-glow" />
           <div className="home-landscape-horizon" />
           <div className="home-landscape-floor">
             <div className="home-landscape-plane">
               <div ref={streamerRef} className="home-landscape-streamer">
-                <div className="home-landscape-grid home-landscape-grid--glow" />
                 <div className="home-landscape-grid" />
+                <div className="home-grid-box-layer">
+                  {visibleBoxes.map((box) => (
+                    <GridBox
+                      key={box.id}
+                      box={box}
+                      halfCylinderShellArcAngleDeg={
+                        halfCylinderShellArcAngleDeg
+                      }
+                      tileSize={tileSize}
+                    />
+                  ))}
+                </div>
               </div>
             </div>
           </div>
@@ -686,8 +1011,15 @@ export function Home() {
               className="home-rise max-w-xl text-lg leading-relaxed text-fg-muted"
               style={{ animationDelay: '250ms' }}
             >
-              Your free personal AI academic advisor for UBC Vancouver — one place to
-              explore courses, untangle prerequisites, and plan your degree.
+              Your personal academic advisor for UBC Vancouver — one place to
+              explore courses, untangle prerequisites, and plan your degree. 
+            </p>
+              <p
+              ref={descRef}
+              className="home-rise max-w-xl text-lg leading-relaxed text-fg-muted"
+              style={{ animationDelay: '350ms' }}
+            >
+              And guess what — its completely free
             </p>
           </div>
 

@@ -43,12 +43,11 @@ export default function App() {
     document.documentElement.style.fontSize = `${(20 * zoom) / 100}px`
   }, [zoom])
   useEffect(() => {
-    // Auto-load Qwen3.5 2B on mount — no user choice, no picker. Warm
-    // visits hit the IndexedDB cache in ~1-3 s; first visits stream the
-    // weights in the background while the user can poke around the
-    // Home / Course Finder / Prereq Tree panels.
+    // Load Qwen3.5 2B only after the user enters the app shell. The home
+    // background should not compete with WebGPU model initialization.
+    if (route !== ROUTES.app) return
     void startLoad(DEFAULT_MODEL_SIZE)
-  }, [startLoad])
+  }, [route, startLoad])
   // Drive the SomaFM <audio> element from the persisted music settings, and
   // host the easter-egg toast (below) — both live ABOVE the route switch so a
   // playing station and a pending discovery survive navigation between the

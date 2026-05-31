@@ -601,13 +601,57 @@ body {
 }
 
 .home-jump-nav {
+  isolation: isolate;
   opacity: var(--home-jump-opacity, 0);
   pointer-events: var(--home-jump-pointer-events, none);
   transition: opacity 180ms ease;
 }
 
+.home-jump-nav::before {
+  content: "";
+  position: absolute;
+  inset: -1rem -2rem -1rem -1.25rem;
+  z-index: -1;
+  pointer-events: none;
+  background: var(--canvas);
+  mask-image:
+    linear-gradient(
+      to right,
+      transparent 0,
+      #000 1.2rem,
+      #000 calc(100% - 1.4rem),
+      transparent 100%
+    ),
+    linear-gradient(
+      to bottom,
+      transparent 0,
+      #000 0.9rem,
+      #000 calc(100% - 0.9rem),
+      transparent 100%
+    );
+  mask-composite: intersect;
+  -webkit-mask-image:
+    linear-gradient(
+      to right,
+      transparent 0,
+      #000 1.2rem,
+      #000 calc(100% - 1.4rem),
+      transparent 100%
+    ),
+    linear-gradient(
+      to bottom,
+      transparent 0,
+      #000 0.9rem,
+      #000 calc(100% - 0.9rem),
+      transparent 100%
+    );
+  -webkit-mask-composite: source-in;
+}
+
 .home-jump-link {
   --home-jump-link-active: 0;
+  position: relative;
+  z-index: 1;
   color: color-mix(
     in srgb,
     var(--fg-faint),
@@ -681,10 +725,9 @@ body {
 
    The whole layer is position:fixed (set in Home.tsx) so it stays locked to
    the viewport — the scene holds still on screen while the page scrolls past
-   it. It has no idle animation: the floor only moves when you scroll, via
-   .home-landscape-streamer translateY(var(--scroll-shift)) set from a scroll
-   listener in Home.tsx. That transform is compositor-only, so it never blocks
-   the main thread (which is busy driving WebGPU inference).
+   it. It has no idle animation: the floor only moves when you scroll. Home.tsx
+   writes the repeated grid offset and the continuous ground-object offset once
+   per animation frame.
 
    The horizon (sun + line + floor origin) is pinned to var(--horizon-y) — the
    pixel midpoint of the gap between the hero description and the CTA, measured
@@ -693,6 +736,13 @@ body {
 .home-landscape {
   --grid-line: var(--accent);
   --grid-glow: var(--accent-hover);
+  --scene-line-width: 2px;
+  --floor-grid-line-width: var(--scene-line-width);
+  --box-top-fill: var(--canvas);
+  --box-front-fill: var(--canvas);
+  --box-side-fill: var(--canvas);
+  --home-tile-size: 64px;
+  --home-tile-half: calc(var(--home-tile-size) / 2);
 }
 
 /* Sun/sky glow sitting on the horizon; its upper half bleeds up behind the
@@ -730,8 +780,9 @@ body {
   right: 0;
   top: var(--horizon-y, 60%);
   bottom: 0;
-  perspective: 400px;
+  perspective: 900px;
   perspective-origin: 50% 0%;
+  transform-style: preserve-3d;
 }
 
 /* The plane is tilted away from the viewer: its far (top) edge meets the
@@ -741,39 +792,373 @@ body {
   inset: 0 -80% -160% -80%;
   transform: rotateX(76deg);
   transform-origin: 50% 0%;
+  transform-style: preserve-3d;
 }
 
 /* Scroll-driven layer between the tilted plane and the grids: carries the
-   page-scroll offset as a composited translateY so it stacks on top of the
-   grids' idle drift without either fighting the other for the transform
-   property. --scroll-shift is updated per-frame from Home.tsx. */
+   page-scroll offsets. --scroll-shift is the modulo texture offset for the
+   repeating grid; --ground-shift is the continuous offset for finite objects
+   sitting on the floor, so visible props do not jump when the grid wraps. */
 .home-landscape-streamer {
   position: absolute;
   inset: 0;
+  transform-style: preserve-3d;
+}
+
+.home-grid-box-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transform-style: preserve-3d;
 }
 
 .home-landscape-grid {
+  --grid-center-x: calc(50% + var(--home-tile-half));
   position: absolute;
   /* -64px top overdraw: the scroll push translates the grid down by up to one
      tile (64px), so paint an extra tile above the horizon to keep the grid
      reaching it at peak shift. (No idle animation — motion is scroll-only.) */
   inset: 0 0 -120% 0;
   background-image:
-    linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
-    linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
+    linear-gradient(
+      to right,
+      var(--grid-line) var(--floor-grid-line-width),
+      transparent var(--floor-grid-line-width)
+    ),
+    linear-gradient(
+      to bottom,
+      var(--grid-line) var(--floor-grid-line-width),
+      transparent var(--floor-grid-line-width)
+    );
   background-position:
-    0 var(--scroll-shift, 0px),
+    var(--grid-center-x) var(--scroll-shift, 0px),
     0 var(--scroll-shift, 0px);
-  background-size: 64px 64px;
+  background-size: var(--home-tile-size) var(--home-tile-size);
 }
 
-/* A blurred copy stacked behind the sharp grid → the neon bloom. */
-.home-landscape-grid--glow {
-  filter: blur(4px);
-  opacity: 0.5;
+.home-grid-box {
+  --box-w: 64px;
+  --box-d: 64px;
+  --box-h: 64px;
+  --box-x: 0px;
+  --box-y: 0px;
+  --ground-opacity: 0.72;
+  --box-visible: calc(var(--ground-opacity) * var(--ground-fade, 0));
+  position: absolute;
+  left: calc(var(--ground-grid-origin-x, 50%) + var(--box-x));
+  top: calc(var(--box-y) + var(--ground-shift, 0px));
+  width: var(--box-w);
+  height: var(--box-d);
+  transform: translateZ(calc(var(--box-h) / 2));
+  transform-style: preserve-3d;
+  will-change: top;
+}
+
+.home-grid-box__face {
+  position: absolute;
+  border: var(--scene-line-width) solid var(--grid-line);
+  backface-visibility: hidden;
+  opacity: var(--box-visible);
+  transform-origin: 50% 50%;
+}
+
+.home-grid-box__face--top {
+  inset: 0;
+  background: var(--box-top-fill);
+  transform: translateZ(calc(var(--box-h) / 2));
+}
+
+.home-grid-box__face--front {
+  left: 0;
+  top: calc((var(--box-d) - var(--box-h)) / 2);
+  width: var(--box-w);
+  height: var(--box-h);
+  background: var(--box-front-fill);
+  transform: rotateX(-90deg) translateZ(calc(var(--box-d) / 2));
+}
+
+.home-grid-box__face--left,
+.home-grid-box__face--right {
+  left: calc((var(--box-w) - var(--box-h)) / 2);
+  top: 0;
+  width: var(--box-h);
+  height: var(--box-d);
+  background: var(--box-side-fill);
+}
+
+.home-grid-box__face--left {
+  transform: rotateY(-90deg) translateZ(calc(var(--box-w) / 2));
+}
+
+.home-grid-box__face--right {
+  transform: rotateY(90deg) translateZ(calc(var(--box-w) / 2));
+}
+
+.home-grid-box__triangle {
+  position: absolute;
+  background: var(--grid-line);
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+  opacity: var(--box-visible);
+  transform-origin: 50% 50%;
+  backface-visibility: hidden;
+}
+
+.home-grid-box__triangle::after {
+  content: "";
+  position: absolute;
+  inset: var(--scene-line-width);
+  background: var(--canvas);
+  clip-path: inherit;
+}
+
+.home-grid-box__triangle--front {
+  left: 0;
+  top: calc((var(--box-d) - var(--box-h)) / 2);
+  width: var(--box-w);
+  height: var(--box-h);
+  transform: rotateX(-90deg) translateZ(calc(var(--box-d) / 2));
+}
+
+.home-grid-box__triangle--left,
+.home-grid-box__triangle--right {
+  left: calc((var(--box-w) - var(--box-h)) / 2);
+  top: 0;
+  width: var(--box-h);
+  height: var(--box-d);
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+
+.home-grid-box__triangle--left {
+  transform: rotateY(-90deg) translateZ(calc(var(--box-w) / 2));
+}
+
+.home-grid-box__triangle--right {
+  transform: rotateY(90deg) translateZ(calc(var(--box-w) / 2));
+}
+
+.home-grid-box__tent-plane-anchor {
+  position: absolute;
+  top: 0;
+  width: 0;
+  height: var(--box-d);
+  transform: translateZ(calc(var(--box-h) / -2));
+  transform-style: preserve-3d;
+}
+
+.home-grid-box__tent-plane-anchor--left {
+  left: 0;
+}
+
+.home-grid-box__tent-plane-anchor--right {
+  left: var(--box-w);
+}
+
+.home-grid-box__tent-plane {
+  position: absolute;
+  top: 0;
+  width: var(--pyramid-side-slant);
+  height: var(--box-d);
+  box-sizing: border-box;
+  border: var(--scene-line-width) solid var(--grid-line);
+  background: var(--box-side-fill);
+  opacity: var(--box-visible);
+  backface-visibility: hidden;
+  transform-style: preserve-3d;
+}
+
+.home-grid-box__tent-plane--left {
+  left: 0;
+  transform: rotateY(var(--pyramid-side-left-angle));
+  transform-origin: 0 50%;
+}
+
+.home-grid-box__tent-plane--right {
+  /* Right-edge faces are visible on the left side of the scene. The grid
+     paints each line as a stripe starting at the grid coordinate, so extend
+     the painted face by one line width but keep the transform pivot on the
+     original coordinate. Otherwise the stroke ends at the grid line and reads
+     as shifted left. */
+  width: calc(var(--pyramid-side-slant) + var(--scene-line-width));
+  right: calc(var(--scene-line-width) * -1);
+  transform: rotateY(var(--pyramid-side-right-angle));
+  transform-origin: calc(100% - var(--scene-line-width)) 50%;
+}
+
+.home-grid-box__pyramid-anchor {
+  position: absolute;
+  transform: translateZ(calc(var(--box-h) / -2));
+  transform-style: preserve-3d;
+}
+
+.home-grid-box__pyramid-anchor--front {
+  left: 0;
+  top: var(--box-d);
+  width: var(--box-w);
+  height: 0;
+}
+
+.home-grid-box__pyramid-anchor--left,
+.home-grid-box__pyramid-anchor--right {
+  top: 0;
+  width: 0;
+  height: var(--box-d);
+}
+
+.home-grid-box__pyramid-anchor--left {
+  left: 0;
+}
+
+.home-grid-box__pyramid-anchor--right {
+  left: var(--box-w);
+}
+
+.home-grid-box__pyramid-face {
+  position: absolute;
+  background: var(--grid-line);
+  opacity: var(--box-visible);
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
+}
+
+.home-grid-box__pyramid-face::after {
+  content: "";
+  position: absolute;
+  inset: var(--scene-line-width);
+  background: var(--canvas);
+  clip-path: inherit;
+}
+
+.home-grid-box__pyramid-face--front {
+  left: 0;
+  top: calc(var(--pyramid-front-slant) * -1);
+  width: var(--box-w);
+  height: var(--pyramid-front-slant);
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+  transform: rotateX(var(--pyramid-front-angle));
+  transform-origin: 50% 100%;
+}
+
+.home-grid-box__pyramid-face--left {
+  left: 0;
+  top: 0;
+  width: var(--pyramid-side-slant);
+  height: var(--box-d);
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+  transform: rotateY(var(--pyramid-side-left-angle));
+  transform-origin: 0 50%;
+}
+
+.home-grid-box__pyramid-face--right {
+  top: 0;
+  width: calc(var(--pyramid-side-slant) + var(--scene-line-width));
+  height: var(--box-d);
+  clip-path: polygon(100% 0, 0 50%, 100% 100%);
+  transform: rotateY(var(--pyramid-side-right-angle));
+  right: calc(var(--scene-line-width) * -1);
+  transform-origin: calc(100% - var(--scene-line-width)) 50%;
+}
+
+.home-grid-box__half-cap {
+  position: absolute;
+  top: calc((var(--box-d) - var(--box-h)) / 2);
+  width: calc(var(--box-w) + var(--scene-line-width));
+  height: var(--box-h);
+  box-sizing: border-box;
+  border: var(--scene-line-width) solid var(--grid-line);
+  outline: 0;
+  border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+  background: var(--canvas);
+  opacity: var(--box-visible);
+  transform-origin: 50% 50%;
+  backface-visibility: hidden;
+}
+
+.home-grid-box__half-cap--front {
+  transform: rotateX(-90deg) translateZ(calc(var(--box-d) / 2));
+}
+
+.home-grid-box__half-cap--back {
+  transform: rotateX(-90deg) translateZ(calc(var(--box-d) / -2));
+}
+
+.home-grid-box__half-cylinder--left.home-grid-box__half-cap {
+  left: 0;
+}
+
+.home-grid-box__half-cylinder--right.home-grid-box__half-cap {
+  left: 0;
+}
+
+.home-grid-box__half-shell-anchor {
+  --half-shell-line-width: calc(
+    var(--scene-line-width) *
+    var(--half-cylinder-shell-line-width-ratio, 1.12735179)
+  );
+  position: absolute;
+  top: 0;
+  width: 0;
+  height: var(--box-d);
+  transform: translateZ(calc(var(--box-h) / -2));
+  transform-style: preserve-3d;
+}
+
+.home-grid-box__half-cylinder--left.home-grid-box__half-shell-anchor {
+  left: var(--box-w);
+  transform: translateZ(calc(var(--box-h) / -2)) scaleX(-1);
+}
+
+.home-grid-box__half-cylinder--right.home-grid-box__half-shell-anchor {
+  right: var(--box-w);
+}
+
+.home-grid-box__half-shell {
+  position: absolute;
+  top: 0;
+  width: calc(var(--box-h) * var(--half-cylinder-shell-width-ratio, 1.84775907));
+  height: 100%;
+  box-sizing: border-box;
+  border: var(--half-shell-line-width) solid var(--grid-line);
+  border-top-width: 0;
+  border-bottom-width: 0;
+  background: var(--canvas);
+  opacity: var(--box-visible);
+  backface-visibility: visible;
+}
+
+.home-grid-box__half-cylinder--left.home-grid-box__half-shell {
+  right: 0;
+  transform: rotateY(var(--half-cylinder-shell-right-rotation, 157.5deg));
+  transform-origin: 100% 50%;
+}
+
+.home-grid-box__half-cylinder--right.home-grid-box__half-shell {
+  right: 0;
+  transform: rotateY(var(--half-cylinder-shell-right-rotation, 157.5deg));
+  transform-origin: 100% 50%;
+}
+
+.home-grid-box__hat {
+  position: absolute;
+  inset: 0;
+  width: var(--box-w);
+  height: var(--box-d);
+  --box-h: var(--hat-h);
+  transform: translateZ(calc((var(--base-h) + var(--hat-h)) / 2));
+  transform-style: preserve-3d;
+}
+
+.home-grid-box__hat .home-grid-box__half-cap {
+  left: 0;
+  width: var(--box-w);
+  height: var(--box-h);
+  border-radius: 50% 50% 0 0 / 100% 100% 0 0;
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .home-grid-box {
+    --ground-fade: 1;
+  }
+
   .home-rise {
     animation: none;
   }

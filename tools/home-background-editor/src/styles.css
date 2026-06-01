@@ -179,6 +179,37 @@ h1 {
   border-left: 1px solid var(--line);
 }
 
+.side-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.35rem;
+  border-bottom: 1px solid var(--line);
+  background: rgba(11, 15, 21, 0.94);
+  padding: 0.75rem;
+  backdrop-filter: blur(16px);
+}
+
+.side-tabs button {
+  min-width: 0;
+  min-height: 1.9rem;
+  padding: 0.35rem 0.45rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.side-tabs button.active {
+  border-color: rgba(34, 211, 238, 0.58);
+  background: var(--cyan-soft);
+  color: #cffafe;
+}
+
+.tab-panel {
+  min-height: 0;
+}
+
 section {
   display: flex;
   flex-direction: column;
@@ -364,55 +395,10 @@ input[type="range"] {
   gap: 0.35rem;
 }
 
-.selection-popover {
-  position: fixed;
-  z-index: 20;
-  display: flex;
-  width: min(20rem, calc(100vw - 2rem));
-  max-height: calc(100vh - 2rem);
-  max-height: calc(100dvh - 2rem);
-  flex-direction: column;
-  gap: 0.75rem;
-  border: 1px solid rgba(251, 191, 36, 0.42);
-  border-radius: 0.55rem;
-  background: rgba(15, 18, 24, 0.94);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding: 0.85rem;
-  scrollbar-gutter: stable;
-  box-shadow: var(--shadow);
-  backdrop-filter: blur(18px);
-}
-
-.popover-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-}
-
-.popover-head strong {
-  color: #fde68a;
-}
-
-.popover-head button {
-  min-height: 1.6rem;
-  padding: 0.1rem 0.5rem;
-  color: var(--muted);
-}
-
 .preset-row {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 0.35rem;
-}
-
-.hat-controls {
-  display: flex;
-  flex-direction: column;
-  gap: 0.65rem;
-  border-top: 1px solid var(--line);
-  padding-top: 0.7rem;
 }
 
 .json-section pre {
@@ -432,11 +418,7 @@ input[type="range"] {
 
 @media (max-width: 1180px) {
   .app-shell {
-    grid-template-columns: minmax(15rem, 17rem) minmax(0, 1fr);
-  }
-
-  .right-panel {
-    display: none;
+    grid-template-columns: minmax(14rem, 16rem) minmax(0, 1fr) minmax(16rem, 19rem);
   }
 }
 
@@ -448,7 +430,7 @@ input[type="range"] {
   .app-shell {
     min-height: 100%;
     grid-template-columns: 1fr;
-    grid-template-rows: auto minmax(26rem, 56vh) auto;
+    grid-template-rows: auto minmax(26rem, 56vh) auto auto;
   }
 
   .topbar {
@@ -470,6 +452,7 @@ input[type="range"] {
 
   .right-panel {
     display: block;
+    grid-row: 4;
     border-left: 0;
   }
 }

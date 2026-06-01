@@ -37,6 +37,10 @@ export interface YearRequirement {
   mode: RequirementMode
   // Canonical "SUBJ NUM" codes referenced by this row (empty for text rows).
   codes: string[]
+  // Conjunctive groups of alternatives. Every group must be satisfied; within
+  // a group any one code is enough. Example:
+  //   "MATH 221 (or 223), 215" -> [["MATH 221", "MATH 223"], ["MATH 215"]]
+  groups: string[][]
   // Credit value from the table (may be null if the page omitted it).
   credits: number | null
 }
@@ -69,8 +73,9 @@ const CREDIT_LINE_RE = /^\d{1,3}(\.\d+)?$/
 const DEGREE_TOTAL_RE =
   /(credits?\s+for\s+(the\s+)?degree|minimum\s+credits|overall\b.*\btotal\s+credits)/i
 const YEAR_TOTAL_RE = /^total\s+credits$/i
-// "one of" / "any of" / "either" / "or" all signal a pick-one group.
-const ONEOF_RE = /\b(one|any|either)\s+of\b|\bor\b/i
+// Whole-row choice markers. A bare "or" is handled between adjacent codes so
+// mixed rows like "MATH 221 (or 223), 215" don't become one giant pick-one.
+const WHOLE_ROW_CHOICE_RE = /\b(one|any)\s+of\b|\beither\b/i
 // A course-subject token (CPSC, CPSC_V, AI) or a 3-digit course number.
 const TOKEN_RE = /[A-Z]{2,4}(?:_V)?|\d{3}[A-Z]?/g
 // Trailing footnote markers: " 1", " 2", " 4,5" at the end of a label. Course
@@ -93,24 +98,74 @@ function yearLabel(line: string): string {
 // recent subject forward across bare numbers: "DSCI_V 200, 220, 221" →
 // DSCI 200 / DSCI 220 / DSCI 221; "MATH_V 100 (or 180 or 120 or 110)" →
 // MATH 100 / 180 / 120 / 110.
-function extractCodes(label: string): string[] {
-  const codes: string[] = []
+interface CodeMention {
+  code: string
+  start: number
+  end: number
+}
+
+function extractCodeMentions(label: string): CodeMention[] {
+  const mentions: CodeMention[] = []
   const seen = new Set<string>()
   let subject: string | null = null
-  for (const tok of label.match(TOKEN_RE) ?? []) {
+  let pendingSubjectStart: number | null = null
+  for (const match of label.matchAll(TOKEN_RE)) {
+    const tok = match[0]
+    const start = match.index
+    if (start == null) continue
     if (/^\d/.test(tok)) {
       if (subject) {
         const code = `${subject} ${tok}`
         if (!seen.has(code)) {
           seen.add(code)
-          codes.push(code)
+          mentions.push({
+            code,
+            start: pendingSubjectStart ?? start,
+            end: start + tok.length,
+          })
         }
+        pendingSubjectStart = null
       }
     } else {
       subject = tok.replace(/_V$/, '')
+      pendingSubjectStart = start
     }
   }
-  return codes
+  return mentions
+}
+
+function uniqueCodes(codes: string[]): string[] {
+  const out: string[] = []
+  for (const code of codes) if (!out.includes(code)) out.push(code)
+  return out
+}
+
+function requirementGroups(label: string): string[][] {
+  const mentions = extractCodeMentions(label)
+  if (mentions.length === 0) return []
+
+  const allCodes = uniqueCodes(mentions.map((m) => m.code))
+  const branchLabels = label.match(/\([a-e]\)/gi)
+  if (
+    WHOLE_ROW_CHOICE_RE.test(label) ||
+    (branchLabels != null && branchLabels.length >= 2)
+  ) {
+    return [allCodes]
+  }
+
+  const groups: string[][] = [[mentions[0].code]]
+  for (let i = 1; i < mentions.length; i++) {
+    const prev = mentions[i - 1]
+    const cur = mentions[i]
+    const connector = label.slice(prev.end, cur.start).toLowerCase()
+    const currentGroup = groups[groups.length - 1]
+    if (/\bor\b/.test(connector)) {
+      if (!currentGroup.includes(cur.code)) currentGroup.push(cur.code)
+    } else {
+      groups.push([cur.code])
+    }
+  }
+  return groups
 }
 
 // A requirement row is a "pick one" choice when it says so explicitly ("one of",
@@ -118,8 +173,7 @@ function extractCodes(label: string): string[] {
 // "Either (a) … or (b) …" (has "or") with "Either (a) … (b) …" (no "or"); both are
 // choices, so a lone "either" or a second "(b)/(c)" label is enough.
 function isChoice(label: string): boolean {
-  if (ONEOF_RE.test(label)) return true
-  if (/\beither\b/i.test(label)) return true
+  if (WHOLE_ROW_CHOICE_RE.test(label)) return true
   const branchLabels = label.match(/\([a-e]\)/gi)
   return branchLabels != null && branchLabels.length >= 2
 }
@@ -132,12 +186,17 @@ const CONTINUATION_RE = /^(or\s+)?\([a-e]\)/i
 
 function parseRequirement(rawLabel: string): YearRequirement {
   const label = rawLabel.replace(FOOTNOTE_RE, '').trim()
-  const codes = extractCodes(label)
+  const groups = requirementGroups(label)
+  const codes = uniqueCodes(groups.flat())
   return {
     label,
     kind: codes.length > 0 ? 'course' : 'text',
-    mode: isChoice(label) ? 'oneof' : 'all',
+    mode:
+      isChoice(label) || (groups.length === 1 && groups[0].length > 1)
+        ? 'oneof'
+        : 'all',
     codes,
+    groups,
     credits: null,
   }
 }
@@ -149,18 +208,7 @@ function mergeRequirement(
   base: YearRequirement,
   next: YearRequirement,
 ): YearRequirement {
-  const codes = [...base.codes]
-  for (const c of next.codes) if (!codes.includes(c)) codes.push(c)
-  const label = `${base.label} ${next.label}`.trim()
-  return {
-    label,
-    kind: codes.length > 0 ? 'course' : base.kind === 'course' ? 'course' : 'text',
-    mode: base.mode === 'oneof' || next.mode === 'oneof' || isChoice(label)
-      ? 'oneof'
-      : 'all',
-    codes,
-    credits: null,
-  }
+  return parseRequirement(`${base.label} ${next.label}`.trim())
 }
 
 export function parseProgramYears(text: string): ParsedProgramYears {
@@ -250,9 +298,22 @@ export function isRequirementMet(
   plannedCodes: Set<string>,
 ): boolean {
   if (item.kind !== 'course' || item.codes.length === 0) return false
+  if (item.groups.length > 0) {
+    return item.groups.every((group) =>
+      group.some((c) => plannedCodes.has(c)),
+    )
+  }
   return item.mode === 'oneof'
     ? item.codes.some((c) => plannedCodes.has(c))
     : item.codes.every((c) => plannedCodes.has(c))
+}
+
+export function autofillCodesForRequirement(item: YearRequirement): string[] {
+  if (item.kind !== 'course') return []
+  if (item.groups.length > 0) {
+    return item.groups.map((group) => group[0]).filter(Boolean)
+  }
+  return item.mode === 'oneof' ? item.codes.slice(0, 1) : item.codes
 }
 
 // Stable key for a requirement row. Shared by the Progress checklist (to

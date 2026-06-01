@@ -117,6 +117,75 @@ function halfCylinderGeometry(width: number, height: number, depth: number) {
   return geometryFromTriangles(vertices, indices)
 }
 
+function slopeGeometry(
+  width: number,
+  height: number,
+  depth: number,
+  facing: HomeBackgroundBox['facing'],
+  visibleSide: 'left' | 'right',
+) {
+  const halfWidth = width / 2
+  const halfDepth = depth / 2
+
+  if (facing === 'front' || facing === 'back') {
+    const highZ = facing === 'back' ? -halfDepth : halfDepth
+    const lowZ = facing === 'back' ? halfDepth : -halfDepth
+
+    return geometryFromTriangles(
+      [
+        -halfWidth, 0, lowZ,
+        halfWidth, 0, lowZ,
+        halfWidth, 0, highZ,
+        -halfWidth, 0, highZ,
+        -halfWidth, height, highZ,
+        halfWidth, height, highZ,
+      ],
+      [
+        0, 1, 2,
+        0, 2, 3,
+        0, 5, 1,
+        0, 4, 5,
+        3, 2, 5,
+        3, 5, 4,
+        0, 3, 4,
+        1, 5, 2,
+      ],
+    )
+  }
+
+  const highX = facing === 'right' ? -halfWidth : halfWidth
+  const lowX = facing === 'right' ? halfWidth : -halfWidth
+  const highSide = facing === 'left' ? 'right' : 'left'
+  const indices = [
+    0, 1, 2,
+    3, 5, 4,
+    0, 3, 4,
+    0, 4, 1,
+  ]
+  if (visibleSide === highSide) {
+    indices.push(
+      1, 4, 5,
+      1, 5, 2,
+    )
+  }
+  indices.push(
+    0, 2, 5,
+    0, 5, 3,
+  )
+
+  return geometryFromTriangles(
+    [
+      lowX, 0, -halfDepth,
+      highX, 0, -halfDepth,
+      highX, height, -halfDepth,
+      lowX, 0, halfDepth,
+      highX, 0, halfDepth,
+      highX, height, halfDepth,
+    ],
+    indices,
+  )
+}
+
 function shapeGeometry(box: HomeBackgroundBox, tileSize: number) {
   const width = box.widthTiles * tileSize
   const depth = box.depthTiles * tileSize
@@ -171,6 +240,16 @@ function shapeGeometry(box: HomeBackgroundBox, tileSize: number) {
     return halfCylinderGeometry(width, height, depth)
   }
 
+  if (box.kind === 'slope') {
+    return slopeGeometry(
+      width,
+      height,
+      depth,
+      box.facing,
+      box.xTiles <= 0 ? 'right' : 'left',
+    )
+  }
+
   const geometry = new THREE.BoxGeometry(width, height, depth)
   geometry.translate(0, height / 2, 0)
   return geometry
@@ -180,6 +259,7 @@ function shapeColor(kind: HomeBackgroundBox['kind']) {
   if (kind === 'pyramid') return 0xfbbf24
   if (kind === 'tent') return 0x34d399
   if (kind === 'halfCylinder') return 0xf472b6
+  if (kind === 'slope') return 0xfb923c
   return 0x32d4ff
 }
 
@@ -192,7 +272,7 @@ function cubeObject(box: HomeBackgroundBox, tileSize: number, selected: boolean)
       emissive: selected ? 0x7a4b00 : 0x08364b,
       metalness: 0.16,
       roughness: 0.48,
-      flatShading: shapeBox.kind === 'halfCylinder',
+      flatShading: shapeBox.kind === 'halfCylinder' || shapeBox.kind === 'slope',
       transparent: true,
       opacity: selected ? Math.min(1, box.opacity + 0.18) : box.opacity,
     })
@@ -224,6 +304,10 @@ function cubeObject(box: HomeBackgroundBox, tileSize: number, selected: boolean)
         ...box,
         kind: box.hat.kind,
         heightPx: box.hat.heightPx,
+        facing:
+          box.hat.kind === 'slope'
+            ? box.hat.facing ?? box.facing ?? 'right'
+            : box.facing,
       },
       box.heightPx,
     )

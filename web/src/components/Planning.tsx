@@ -36,11 +36,16 @@ import {
   parsePrereq,
   type Expr,
 } from '../lib/prereqAst'
-import { getRequirementsFor } from '../lib/programRequirements'
+import {
+  getRequirementsFor,
+  optionMatches,
+  type ProgramRequirements,
+} from '../lib/programRequirements'
 import {
   parseProgramYears,
   hasYearRequirements,
   isRequirementMet,
+  autofillCodesForRequirement,
   requirementKey,
 } from '../lib/programYears'
 import { YearColumn } from './planner/YearColumn'
@@ -118,8 +123,42 @@ const blockFirstCollision: CollisionDetection = (args) => {
   })
 }
 
+function requirementCodesInPlan(
+  req: ProgramRequirements | null,
+  plannedCodes: Set<string>,
+): Set<string> {
+  const out = new Set<string>()
+  if (!req) return out
+  if (req.kind === 'structured') {
+    for (const code of plannedCodes) {
+      if (
+        req.categories.some((cat) =>
+          cat.options.some((opt) => optionMatches(opt, code)),
+        )
+      ) {
+        out.add(code)
+      }
+    }
+    return out
+  }
+
+  const parsed = parseProgramYears(req.text)
+  const listedCodes = hasYearRequirements(parsed)
+    ? parsed.years.flatMap((year) =>
+        year.items.flatMap((item) =>
+          item.kind === 'course' ? item.codes : [],
+        ),
+      )
+    : (req.referenced_courses ?? [])
+  for (const code of listedCodes) {
+    if (plannedCodes.has(code)) out.add(code)
+  }
+  return out
+}
+
 export function Planning() {
   const years = usePlanner((s) => s.years)
+  const major = usePlanner((s) => s.major)
   const addBlock = usePlanner((s) => s.addBlock)
   const moveBlock = usePlanner((s) => s.moveBlock)
   const removeBlock = usePlanner((s) => s.removeBlock)
@@ -139,10 +178,30 @@ export function Planning() {
     | { kind: 'lookup'; code: string }
     | null
   >(null)
+  const [requirements, setRequirements] =
+    useState<ProgramRequirements | null>(null)
 
   useEffect(() => {
     void getCourseIndex().then(setCourseIndex)
   }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    if (!major) {
+      queueMicrotask(() => {
+        if (!cancelled) setRequirements(null)
+      })
+      return () => {
+        cancelled = true
+      }
+    }
+    getRequirementsFor(major).then((req) => {
+      if (!cancelled) setRequirements(req)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [major])
 
   // Keyboard shortcuts for the planner page: Ctrl/Cmd+Z undoes, Ctrl/Cmd+
   // Shift+Z and Ctrl+Y redo. Skipped while a text field is focused so we
@@ -250,6 +309,11 @@ export function Planning() {
     }
     return out
   }, [years])
+
+  const requirementCodes = useMemo(
+    () => requirementCodesInPlan(requirements, plannedCodes),
+    [requirements, plannedCodes],
+  )
 
   function findBlockYearTerm(
     blockId: string,
@@ -391,6 +455,7 @@ export function Planning() {
                     year={year}
                     courseIndex={courseIndex}
                     validations={validations}
+                    requirementCodes={requirementCodes}
                   />
                 ))}
               </div>
@@ -500,6 +565,7 @@ export function Planning() {
             validation={
               validations.get(activeDrag.blockId) ?? EMPTY_VALIDATION
             }
+            fulfillsRequirement={requirementCodes.has(activeDrag.code)}
             ghost
           />
         )}
@@ -609,7 +675,6 @@ function ActionsSection({
 }) {
   const major = usePlanner((s) => s.major)
   const addBlocks = usePlanner((s) => s.addBlocks)
-  const preferredCoursesPerTerm = usePlanner((s) => s.preferredCoursesPerTerm)
   const toggleIgnoreBlock = usePlanner((s) => s.toggleIgnoreBlock)
   const checkedRequirements = usePlanner((s) => s.checkedRequirements)
   const undo = usePlanner((s) => s.undo)
@@ -634,10 +699,11 @@ function ActionsSection({
 
   // Autofill in two passes: (1) place each required course as early as its
   // prerequisites and corequisites allow, then (2) push courses back, term by
-  // term, until every term is within the preferred course load. One-of rows
-  // take the first listed course, all-of rows take every course; rows already
-  // fulfilled (a satisfying course planned, or a manual check), unknown codes,
-  // and anything already in the plan are skipped.
+  // term, until every term is within the computed course load target
+  // (required courses / total terms, rounded up). One-of rows take the first
+  // listed course, all-of rows take every course; rows already fulfilled (a
+  // satisfying course planned, or a manual check), unknown codes, and anything
+  // already in the plan are skipped.
   async function handleAutofill() {
     if (!major) {
       window.alert('Select a major / program first.')
@@ -656,40 +722,107 @@ function ActionsSection({
       // placed by hand; it only schedules the courses it adds.
       const planned = new Set(plannedCodes)
 
-      // 1) Gather the courses to place — a flat list in requirement order
-      //    (lower years first, a natural tiebreaker for "as early as
-      //    possible"). One-of → first listed course; all-of → every course.
+      // 1) Gather the courses to place — a flat list in requirement order.
+      //    One-of → first listed course; all-of → every course.
       //    Skip rows already fulfilled / manually checked, unknown codes, and
       //    anything already in the plan.
       const toPlace: string[] = []
       const willPlace = new Set<string>()
-      for (const pyear of parsed.years) {
+      const requiredCourseCodes = new Set<string>()
+      const preferredWindow = new Map<string, { start: number; end: number }>()
+      const placeOrder = new Map<string, number>()
+      const yearNameToIndex: Record<string, number> = {
+        '1': 0,
+        first: 0,
+        one: 0,
+        '2': 1,
+        second: 1,
+        two: 1,
+        '3': 2,
+        third: 2,
+        three: 2,
+        '4': 3,
+        fourth: 3,
+        four: 3,
+        '5': 4,
+        fifth: 4,
+        five: 4,
+      }
+      const requirementYearWindow = (
+        label: string,
+        fallback: number,
+      ): { start: number; end: number } => {
+        const lower = label.toLowerCase()
+        const word = lower.match(
+          /\b(first|second|third|fourth|fifth)\b(?:\s+and\s+\b(first|second|third|fourth|fifth)\b)?/,
+        )
+        if (word) {
+          const first = yearNameToIndex[word[1]]
+          const second = word[2] ? yearNameToIndex[word[2]] : first
+          return {
+            start: Math.min(first, second),
+            end: Math.max(first, second),
+          }
+        }
+        const numeric = lower.match(
+          /\byear\s+([1-5]|one|two|three|four|five)\b/,
+        )
+        if (numeric) {
+          const yearIdx = yearNameToIndex[numeric[1]]
+          return { start: yearIdx, end: yearIdx }
+        }
+        return { start: fallback, end: fallback }
+      }
+      const scheduledCodesForRequirement = (
+        item: { mode: 'oneof' | 'all'; codes: string[]; groups: string[][] },
+      ): string[] => {
+        if (item.groups.length > 0) {
+          return item.groups
+            .map((group) => group.find((c) => planned.has(c)) ?? group[0])
+            .filter(Boolean)
+        }
+        if (item.mode === 'oneof') {
+          const code = item.codes.find((c) => planned.has(c)) ?? item.codes[0]
+          return code ? [code] : []
+        }
+        return item.codes
+      }
+      const addAutofillCourse = (
+        code: string,
+        window: { start: number; end: number },
+      ): void => {
+        if (!courseIndex.has(code)) return
+        if (!preferredWindow.has(code)) preferredWindow.set(code, window)
+        if (!placeOrder.has(code)) placeOrder.set(code, toPlace.length)
+        if (planned.has(code) || willPlace.has(code)) return
+        willPlace.add(code)
+        toPlace.push(code)
+      }
+      for (const [pyearIdx, pyear] of parsed.years.entries()) {
+        const rawWindow = requirementYearWindow(pyear.label, pyearIdx)
+        const window = {
+          start: Math.max(0, Math.min(rawWindow.start, years.length - 1)),
+          end: Math.max(0, Math.min(rawWindow.end, years.length - 1)),
+        }
         for (const item of pyear.items) {
           if (item.kind !== 'course') continue
           const key = requirementKey(req.program_url, pyear.label, item)
+          if (!checked.has(key)) {
+            for (const code of scheduledCodesForRequirement(item)) {
+              if (courseIndex.has(code)) requiredCourseCodes.add(code)
+            }
+          }
           if (isRequirementMet(item, planned) || checked.has(key)) continue
-          const chosen =
-            item.mode === 'oneof' ? item.codes.slice(0, 1) : item.codes
+          const chosen = autofillCodesForRequirement(item)
           for (const code of chosen) {
-            if (!courseIndex.has(code)) continue
-            if (planned.has(code) || willPlace.has(code)) continue
-            willPlace.add(code)
-            toPlace.push(code)
+            addAutofillCourse(code, window)
           }
         }
       }
-      if (toPlace.length === 0) {
-        window.alert('All requirements are already in the plan or fulfilled.')
-        return
-      }
-
-      // Every code that will live in the plan once we're done. Only courses
-      // actually present can constrain ordering, so prereq/coreq edges below
-      // are filtered to this set.
-      const planSet = new Set([...planned, ...willPlace])
 
       // Every code referenced anywhere in a parsed requirement expression.
-      // Used (filtered to the plan) to wire up the push-back safety map.
+      // Used to expand prerequisite closure and wire up the push-back safety
+      // map.
       const astCodes = (e: Expr | null): string[] => {
         if (!e) return []
         switch (e.kind) {
@@ -714,6 +847,75 @@ function ActionsSection({
         const chunk = courseIndex.get(code)
         return chunk ? parsePrereq(parseCourseChunk(chunk).corequisites) : null
       }
+      const pickPrereqCodes = (
+        e: Expr | null,
+        selected: Set<string>,
+      ): string[] => {
+        if (!e) return []
+        switch (e.kind) {
+          case 'code':
+            return courseIndex.has(e.code) ? [e.code] : []
+          case 'and':
+            return [
+              ...new Set(
+                e.children.flatMap((c) =>
+                  c.kind === 'literal' || c.kind === 'soft'
+                    ? []
+                    : pickPrereqCodes(c, selected),
+                ),
+              ),
+            ]
+          case 'or': {
+            const options = e.children
+              .map((child, idx) => ({
+                idx,
+                codes: pickPrereqCodes(child, selected),
+              }))
+              .filter((option) => option.codes.length > 0)
+            options.sort(
+              (a, b) =>
+                a.codes.filter((code) => !selected.has(code)).length -
+                  b.codes.filter((code) => !selected.has(code)).length ||
+                a.codes.length - b.codes.length ||
+                a.idx - b.idx,
+            )
+            return options[0]?.codes ?? []
+          }
+          case 'flattened':
+            return pickPrereqCodes(e.subExpr, selected)
+          case 'soft':
+          case 'literal':
+            return []
+        }
+      }
+      const prerequisiteWindowFor = (
+        dependentCode: string,
+      ): { start: number; end: number } => {
+        const dependentWindow = preferredWindow.get(dependentCode)
+        if (!dependentWindow) return { start: 0, end: years.length - 1 }
+        return {
+          start: 0,
+          end: Math.max(0, dependentWindow.start),
+        }
+      }
+      for (let i = 0; i < toPlace.length; i++) {
+        const code = toPlace[i]
+        const selected = new Set([...planned, ...willPlace])
+        for (const prereq of pickPrereqCodes(prereqAstOf(code), selected)) {
+          if (!courseIndex.has(prereq)) continue
+          requiredCourseCodes.add(prereq)
+          addAutofillCourse(prereq, prerequisiteWindowFor(code))
+        }
+      }
+      if (toPlace.length === 0) {
+        window.alert('All requirements are already in the plan or fulfilled.')
+        return
+      }
+
+      // Every code that will live in the plan once we're done. Only courses
+      // actually present can constrain ordering, so prereq/coreq edges below
+      // are filtered to this set.
+      const planSet = new Set([...planned, ...willPlace])
 
       // Linear list of (year, term) slots in chronological order, and where
       // each course currently sits. Existing blocks seed `slot` as anchors.
@@ -728,10 +930,26 @@ function ActionsSection({
       )
       const lastSlot = slotOf.length - 1
       if (lastSlot < 0) return
+      const coursesPerTermTarget = Math.max(
+        1,
+        Math.ceil(requiredCourseCodes.size / slotOf.length),
+      )
+      const firstSlotInYear = years.map((_, yearIdx) =>
+        slotOf.findIndex((s) => s.yearIdx === yearIdx),
+      )
+      const preferredStartSlot = (code: string): number => {
+        const window = preferredWindow.get(code)
+        if (!window) return 0
+        const gi = firstSlotInYear[window.start]
+        return gi >= 0 ? gi : 0
+      }
 
-      // 2) PLACE AS EARLY AS POSSIBLE. To order a course we walk its prereq /
-      //    coreq AST and ask: by which term does the *plan* satisfy it? An AND
-      //    needs its latest child; an OR (an "either A, B, C") needs only its
+      // 2) PLACE NEAR THE REQUIREMENT YEAR. To order a course we walk its
+      //    prereq / coreq AST and ask: by which term does the *plan* satisfy
+      //    it? The course starts no earlier than the year where the requirement
+      //    row starts unless an existing prerequisite/corequisite anchor
+      //    forces it later. An AND needs its latest child; an OR (an "either A,
+      //    B, C") needs only its
       //    EARLIEST satisfiable branch — so a big "or" never floats a course to
       //    term 0 just because two of its options happen to both be planned,
       //    and never forces it after options it doesn't need. Branches the plan
@@ -746,15 +964,15 @@ function ActionsSection({
           case 'code':
             return planSet.has(e.code) ? earliest(e.code, stack) : null
           case 'and': {
-            // Need every evaluable conjunct; satisfied at the latest of them.
-            // A required conjunct the plan lacks can't be satisfied → no
-            // ordering (null) rather than an invented chain.
+            // Need every evaluable conjunct; satisfied at the latest planned
+            // one. Missing/unplanned conjuncts still show as validation
+            // errors later, but they must not erase ordering constraints from
+            // the planned prerequisites we do know about.
             let max = -1
             for (const c of e.children) {
               if (c.kind === 'literal' || c.kind === 'soft') continue
               const s = reqSlot(c, stack)
-              if (s === null) return null
-              max = Math.max(max, s)
+              if (s !== null) max = Math.max(max, s)
             }
             return max < 0 ? null : max
           }
@@ -778,9 +996,9 @@ function ActionsSection({
         if (slot.has(code) && !willPlace.has(code)) return slot.get(code)!
         const cached = earliestMemo.get(code)
         if (cached != null) return cached
-        if (stack.has(code)) return 0
+        if (stack.has(code)) return preferredStartSlot(code)
         stack.add(code)
-        let e = 0
+        let e = preferredStartSlot(code)
         const pre = reqSlot(prereqAstOf(code), stack)
         if (pre !== null) e = Math.max(e, pre + 1) // prereqs finish earlier
         const co = reqSlot(coreqAstOf(code), stack)
@@ -825,29 +1043,59 @@ function ActionsSection({
         }
         return true
       }
+      const preferredYearDistance = (code: string, gi: number): number => {
+        const window = preferredWindow.get(code)
+        if (!window) return 0
+        const yearIdx = slotOf[gi].yearIdx
+        if (yearIdx < window.start) return window.start - yearIdx
+        if (yearIdx > window.end) return yearIdx - window.end
+        return 0
+      }
+      const worsensPreferredYearDistance = (
+        code: string,
+        fromGi: number,
+        toGi: number,
+      ): boolean =>
+        preferredYearDistance(code, toGi) >
+        preferredYearDistance(code, fromGi)
+      const pushCost = (code: string, toGi: number): number =>
+        preferredYearDistance(code, toGi) * 1000 +
+        Math.max(0, toGi - preferredStartSlot(code))
 
       // 3) PUSH BACK TO MEET THE LIMIT. Sweep terms earliest → latest; while a
-      //    term is over the preferred load, push one course we added into the
+      //    term is over the computed load target, push one course we added into the
       //    next term (never a user-placed block), choosing one that can move
-      //    without breaking an order and has the fewest dependents (keep the
-      //    heavily-depended-on courses early). Repeat the sweep because moving
-      //    a dependent course later can open room for its prerequisite on an
-      //    earlier term. The limit is a soft target: if nothing can move, the
-      //    term is left a little heavy rather than dropping a required course.
+      //    without breaking an order. Prefer moves that stay in the mentioned
+      //    year/window; when the year is over capacity, allow spillover but
+      //    make each extra year increasingly expensive. Then choose the course
+      //    with the fewest dependents (keep the heavily-depended-on courses
+      //    early). Repeat the sweep because moving a dependent course later
+      //    can open room for its prerequisite on an earlier term. The limit is
+      //    a soft target: if nothing can move, the term is left a little heavy
+      //    rather than dropping a required course.
       let pushed = true
       while (pushed) {
         pushed = false
         for (let gi = 0; gi < lastSlot; gi++) {
-          while (load[gi] > preferredCoursesPerTerm) {
-            const movable = toPlace
-              .filter((c) => slot.get(c) === gi && canPush(c, gi + 1))
-              .sort(
-                (a, b) =>
-                  (dependents.get(a)?.length ?? 0) -
-                    (dependents.get(b)?.length ?? 0) || a.localeCompare(b),
-              )
+          while (load[gi] > coursesPerTermTarget) {
+            const movable = toPlace.filter(
+              (c) => slot.get(c) === gi && canPush(c, gi + 1),
+            )
             if (movable.length === 0) break
-            const c = movable[0]
+            const preferredMovable = movable.filter(
+              (c) => !worsensPreferredYearDistance(c, gi, gi + 1),
+            )
+            const candidates =
+              preferredMovable.length > 0 ? preferredMovable : movable
+            candidates.sort(
+              (a, b) =>
+                pushCost(a, gi + 1) - pushCost(b, gi + 1) ||
+                (dependents.get(a)?.length ?? 0) -
+                  (dependents.get(b)?.length ?? 0) ||
+                (placeOrder.get(b) ?? 0) - (placeOrder.get(a) ?? 0) ||
+                a.localeCompare(b),
+            )
+            const c = candidates[0]
             slot.set(c, gi + 1)
             load[gi]--
             load[gi + 1]++

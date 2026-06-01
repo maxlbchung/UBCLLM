@@ -186,6 +186,23 @@ For `kind: "tent"` it renders two faces:
 - one front triangle facing the camera and pointing directly up;
 - one inward rectangular side face facing the y-axis.
 
+For `kind: "slope"` it renders two faces:
+
+- one front right-triangle face;
+- one sloped rectangular face.
+
+`facing: "left" | "right" | "front" | "back"` controls the named slope
+orientation. The names are intentionally swapped from the original internal
+draft: old `left` became `right`, old `right` became `left`, old `front` became
+`back`, and old `back` became `front`. If omitted, left-side objects default to
+`left` and right-side objects default to `right`, preserving the original
+inward-facing default.
+
+For width-wise slopes, the tall-side rectangle is only drawn when that side is
+the screen-inward visible side: a `left` slope on the left side of the screen
+draws its right-side rectangle, and a `right` slope on the right side draws its
+left-side rectangle.
+
 Triangle faces are one DOM element each with a clipped `::after` inset that
 creates the border and opaque `var(--canvas)` fill. Avoid segmenting the
 triangles into many line elements.
@@ -288,9 +305,9 @@ To place an object anywhere on the grid, add a `GridBoxSpec`:
 }
 ```
 
-Supported `kind` values are `cube`, `pyramid`, `tent`, and `halfCylinder`. The
-old `box` kind is still accepted as a compatibility alias for `cube`. Missing
-or invalid values default to `cube`.
+Supported `kind` values are `cube`, `pyramid`, `tent`, `halfCylinder`, and
+`slope`. The old `box` kind is still accepted as a compatibility alias for
+`cube`. Missing or invalid values default to `cube`.
 
 Placement rules:
 

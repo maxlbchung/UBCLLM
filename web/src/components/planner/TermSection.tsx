@@ -21,6 +21,7 @@ interface TermSectionProps {
   term: Term
   courseIndex: Map<string, Chunk>
   validations: Map<string, BlockValidation>
+  requirementCodes: Set<string>
 }
 
 export function TermSection({
@@ -29,6 +30,7 @@ export function TermSection({
   term,
   courseIndex,
   validations,
+  requirementCodes,
 }: TermSectionProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: `term:${yearId}:${termIdx}`,
@@ -99,6 +101,7 @@ export function TermSection({
               code={b.code}
               chunk={courseIndex.get(b.code)}
               validation={validations.get(b.id) ?? EMPTY_VALIDATION}
+              fulfillsRequirement={requirementCodes.has(b.code)}
             />
           ))}
           {term.blocks.length === 0 && (

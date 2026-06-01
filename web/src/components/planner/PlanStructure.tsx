@@ -4,10 +4,8 @@
 // header. Shrinking either dimension can drop already-planned blocks, so
 // both selectors guard the change with a confirm naming the loss.
 import {
-  MAX_PREFERRED_PER_TERM,
   MAX_TERMS,
   MAX_YEARS,
-  MIN_PREFERRED_PER_TERM,
   MIN_TERMS,
   MIN_YEARS,
   usePlanner,
@@ -17,12 +15,8 @@ import { playSfx } from '../../lib/sfx'
 export function PlanStructure() {
   const years = usePlanner((s) => s.years)
   const termsPerYear = usePlanner((s) => s.termsPerYear)
-  const preferredCoursesPerTerm = usePlanner((s) => s.preferredCoursesPerTerm)
   const setYearCount = usePlanner((s) => s.setYearCount)
   const setTermsPerYear = usePlanner((s) => s.setTermsPerYear)
-  const setPreferredCoursesPerTerm = usePlanner(
-    (s) => s.setPreferredCoursesPerTerm,
-  )
 
   return (
     <div className="flex flex-col gap-2">
@@ -112,26 +106,6 @@ export function PlanStructure() {
           </select>
         </label>
       </div>
-      <label className="flex flex-col gap-1 min-w-0 text-sm">
-        <span className="text-xs text-fg-muted">Preferred courses per term</span>
-        <select
-          value={preferredCoursesPerTerm}
-          onChange={(e) => {
-            setPreferredCoursesPerTerm(Number(e.target.value))
-            playSfx('click')
-          }}
-          className="bg-input border border-line-soft text-fg rounded px-2 py-1 text-sm focus:outline-none focus:border-fg-faint"
-        >
-          {Array.from(
-            { length: MAX_PREFERRED_PER_TERM - MIN_PREFERRED_PER_TERM + 1 },
-            (_, i) => MIN_PREFERRED_PER_TERM + i,
-          ).map((n) => (
-            <option key={n} value={n}>
-              {n}
-            </option>
-          ))}
-        </select>
-      </label>
     </div>
   )
 }

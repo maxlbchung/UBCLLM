@@ -10,9 +10,15 @@ interface YearColumnProps {
   year: Year
   courseIndex: Map<string, Chunk>
   validations: Map<string, BlockValidation>
+  requirementCodes: Set<string>
 }
 
-export function YearColumn({ year, courseIndex, validations }: YearColumnProps) {
+export function YearColumn({
+  year,
+  courseIndex,
+  validations,
+  requirementCodes,
+}: YearColumnProps) {
   return (
     <section className="flex flex-col gap-2 min-w-0 min-h-0 h-full">
       <header className="px-1 shrink-0">
@@ -27,6 +33,7 @@ export function YearColumn({ year, courseIndex, validations }: YearColumnProps) 
             term={term}
             courseIndex={courseIndex}
             validations={validations}
+            requirementCodes={requirementCodes}
           />
         ))}
       </div>

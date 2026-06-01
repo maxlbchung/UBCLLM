@@ -19,6 +19,7 @@ interface CourseBlockProps {
   code: string
   chunk: Chunk | undefined
   validation: BlockValidation
+  fulfillsRequirement?: boolean
   ghost?: boolean
 }
 
@@ -27,6 +28,7 @@ export function CourseBlock({
   code,
   chunk,
   validation,
+  fulfillsRequirement = false,
   ghost = false,
 }: CourseBlockProps) {
   const {
@@ -46,9 +48,11 @@ export function CourseBlock({
     opacity: isDragging ? 0.4 : 1,
   }
 
-  const borderClass = validation.ok
-    ? 'border-line hover:border-line-soft'
-    : 'border-danger-fg'
+  const borderClass = !validation.ok
+    ? 'border-danger-fg'
+    : fulfillsRequirement
+      ? 'border-line hover:border-line-soft'
+      : 'border-white hover:border-white'
 
   // Parse prereq/coreq trees once per block so the popup can render
   // them with clause-level highlighting against the snapshot completed

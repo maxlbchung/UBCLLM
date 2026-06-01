@@ -1,9 +1,16 @@
-export type HomeBackgroundShape = 'cube' | 'pyramid' | 'tent' | 'halfCylinder'
+export type HomeBackgroundShape =
+  | 'cube'
+  | 'pyramid'
+  | 'tent'
+  | 'halfCylinder'
+  | 'slope'
+export type HomeBackgroundFacing = 'left' | 'right' | 'front' | 'back'
 export type HomeBackgroundHatKind = Exclude<HomeBackgroundShape, 'cube'>
 
 export type HomeBackgroundHat = {
   kind: HomeBackgroundHatKind
   heightPx: number
+  facing?: HomeBackgroundFacing
 }
 
 export type HomeBackgroundBox = {
@@ -16,6 +23,7 @@ export type HomeBackgroundBox = {
   depthTiles: number
   heightPx: number
   opacity: number
+  facing?: HomeBackgroundFacing
 }
 
 export type HomeBackgroundScene = {
@@ -38,6 +46,7 @@ type RawStream = {
   heightPx?: number
   opacity?: number
   kind?: HomeBackgroundShape | 'box'
+  facing?: HomeBackgroundFacing
   hat?: Partial<HomeBackgroundHat>
 }
 
@@ -51,6 +60,7 @@ export type Brush = {
   widthTiles: number
   depthTiles: number
   kind: HomeBackgroundShape
+  facing: HomeBackgroundFacing
 }
 
 export const DEFAULT_TILE_SIZE = 64
@@ -111,13 +121,41 @@ function boundedNumber(value: unknown, fallback: number, min: number, max: numbe
 }
 
 function normalizeShape(value: unknown): HomeBackgroundShape {
+  if (value === 'slope') return value
   if (value === 'halfCylinder') return value
   if (value === 'pyramid' || value === 'tent') return value
   return 'cube'
 }
 
+function defaultSlopeFacing(xTiles: number): HomeBackgroundFacing {
+  return xTiles <= 0 ? 'left' : 'right'
+}
+
+function normalizeFacing(
+  value: unknown,
+  fallback: HomeBackgroundFacing,
+): HomeBackgroundFacing {
+  return value === 'left' ||
+    value === 'right' ||
+    value === 'front' ||
+    value === 'back'
+    ? value
+    : fallback
+}
+
+export function flipFacing(facing: HomeBackgroundFacing | undefined) {
+  if (facing === 'left') return 'right'
+  if (facing === 'right') return 'left'
+  return facing ?? 'right'
+}
+
 function normalizeHatKind(value: unknown): HomeBackgroundHatKind | null {
-  if (value === 'pyramid' || value === 'tent' || value === 'halfCylinder') {
+  if (
+    value === 'pyramid' ||
+    value === 'tent' ||
+    value === 'halfCylinder' ||
+    value === 'slope'
+  ) {
     return value
   }
   return null
@@ -131,6 +169,7 @@ function normalizeHat(value: unknown): HomeBackgroundHat | undefined {
   return {
     kind,
     heightPx: positiveNumber(raw.heightPx, DEFAULT_TILE_SIZE * 0.75),
+    facing: kind === 'slope' ? normalizeFacing(raw.facing, 'right') : undefined,
   }
 }
 
@@ -166,6 +205,10 @@ function normalizeBox(raw: unknown, index: number): HomeBackgroundBox | null {
     depthTiles: positiveNumber(box.depthTiles, 1),
     heightPx: positiveNumber(box.heightPx, DEFAULT_TILE_SIZE),
     opacity: clamp(numberOr(box.opacity, 0.72), 0, 1),
+    facing:
+      kind === 'slope'
+        ? normalizeFacing(box.facing, defaultSlopeFacing(xTiles))
+        : undefined,
   }
 }
 
@@ -202,6 +245,10 @@ function expandStream(raw: unknown, index: number): HomeBackgroundBox[] {
       depthTiles,
       heightPx,
       opacity,
+      facing:
+        kind === 'slope'
+          ? normalizeFacing(stream.facing, defaultSlopeFacing(xTiles))
+          : undefined,
     }
   })
 }
@@ -264,6 +311,11 @@ export function serializeScene(scene: HomeBackgroundScene): HomeBackgroundScene 
           ? {
               hat: {
                 kind: box.hat.kind,
+                ...(box.hat.kind === 'slope'
+                  ? {
+                      facing: normalizeFacing(box.hat.facing, 'right'),
+                    }
+                  : {}),
                 heightPx: serializedHeightPx(
                   box.hat.kind,
                   box.widthTiles,
@@ -275,6 +327,14 @@ export function serializeScene(scene: HomeBackgroundScene): HomeBackgroundScene 
           : {}),
         xTiles: box.xTiles,
         yTiles: box.yTiles,
+        ...(box.kind === 'slope'
+          ? {
+              facing: normalizeFacing(
+                box.facing,
+                defaultSlopeFacing(box.xTiles),
+              ),
+            }
+          : {}),
         widthTiles: box.widthTiles,
         depthTiles: box.depthTiles,
         heightPx: serializedHeightPx(
@@ -358,6 +418,7 @@ export function makeBoxForArea(
     yTiles: anchor.minY,
     kind: brush.kind,
     hat: brush.kind === 'cube' && existing?.kind === 'cube' ? existing.hat : undefined,
+    facing: brush.kind === 'slope' ? brush.facing : undefined,
     widthTiles: Math.max(1, anchor.widthTiles),
     depthTiles: Math.max(1, anchor.depthTiles),
     heightPx: Math.max(1, brush.heightPx),

@@ -53,9 +53,6 @@ interface PlannerState {
   // store (not derived from years[0].terms.length) so the persisted value
   // survives a year-count change that would otherwise drop the signal.
   termsPerYear: number
-  // Preferred courses per term — a soft target used only by the autofill
-  // scheduler to balance the spread. Manual drag-in ignores it entirely.
-  preferredCoursesPerTerm: number
   faculty: string | null
   major: string | null
   minor: string | null
@@ -74,7 +71,6 @@ interface PlannerState {
 
   setYearCount: (n: number) => void
   setTermsPerYear: (n: number) => void
-  setPreferredCoursesPerTerm: (n: number) => void
   addBlock: (yearId: string, termIdx: number, code: string) => void
   // Batch insert (used by autofill) so the whole fill is a single undo step.
   addBlocks: (
@@ -108,13 +104,6 @@ export const MIN_TERMS = 1
 export const MAX_TERMS = 3
 export const DEFAULT_YEARS = 4
 export const DEFAULT_TERMS = 2
-// Preferred per-term course load. A soft target the autofill scheduler aims
-// for when spreading courses; drag-in is NOT constrained by it (the user can
-// stack a term as high as they like by hand).
-export const MIN_PREFERRED_PER_TERM = 3
-export const MAX_PREFERRED_PER_TERM = 10
-export const DEFAULT_PREFERRED_PER_TERM = 5
-
 function newId(): string {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
     return crypto.randomUUID()
@@ -187,7 +176,6 @@ export const usePlanner = create<PlannerState>()(
     (set) => ({
       years: initialYears(),
       termsPerYear: DEFAULT_TERMS,
-      preferredCoursesPerTerm: DEFAULT_PREFERRED_PER_TERM,
       faculty: null,
       major: null,
       minor: null,
@@ -235,15 +223,6 @@ export const usePlanner = create<PlannerState>()(
           })
           return commit(s, { years, termsPerYear: target })
         }),
-
-      setPreferredCoursesPerTerm: (n) =>
-        set(() => ({
-          preferredCoursesPerTerm: clamp(
-            n,
-            MIN_PREFERRED_PER_TERM,
-            MAX_PREFERRED_PER_TERM,
-          ),
-        })),
 
       addBlock: (yearId, termIdx, code) =>
         set((s) => {
@@ -412,7 +391,6 @@ export const usePlanner = create<PlannerState>()(
       partialize: (s) => ({
         years: s.years,
         termsPerYear: s.termsPerYear,
-        preferredCoursesPerTerm: s.preferredCoursesPerTerm,
         faculty: s.faculty,
         major: s.major,
         minor: s.minor,

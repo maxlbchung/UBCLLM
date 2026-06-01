@@ -266,23 +266,27 @@ export function Sidebar() {
     <>
       <aside className="w-72 shrink-0 flex flex-col bg-canvas border-r border-line p-3 gap-3 h-screen">
         <div className="flex items-center justify-between">
-          <button
-            onClick={() => {
-              playSfx('tab')
-              navigate(ROUTES.home)
-            }}
-            className="flex items-center gap-2 min-w-0 text-left rounded hover:opacity-80"
-            aria-label="Back to home"
-            title="Back to home"
-          >
-            <img
-              src={`${import.meta.env.BASE_URL}logo.png`}
-              alt="Reodite"
-              className="h-5 w-5 shrink-0"
-            />
-            <h1 className="text-sm font-semibold tracking-wide">Reodite</h1>
-            <span className="text-[0.625rem] text-fg-faint">AI Academic Assistance</span>
-          </button>
+          <div className="flex items-center gap-2 min-w-0">
+            <button
+              onClick={() => {
+                playSfx('tab')
+                navigate(ROUTES.home)
+              }}
+              className="flex items-center gap-2 rounded hover:opacity-80 shrink-0"
+              aria-label="Back to home"
+              title="Back to home"
+            >
+              <img
+                src={`${import.meta.env.BASE_URL}logo.png`}
+                alt="Reodite"
+                className="h-5 w-5 shrink-0"
+              />
+              <h1 className="text-sm font-semibold tracking-wide">Reodite</h1>
+            </button>
+            <span className="text-[0.625rem] text-fg-faint truncate">
+              AI Academic Assistance
+            </span>
+          </div>
           <button
             onClick={() => {
               playSfx('collapse')

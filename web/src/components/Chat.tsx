@@ -66,8 +66,8 @@ export function Chat() {
   const setStreaming = useChat((s) => s.setStreaming)
   const view = useConversations((s) => s.view)
 
-  // Model lifecycle. The app auto-loads Qwen3.5 2B on startup
-  // (App.tsx → useLLMLoader.startLoad('2b')), so there's no picker.
+  // Model lifecycle. The app loads Qwen3.5 2B when the /app shell opens
+  // (App.tsx -> useLLMLoader.startLoad('2b')), so there's no picker.
   // The composer's send is gated on `loadedFor !== null` (the engine
   // is alive and ready) so pre-load submits can't fire.
   const loadingFor = useLLMLoader((s) => s.loadingFor)
@@ -537,7 +537,7 @@ export function Chat() {
 
 // ── Load error card ─────────────────────────────────────────────────
 //
-// Shown center-stage on a brand-new chat when the auto-load failed.
+// Shown center-stage on a brand-new chat when the model load failed.
 // There's no picker any more (we hardcoded Qwen3.5 2B), so this card
 // surfaces the error inline and gives the user retry / clear-cache
 // affordances. Once the conversation has any messages, mid-stream

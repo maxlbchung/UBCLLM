@@ -76,15 +76,17 @@ The full v1 stack from the original plan is shipped and live. Highlights:
 
 ## Versioning
 
-The app version is shown in the bottom-left of the screen on the main page (Sidebar) and on the model-loading screen (ModelLoader badge). Format: `MAJOR.MINOR.PATCH`.
+The app version is shown in the bottom-left of the screen on the main page (Sidebar) and on the model-loading screen (ModelLoader badge). Format: `MAJOR.SIGNIFICANT.PATCH`.
 
 - **MAJOR** — only bump when the user explicitly tells you to.
-- **SIGNIFICANT** — A significant architectural shift, new feature added, model change, etc. 
-- **PATCH** — everything else, and this is what you should default to. UX polish, prompt tweaks, layout refinements, error-handling improvements, bug fixes, dependency bumps, deploy/CI fixes, doc updates, small new affordances. When in doubt, PATCH.
+- **SIGNIFICANT** — significant architectural shifts, new pages or major features, model changes, etc.
+- **PATCH** — small features, bug fixes, polish, and other user-visible changes that are important enough to deserve a visible version change.
 
 Single source of truth: `web/src/version.ts` (`APP_VERSION`). Mirror it in `web/package.json` so npm tooling stays in sync.
 
-**Workflow:** every time you push or land a change, bump the appropriate digit (almost always PATCH), edit both files, build, commit, push, then tell the user the new version number in your reply (e.g. "Pushed v0.8.2 — …").
+Do **not** bump the version for every code edit by default. Bump only when the completed change is important enough to deserve a version number. For a sequence of small edits that are part of the same feature or fix, bump once at the end when that feature/fix is complete. Documentation-only changes, including edits to this file, do not require a version bump.
+
+Build, commit, and push are **not** mandatory for every change. The user can tell you when to commit or push. When you do make a versioned app change, update both version files and tell the user the resulting version number in the reply.
 
 ## Gotchas worth knowing
 

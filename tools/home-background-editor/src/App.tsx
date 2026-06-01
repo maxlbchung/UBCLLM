@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Brush,
   ClipboardPaste,
@@ -28,6 +28,7 @@ import {
   cellBounds,
   cellKey,
   createDefaultScene,
+  flipFacing,
   jsonForScene,
   makeBoxForArea,
   normalizeScene,
@@ -37,6 +38,7 @@ import {
   type Brush as BrushState,
   type Cell,
   type HomeBackgroundBox,
+  type HomeBackgroundFacing,
   type HomeBackgroundHatKind,
   type HomeBackgroundScene,
   type HomeBackgroundShape,
@@ -45,11 +47,6 @@ import {
 type PopupAnchor = {
   x: number
   y: number
-}
-
-type PopupPosition = {
-  left: number
-  top: number
 }
 
 type HistoryState = {
@@ -71,23 +68,44 @@ type CopyBuffer = {
   widthTiles: number
 }
 
+type RightPanelTab = 'selection' | 'scene'
+type HatOptionValue = 'none' | HomeBackgroundHatKind
+
 const API_PATH = '/api/home-background'
-const POPUP_MARGIN_PX = 16
-const POPUP_OFFSET_PX = 14
-const FALLBACK_POPUP_WIDTH_PX = 320
-const FALLBACK_POPUP_HEIGHT_PX = 260
+const MAX_HEIGHT_PX = 720
 const SHAPE_OPTIONS: { value: HomeBackgroundShape; label: string }[] = [
   { value: 'cube', label: 'Cube' },
   { value: 'pyramid', label: 'Pyramid' },
   { value: 'tent', label: 'Tent' },
   { value: 'halfCylinder', label: 'Semi-cylinder' },
+  { value: 'slope', label: 'Slope' },
 ]
-const HAT_OPTIONS: { value: HomeBackgroundHatKind | 'none'; label: string }[] = [
+const HAT_OPTIONS: { value: HatOptionValue; label: string }[] = [
   { value: 'none', label: 'No hat' },
   { value: 'pyramid', label: 'Pyramid' },
   { value: 'tent', label: 'Tent' },
   { value: 'halfCylinder', label: 'Semi-cylinder' },
+  { value: 'slope', label: 'Slope' },
 ]
+const SHAPE_LABELS: Record<HomeBackgroundShape, string> = {
+  cube: 'Cube',
+  pyramid: 'Pyramid',
+  tent: 'Tent',
+  halfCylinder: 'Semi-cylinder',
+  slope: 'Slope',
+}
+const FACING_OPTIONS: { value: HomeBackgroundFacing; label: string }[] = [
+  { value: 'right', label: 'Right' },
+  { value: 'left', label: 'Left' },
+  { value: 'front', label: 'Front' },
+  { value: 'back', label: 'Back' },
+]
+const MODE_LABELS: Record<EditorMode, string> = {
+  select: 'Select',
+  area: 'Area',
+  paint: 'Paint',
+  erase: 'Erase',
+}
 
 function cloneScene(scene: HomeBackgroundScene): HomeBackgroundScene {
   return normalizeScene(serializeScene(scene))
@@ -97,6 +115,7 @@ function cloneBox(box: HomeBackgroundBox): HomeBackgroundBox {
   return {
     ...box,
     hat: box.hat ? { ...box.hat } : undefined,
+    facing: box.facing,
   }
 }
 
@@ -104,29 +123,6 @@ function boxBounds(boxes: HomeBackgroundBox[]) {
   if (boxes.length === 0) return null
   const cells = boxes.flatMap(boxCells)
   return cellBounds(cells)
-}
-
-function clampNumber(value: number, min: number, max: number) {
-  return Math.min(Math.max(value, min), Math.max(min, max))
-}
-
-function clampedPopupPosition(anchor: PopupAnchor, rect?: DOMRect) {
-  const viewport = window.visualViewport
-  const viewportLeft = viewport?.offsetLeft ?? 0
-  const viewportTop = viewport?.offsetTop ?? 0
-  const viewportWidth = viewport?.width ?? window.innerWidth
-  const viewportHeight = viewport?.height ?? window.innerHeight
-  const popupWidth = rect?.width ?? FALLBACK_POPUP_WIDTH_PX
-  const popupHeight = rect?.height ?? FALLBACK_POPUP_HEIGHT_PX
-  const minLeft = viewportLeft + POPUP_MARGIN_PX
-  const minTop = viewportTop + POPUP_MARGIN_PX
-  const maxLeft = viewportLeft + viewportWidth - popupWidth - POPUP_MARGIN_PX
-  const maxTop = viewportTop + viewportHeight - popupHeight - POPUP_MARGIN_PX
-
-  return {
-    left: Math.round(clampNumber(anchor.x + POPUP_OFFSET_PX, minLeft, maxLeft)),
-    top: Math.round(clampNumber(anchor.y + POPUP_OFFSET_PX, minTop, maxTop)),
-  }
 }
 
 function sceneBounds(boxes: HomeBackgroundBox[]) {
@@ -194,9 +190,37 @@ function ShapeField({
       <span>Shape</span>
       <select
         value={value}
+        title="Brush shape (Shift+1, Shift+2, Shift+3, Shift+4, Shift+5)"
         onChange={(event) => onChange(event.target.value as HomeBackgroundShape)}
       >
         {SHAPE_OPTIONS.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  )
+}
+
+function FacingField({
+  label = 'Slope faces',
+  value,
+  onChange,
+}: {
+  label?: string
+  value: HomeBackgroundFacing
+  onChange: (value: HomeBackgroundFacing) => void
+}) {
+  return (
+    <label className="field">
+      <span>{label}</span>
+      <select
+        value={value}
+        title="Direction for slope blocks"
+        onChange={(event) => onChange(event.target.value as HomeBackgroundFacing)}
+      >
+        {FACING_OPTIONS.map((option) => (
           <option key={option.value} value={option.value}>
             {option.label}
           </option>
@@ -258,7 +282,6 @@ function RangeField({
 
 export function App() {
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const popupRef = useRef<HTMLDivElement>(null)
   const [scene, setScene] = useState<HomeBackgroundScene>(() => createDefaultScene())
   const sceneRef = useRef(scene)
   const initialLoadRequestRef = useRef(0)
@@ -267,11 +290,10 @@ export function App() {
   const selectedKeysRef = useRef(selectedKeys)
   const [hoverCell, setHoverCell] = useState<Cell | null>(null)
   const hoverCellRef = useRef<Cell | null>(null)
-  const [popupAnchor, setPopupAnchor] = useState<PopupAnchor | null>(null)
-  const [popupPosition, setPopupPosition] = useState<PopupPosition | null>(null)
   const [copyBuffer, setCopyBuffer] = useState<CopyBuffer | null>(null)
   const copyBufferRef = useRef<CopyBuffer | null>(null)
   const pasteCountRef = useRef(0)
+  const [rightPanelTab, setRightPanelTab] = useState<RightPanelTab>('selection')
   const [mode, setMode] = useState<EditorMode>('select')
   const [dirty, setDirty] = useState(false)
   const [status, setStatus] = useState('Ready')
@@ -280,6 +302,7 @@ export function App() {
     widthTiles: 1,
     depthTiles: 1,
     kind: 'cube',
+    facing: 'left',
   })
   const heightStepPx = scene.tileSize / 8
   const brushRef = useRef(brush)
@@ -302,52 +325,13 @@ export function App() {
     brushRef.current = brush
   }, [brush])
 
-  const updatePopupPosition = useCallback(() => {
-    if (!popupAnchor) {
-      setPopupPosition(null)
-      return
-    }
-
-    const nextPosition = clampedPopupPosition(
-      popupAnchor,
-      popupRef.current?.getBoundingClientRect(),
-    )
-    setPopupPosition((current) =>
-      current?.left === nextPosition.left && current.top === nextPosition.top
-        ? current
-        : nextPosition,
-    )
-  }, [popupAnchor])
-
-  useLayoutEffect(() => {
-    updatePopupPosition()
-  })
-
-  useEffect(() => {
-    if (!popupAnchor) return undefined
-
-    const popupElement = popupRef.current
-    const resizeObserver =
-      popupElement && 'ResizeObserver' in window
-        ? new ResizeObserver(updatePopupPosition)
-        : null
-
-    if (popupElement) resizeObserver?.observe(popupElement)
-    window.addEventListener('resize', updatePopupPosition)
-    window.visualViewport?.addEventListener('resize', updatePopupPosition)
-    window.visualViewport?.addEventListener('scroll', updatePopupPosition)
-
-    return () => {
-      resizeObserver?.disconnect()
-      window.removeEventListener('resize', updatePopupPosition)
-      window.visualViewport?.removeEventListener('resize', updatePopupPosition)
-      window.visualViewport?.removeEventListener('scroll', updatePopupPosition)
-    }
-  }, [popupAnchor, updatePopupPosition])
+  const clampHeightPx = (heightPx: number, minHeightPx = heightStepPx) =>
+    Math.min(MAX_HEIGHT_PX, Math.max(minHeightPx, Math.round(heightPx)))
 
   const updateBrush = (patch: Partial<BrushState>) => {
     setBrush((current) => {
       const next = { ...current, ...patch }
+      if (patch.heightPx != null) next.heightPx = clampHeightPx(patch.heightPx)
       brushRef.current = next
       return next
     })
@@ -365,13 +349,21 @@ export function App() {
     () => selectedBoxes.filter((box) => box.kind === 'cube'),
     [selectedBoxes],
   )
+  const selectedSlopeBoxes = useMemo(
+    () => selectedBoxes.filter((box) => box.kind === 'slope'),
+    [selectedBoxes],
+  )
   const selectedHat = useMemo(
     () => selectedCubeBoxes.find((box) => box.hat)?.hat,
     [selectedCubeBoxes],
   )
   const selectedHatKind = selectedHat?.kind ?? 'none'
+  const selectedHatValue: HatOptionValue = selectedHatKind
+  const selectedHatFacing = selectedHat?.facing ?? brush.facing
   const selectedHatHeightPx =
-    selectedHat?.heightPx ?? Math.round(scene.tileSize * 0.75)
+    selectedHat?.heightPx == null
+      ? Math.round(scene.tileSize * 0.75)
+      : Math.min(MAX_HEIGHT_PX, selectedHat.heightPx)
   const bounds = useMemo(() => sceneBounds(scene.boxes), [scene.boxes])
 
   const commitScene = (nextScene: HomeBackgroundScene, label: string) => {
@@ -394,7 +386,6 @@ export function App() {
     setHistory({ past: [], future: [] })
     selectedKeysRef.current = new Set()
     setSelectedKeys(new Set())
-    setPopupAnchor(null)
     setDirty(false)
     setStatus(label)
   }
@@ -403,7 +394,17 @@ export function App() {
     commitScene({ ...scene, ...patch }, 'Scene settings changed')
   }
 
-  const applyAreaCells = (cells: Cell[], anchor?: PopupAnchor) => {
+  const setEditorMode = (nextMode: EditorMode) => {
+    setMode(nextMode)
+    setStatus(`${MODE_LABELS[nextMode]} tool selected`)
+  }
+
+  const setBrushShape = (kind: HomeBackgroundShape) => {
+    updateBrush({ kind })
+    setStatus(`${SHAPE_LABELS[kind]} brush selected`)
+  }
+
+  const applyAreaCells = (cells: Cell[], _anchor?: PopupAnchor) => {
     if (cells.length === 0) return
     const sourceScene = sceneRef.current
     const currentBrush = brushRef.current
@@ -414,10 +415,10 @@ export function App() {
     const nextKeys = new Set(boxCells(nextBox).map(cellKey))
     selectedKeysRef.current = nextKeys
     setSelectedKeys(nextKeys)
-    if (anchor) setPopupAnchor(anchor)
+    setRightPanelTab('selection')
   }
 
-  const paintStrokeCells = (cells: Cell[], anchor?: PopupAnchor) => {
+  const paintStrokeCells = (cells: Cell[], _anchor?: PopupAnchor) => {
     const paintedCells = uniqueCells(cells)
     if (paintedCells.length === 0) return
 
@@ -440,6 +441,7 @@ export function App() {
           currentBrush.kind === 'cube' && existing?.kind === 'cube'
             ? existing.hat
             : undefined,
+        facing: currentBrush.kind === 'slope' ? currentBrush.facing : undefined,
         xTiles: cell.x,
         yTiles: cell.y,
         widthTiles: 1,
@@ -451,7 +453,7 @@ export function App() {
 
     commitScene({ ...sourceScene, boxes: [...remaining, ...nextBoxes] }, 'Painted stroke')
     selectBoxesFootprint(nextBoxes)
-    if (anchor) setPopupAnchor(anchor)
+    setRightPanelTab('selection')
   }
 
   const eraseCells = (cells: Cell[]) => {
@@ -465,10 +467,9 @@ export function App() {
     )
     selectedKeysRef.current = new Set()
     setSelectedKeys(new Set())
-    setPopupAnchor(null)
   }
 
-  const selectCells = (cells: Cell[], anchor: PopupAnchor, additive = false) => {
+  const selectCells = (cells: Cell[], _anchor: PopupAnchor, additive = false) => {
     const sourceScene = sceneRef.current
     const boxes = sourceScene.boxes.filter((box) => boxIntersectsCells(box, cells))
     if (boxes.length === 0) {
@@ -478,7 +479,6 @@ export function App() {
       }
       selectedKeysRef.current = new Set()
       setSelectedKeys(new Set())
-      setPopupAnchor(null)
       setStatus('No block selected')
       return
     }
@@ -501,16 +501,17 @@ export function App() {
     const firstBox = boxes[0]
     const nextBrush = {
       ...brushRef.current,
-      heightPx: firstBox.heightPx,
+      heightPx: clampHeightPx(firstBox.heightPx),
       widthTiles: firstBox.widthTiles,
       depthTiles: firstBox.depthTiles,
       kind: firstBox.kind,
+      facing: firstBox.facing ?? brushRef.current.facing,
     }
     brushRef.current = nextBrush
     setBrush(nextBrush)
     selectedKeysRef.current = nextKeys
     setSelectedKeys(nextKeys)
-    setPopupAnchor(anchor)
+    setRightPanelTab('selection')
     if (additive) {
       const addedCount = boxes.filter((box) => !previouslySelectedBoxes.has(box.id)).length
       setStatus(
@@ -545,14 +546,22 @@ export function App() {
     const heightDelta = patch.heightPx == null ? 0 : patch.heightPx - referenceHeight
     const boxes = sourceScene.boxes.map((box) => {
       if (!selectedIdSet.has(box.id)) return box
+      const kind = patch.kind ?? box.kind
+      const facing =
+        kind === 'slope'
+          ? patch.facing ?? box.facing ?? brushRef.current.facing
+          : undefined
       return {
         ...box,
+        kind,
+        hat: kind === 'cube' && box.kind === 'cube' ? box.hat : undefined,
+        facing,
         widthTiles: patch.widthTiles ?? box.widthTiles,
         depthTiles: patch.depthTiles ?? box.depthTiles,
         heightPx:
           patch.heightPx == null
             ? box.heightPx
-            : Math.max(1, Math.round(box.heightPx + heightDelta)),
+            : Math.min(MAX_HEIGHT_PX, Math.max(1, Math.round(box.heightPx + heightDelta))),
       }
     })
     const updatedSelected = boxes.filter((box) => selectedIdSet.has(box.id))
@@ -584,7 +593,10 @@ export function App() {
         ...box,
         hat: {
           ...box.hat,
-          heightPx: Math.max(1, Math.round(box.hat.heightPx + heightDelta)),
+          heightPx: Math.min(
+            MAX_HEIGHT_PX,
+            Math.max(1, Math.round(box.hat.heightPx + heightDelta)),
+          ),
         },
       }
     })
@@ -604,6 +616,48 @@ export function App() {
     }
     selectedKeysRef.current = nextKeys
     setSelectedKeys(nextKeys)
+  }
+
+  const clearSelection = () => {
+    if (selectedKeysRef.current.size === 0) {
+      setEditorMode('select')
+      return
+    }
+    selectedKeysRef.current = new Set()
+    setSelectedKeys(new Set())
+    setStatus('Selection cleared')
+  }
+
+  const selectAllBlocks = () => {
+    const boxes = sceneRef.current.boxes
+    if (boxes.length === 0) {
+      setStatus('No blocks to select')
+      return
+    }
+    selectBoxesFootprint(boxes)
+    setRightPanelTab('selection')
+    setStatus(`Selected all ${boxes.length} blocks`)
+  }
+
+  const deleteSelected = () => {
+    const cells = Array.from(selectedKeysRef.current).map(parseCellKey)
+    const selected = selectedBoxesForCells(sceneRef.current, cells)
+    if (selected.length === 0) {
+      setStatus('Select blocks before deleting')
+      return
+    }
+
+    const selectedIds = new Set(selected.map((box) => box.id))
+    commitScene(
+      {
+        ...sceneRef.current,
+        boxes: sceneRef.current.boxes.filter((box) => !selectedIds.has(box.id)),
+      },
+      `Deleted ${selected.length} ${selected.length === 1 ? 'block' : 'blocks'}`,
+    )
+    selectedKeysRef.current = new Set()
+    setSelectedKeys(new Set())
+    setRightPanelTab('selection')
   }
 
   const copySelection = () => {
@@ -657,6 +711,7 @@ export function App() {
       `Pasted ${pasted.length} ${pasted.length === 1 ? 'block' : 'blocks'}`,
     )
     selectBoxesFootprint(pasted)
+    setRightPanelTab('selection')
   }
 
   const resizeSelectedFootprint = (axis: 'x' | 'y', delta: number) => {
@@ -695,13 +750,18 @@ export function App() {
     }
     commitScene({ ...sceneRef.current, boxes }, delta > 0 ? 'Stretched selection' : 'Shrank selection')
     selectBoxesFootprint(updatedSelected)
+    setRightPanelTab('selection')
   }
 
   const updateSelected = (patch: Partial<BrushState>) => {
-    const nextBrush = { ...brushRef.current, ...patch }
+    const normalizedPatch =
+      patch.heightPx == null
+        ? patch
+        : { ...patch, heightPx: clampHeightPx(patch.heightPx) }
+    const nextBrush = { ...brushRef.current, ...normalizedPatch }
     brushRef.current = nextBrush
     setBrush(nextBrush)
-    const result = buildExistingBoxUpdate(sceneRef.current, selectedCells, patch)
+    const result = buildExistingBoxUpdate(sceneRef.current, selectedCells, normalizedPatch)
     if (!result) {
       setStatus('Select an existing block first')
       return
@@ -711,7 +771,7 @@ export function App() {
     selectBoxesFootprint(result.selectedBoxes)
   }
 
-  const updateSelectedHat = (kind: HomeBackgroundHatKind | 'none') => {
+  const updateSelectedHat = (value: HatOptionValue) => {
     const cells = Array.from(selectedKeysRef.current).map(parseCellKey)
     const sourceScene = sceneRef.current
     const selected = selectedBoxesForCells(sourceScene, cells).filter(
@@ -724,29 +784,73 @@ export function App() {
 
     hatEditStartRef.current = null
     const selectedIdSet = new Set(selected.map((box) => box.id))
-    const fallbackHeight =
-      selected.find((box) => box.hat)?.hat?.heightPx ??
-      Math.round(sourceScene.tileSize * 0.75)
-    const boxes = sourceScene.boxes.map((box) => {
-      if (!selectedIdSet.has(box.id) || box.kind !== 'cube') return box
-      if (kind === 'none') {
+    if (value === 'none') {
+      const boxes = sourceScene.boxes.map((box) => {
+        if (!selectedIdSet.has(box.id) || box.kind !== 'cube') return box
         const { hat: _hat, ...rest } = box
         return rest
-      }
+      })
+      const updatedSelected = boxes.filter((box) => selectedIdSet.has(box.id))
+      commitScene({ ...sourceScene, boxes }, 'Removed hats')
+      selectBoxesFootprint(updatedSelected)
+      return
+    }
+
+    const kind: HomeBackgroundHatKind = value
+    const existingHatHeight = selected.find((box) => box.hat)?.hat?.heightPx
+    const fallbackHeight =
+      existingHatHeight == null
+        ? Math.round(sourceScene.tileSize * 0.75)
+        : clampHeightPx(existingHatHeight)
+    const boxes = sourceScene.boxes.map((box) => {
+      if (!selectedIdSet.has(box.id) || box.kind !== 'cube') return box
       return {
         ...box,
         hat: {
           kind,
+          facing: kind === 'slope'
+            ? box.hat?.facing ?? brushRef.current.facing
+            : undefined,
           heightPx: box.hat?.heightPx ?? fallbackHeight,
         },
       }
     })
     const updatedSelected = boxes.filter((box) => selectedIdSet.has(box.id))
-    commitScene({ ...sourceScene, boxes }, kind === 'none' ? 'Removed hats' : 'Updated hats')
+    commitScene({ ...sourceScene, boxes }, 'Updated hats')
+    selectBoxesFootprint(updatedSelected)
+  }
+
+  const updateSelectedHatFacing = (facing: HomeBackgroundFacing) => {
+    const cells = Array.from(selectedKeysRef.current).map(parseCellKey)
+    const sourceScene = sceneRef.current
+    const selected = selectedBoxesForCells(sourceScene, cells).filter(
+      (box) => box.kind === 'cube' && box.hat?.kind === 'slope',
+    )
+    if (selected.length === 0) {
+      setStatus('Select cubes with slope hats first')
+      return
+    }
+
+    const selectedIdSet = new Set(selected.map((box) => box.id))
+    const boxes = sourceScene.boxes.map((box) => {
+      if (!selectedIdSet.has(box.id) || box.kind !== 'cube' || box.hat?.kind !== 'slope') {
+        return box
+      }
+      return {
+        ...box,
+        hat: {
+          ...box.hat,
+          facing,
+        },
+      }
+    })
+    const updatedSelected = boxes.filter((box) => selectedIdSet.has(box.id))
+    commitScene({ ...sourceScene, boxes }, 'Updated slope hat direction')
     selectBoxesFootprint(updatedSelected)
   }
 
   const previewSelectedHatHeight = (heightPx: number) => {
+    const nextHeightPx = clampHeightPx(heightPx)
     const cells = Array.from(selectedKeysRef.current).map(parseCellKey)
     if (!hatEditStartRef.current) {
       const selected = selectedBoxesForCells(sceneRef.current, cells).filter(
@@ -763,7 +867,7 @@ export function App() {
     const result = buildHatHeightUpdate(
       edit.scene,
       cells,
-      heightPx,
+      nextHeightPx,
       edit.selectedIds,
       edit.referenceHeightPx,
     )
@@ -793,8 +897,9 @@ export function App() {
   }
 
   const previewSelectedHeight = (heightPx: number) => {
+    const nextHeightPx = clampHeightPx(heightPx)
     const previousBrushHeight = brushRef.current.heightPx
-    const nextBrush = { ...brushRef.current, heightPx }
+    const nextBrush = { ...brushRef.current, heightPx: nextHeightPx }
     const cells = Array.from(selectedKeysRef.current).map(parseCellKey)
     if (!heightEditStartRef.current) {
       const selected = selectedBoxesForCells(sceneRef.current, cells)
@@ -809,7 +914,7 @@ export function App() {
     const result = buildExistingBoxUpdate(
       edit.scene,
       cells,
-      { heightPx },
+      { heightPx: nextHeightPx },
       edit.selectedIds,
       edit.referenceHeightPx,
     )
@@ -856,9 +961,12 @@ export function App() {
   })
 
   const nudgeSelected = (dx: number, dy: number, anchor?: PopupAnchor) => {
-    if (selectedBoxes.length === 0) return
+    if (selectedBoxes.length === 0) {
+      setStatus('Select blocks before moving')
+      return
+    }
     if (dx === 0 && dy === 0) {
-      if (anchor) setPopupAnchor(anchor)
+      if (anchor) setRightPanelTab('selection')
       return
     }
 
@@ -876,7 +984,7 @@ export function App() {
     commitScene({ ...sourceScene, boxes }, 'Moved selection')
     selectedKeysRef.current = movedBlockKeys
     setSelectedKeys(movedBlockKeys)
-    if (anchor) setPopupAnchor(anchor)
+    setRightPanelTab('selection')
   }
 
   const mirrorSelected = () => {
@@ -888,6 +996,10 @@ export function App() {
         ...box,
         id: `${box.id}-mirror-${Date.now().toString(36)}`,
         xTiles: -box.xTiles - box.widthTiles,
+        facing:
+          box.kind === 'slope'
+            ? flipFacing(box.facing ?? brushRef.current.facing)
+            : box.facing,
       }
       existing.set(boxAnchorKey(mirrored), mirrored)
       for (const cell of boxCells(mirrored)) {
@@ -900,18 +1012,84 @@ export function App() {
   }
 
   const randomizeSelected = () => {
-    const targets = selectedKeys.size > 0
-      ? new Set(selectedBoxes.map((box) => box.id))
-      : new Set(scene.boxes.map((box) => box.id))
-    const boxes = scene.boxes.map((box) =>
-      targets.has(box.id)
-        ? {
-            ...box,
-            heightPx: Math.round(scene.tileSize * (0.5 + Math.random() * 2.5)),
-          }
-        : box,
+    const cells = Array.from(selectedKeysRef.current).map(parseCellKey)
+    const selected = selectedBoxesForCells(sceneRef.current, cells)
+    if (selected.length === 0) {
+      setStatus('Select blocks before randomizing height')
+      return
+    }
+
+    const selectedIds = new Set(selected.map((box) => box.id))
+    const maxDeltaPx = 8
+    const stepPx = sceneRef.current.tileSize / 8
+    const boxes = sceneRef.current.boxes.map((box) => {
+      if (!selectedIds.has(box.id)) return box
+      const deltaPx = (Math.random() * 2 - 1) * maxDeltaPx
+      const nextHeightPx = Math.round(box.heightPx + deltaPx)
+      return {
+        ...box,
+        heightPx: Math.min(MAX_HEIGHT_PX, Math.max(stepPx, nextHeightPx)),
+      }
+    })
+    const updatedSelected = boxes.filter((box) => selectedIds.has(box.id))
+    commitScene({ ...sceneRef.current, boxes }, 'Randomized selected heights +/-8 px')
+    selectBoxesFootprint(updatedSelected)
+    setRightPanelTab('selection')
+  }
+
+  const applyBrushToSelection = () => {
+    updateSelected(brushRef.current)
+    setRightPanelTab('selection')
+  }
+
+  const adjustHeightBy = (deltaPx: number) => {
+    const sourceScene = sceneRef.current
+    const minHeightPx = sourceScene.tileSize / 8
+    const nextHeightPx = Math.min(
+      MAX_HEIGHT_PX,
+      Math.max(minHeightPx, Math.round(brushRef.current.heightPx + deltaPx)),
     )
-    commitScene({ ...scene, boxes }, 'Randomized heights')
+
+    if (selectedKeysRef.current.size > 0) {
+      updateSelected({ heightPx: nextHeightPx })
+      setRightPanelTab('selection')
+      return
+    }
+
+    updateBrush({ heightPx: nextHeightPx })
+    setStatus(`Brush height ${nextHeightPx}px`)
+  }
+
+  const adjustFootprintBy = (axis: 'x' | 'y', delta: number) => {
+    if (selectedKeysRef.current.size > 0) {
+      resizeSelectedFootprint(axis, delta)
+      return
+    }
+
+    const currentBrush = brushRef.current
+    if (axis === 'x') {
+      const widthTiles = Math.min(8, Math.max(1, currentBrush.widthTiles + delta))
+      updateBrush({ widthTiles })
+      setStatus(`Brush width ${widthTiles}`)
+      return
+    }
+
+    const depthTiles = Math.min(8, Math.max(1, currentBrush.depthTiles + delta))
+    updateBrush({ depthTiles })
+    setStatus(`Brush depth ${depthTiles}`)
+  }
+
+  const copySceneJson = async () => {
+    await navigator.clipboard.writeText(jsonForScene(sceneRef.current))
+    setStatus('Copied scene JSON')
+  }
+
+  const runAction = async (action: () => void | Promise<void>) => {
+    try {
+      await action()
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Action failed')
+    }
   }
 
   const undo = useCallback(() => {
@@ -951,30 +1129,100 @@ export function App() {
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (isTextEditingTarget(event.target)) return
-      if (!event.ctrlKey && !event.metaKey) return
 
+      const commandKey = event.ctrlKey || event.metaKey
       const key = event.key.toLowerCase()
-      if (key === 'z' && event.shiftKey) {
+      const code = event.code
+      const runShortcut = (action: () => void | Promise<void>) => {
         event.preventDefault()
-        redo()
-      } else if (key === 'z') {
-        event.preventDefault()
-        undo()
-      } else if (key === 'y') {
-        event.preventDefault()
-        redo()
-      } else if (key === 'c') {
-        event.preventDefault()
-        copySelection()
-      } else if (key === 'v') {
-        event.preventDefault()
-        pasteSelection()
+        void runAction(action)
+      }
+
+      if (commandKey && !event.altKey) {
+        if (code === 'KeyZ' && event.shiftKey) {
+          runShortcut(redo)
+        } else if (code === 'KeyZ') {
+          runShortcut(undo)
+        } else if (code === 'KeyY') {
+          runShortcut(redo)
+        } else if (code === 'KeyC') {
+          runShortcut(copySelection)
+        } else if (code === 'KeyV') {
+          runShortcut(pasteSelection)
+        } else if (code === 'KeyA') {
+          runShortcut(selectAllBlocks)
+        } else if (code === 'KeyS' && event.shiftKey) {
+          runShortcut(saveAsFile)
+        } else if (code === 'KeyS') {
+          runShortcut(saveHomeFile)
+        } else if (code === 'KeyO') {
+          runShortcut(loadHomeFile)
+        } else if (code === 'KeyI') {
+          event.preventDefault()
+          fileInputRef.current?.click()
+        }
+        return
+      }
+
+      if (event.altKey) return
+
+      if (code === 'Digit1' && event.shiftKey) {
+        runShortcut(() => setBrushShape('cube'))
+      } else if (code === 'Digit2' && event.shiftKey) {
+        runShortcut(() => setBrushShape('pyramid'))
+      } else if (code === 'Digit3' && event.shiftKey) {
+        runShortcut(() => setBrushShape('tent'))
+      } else if (code === 'Digit4' && event.shiftKey) {
+        runShortcut(() => setBrushShape('halfCylinder'))
+      } else if (code === 'Digit5' && event.shiftKey) {
+        runShortcut(() => setBrushShape('slope'))
+      } else if (code === 'Digit1') {
+        runShortcut(() => setEditorMode('select'))
+      } else if (code === 'Digit2') {
+        runShortcut(() => setEditorMode('area'))
+      } else if (code === 'Digit3') {
+        runShortcut(() => setEditorMode('paint'))
+      } else if (code === 'Digit4') {
+        runShortcut(() => setEditorMode('erase'))
+      } else if (key === 'escape') {
+        runShortcut(clearSelection)
+      } else if (key === 'delete' || key === 'backspace') {
+        runShortcut(deleteSelected)
+      } else if (key === 'arrowup') {
+        runShortcut(() => nudgeSelected(0, event.shiftKey ? -5 : -1))
+      } else if (key === 'arrowdown') {
+        runShortcut(() => nudgeSelected(0, event.shiftKey ? 5 : 1))
+      } else if (key === 'arrowleft') {
+        runShortcut(() => nudgeSelected(event.shiftKey ? -5 : -1, 0))
+      } else if (key === 'arrowright') {
+        runShortcut(() => nudgeSelected(event.shiftKey ? 5 : 1, 0))
+      } else if (code === 'BracketLeft') {
+        runShortcut(() => adjustFootprintBy(event.shiftKey ? 'y' : 'x', -1))
+      } else if (code === 'BracketRight') {
+        runShortcut(() => adjustFootprintBy(event.shiftKey ? 'y' : 'x', 1))
+      } else if (code === 'PageUp') {
+        runShortcut(() => adjustHeightBy(event.shiftKey ? sceneRef.current.tileSize : 8))
+      } else if (code === 'PageDown') {
+        runShortcut(() => adjustHeightBy(event.shiftKey ? -sceneRef.current.tileSize : -8))
+      } else if (code === 'Enter') {
+        runShortcut(applyBrushToSelection)
+      } else if (code === 'KeyM') {
+        runShortcut(mirrorSelected)
+      } else if (code === 'KeyH') {
+        runShortcut(randomizeSelected)
+      } else if (code === 'KeyJ') {
+        runShortcut(copySceneJson)
+      } else if (code === 'KeyT') {
+        runShortcut(() => {
+          setRightPanelTab((current) => current === 'selection' ? 'scene' : 'selection')
+          setStatus('Toggled details panel')
+        })
       }
     }
 
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [redo, undo])
+  })
 
   const loadHomeFile = async () => {
     const response = await fetch(API_PATH)
@@ -1100,27 +1348,6 @@ export function App() {
     setSelectedKeys(new Set())
   }
 
-  const runAction = async (action: () => void | Promise<void>) => {
-    try {
-      await action()
-    } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Action failed')
-    }
-  }
-
-  const popupStyle = popupAnchor
-    ? popupPosition
-      ? {
-          left: popupPosition.left,
-          top: popupPosition.top,
-        }
-      : {
-          left: POPUP_MARGIN_PX,
-          top: POPUP_MARGIN_PX,
-          visibility: 'hidden' as const,
-        }
-    : undefined
-
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -1137,6 +1364,7 @@ export function App() {
             onClick={undo}
             disabled={history.past.length === 0}
             title="Undo (Ctrl+Z)"
+            aria-keyshortcuts="Control+Z Meta+Z"
           >
             <Undo2 size={17} /> Undo
           </button>
@@ -1145,19 +1373,41 @@ export function App() {
             onClick={redo}
             disabled={history.future.length === 0}
             title="Redo (Ctrl+Y or Ctrl+Shift+Z)"
+            aria-keyshortcuts="Control+Y Meta+Y Control+Shift+Z Meta+Shift+Z"
           >
             <Redo2 size={17} /> Redo
           </button>
-          <button type="button" onClick={() => runAction(loadHomeFile)}>
+          <button
+            type="button"
+            onClick={() => runAction(loadHomeFile)}
+            title="Open home file (Ctrl+O)"
+            aria-keyshortcuts="Control+O Meta+O"
+          >
             <FolderOpen size={17} /> Open home file
           </button>
-          <button type="button" className="primary" onClick={() => runAction(saveHomeFile)}>
+          <button
+            type="button"
+            className="primary"
+            onClick={() => runAction(saveHomeFile)}
+            title="Save to repo (Ctrl+S)"
+            aria-keyshortcuts="Control+S Meta+S"
+          >
             <Save size={17} /> Save to repo
           </button>
-          <button type="button" onClick={() => runAction(saveAsFile)}>
+          <button
+            type="button"
+            onClick={() => runAction(saveAsFile)}
+            title="Save as JSON (Ctrl+Shift+S)"
+            aria-keyshortcuts="Control+Shift+S Meta+Shift+S"
+          >
             <Download size={17} /> Save as
           </button>
-          <button type="button" onClick={() => fileInputRef.current?.click()}>
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            title="Import JSON (Ctrl+I)"
+            aria-keyshortcuts="Control+I Meta+I"
+          >
             <Upload size={17} /> Import
           </button>
           <input
@@ -1181,32 +1431,36 @@ export function App() {
             <button
               type="button"
               className={mode === 'select' ? 'active' : ''}
-              onClick={() => setMode('select')}
-              title="Select existing blocks"
+              onClick={() => setEditorMode('select')}
+              title="Select existing blocks (1)"
+              aria-keyshortcuts="1"
             >
               <MousePointer2 size={18} /> Select
             </button>
             <button
               type="button"
               className={mode === 'area' ? 'active' : ''}
-              onClick={() => setMode('area')}
-              title="Create one stretched cuboid from the dragged rectangle"
+              onClick={() => setEditorMode('area')}
+              title="Create one stretched cuboid from the dragged rectangle (2)"
+              aria-keyshortcuts="2"
             >
               <Paintbrush size={18} /> Area
             </button>
             <button
               type="button"
               className={mode === 'paint' ? 'active' : ''}
-              onClick={() => setMode('paint')}
-              title="Draw a brush-sized line of cubes"
+              onClick={() => setEditorMode('paint')}
+              title="Draw a brush-sized line of cubes (3)"
+              aria-keyshortcuts="3"
             >
               <Brush size={18} /> Paint
             </button>
             <button
               type="button"
               className={mode === 'erase' ? 'active' : ''}
-              onClick={() => setMode('erase')}
-              title="Erase cells"
+              onClick={() => setEditorMode('erase')}
+              title="Erase cells (4)"
+              aria-keyshortcuts="4"
             >
               <Eraser size={18} /> Erase
             </button>
@@ -1218,7 +1472,7 @@ export function App() {
           <RangeField
             label="Height"
             min={heightStepPx}
-            max={scene.tileSize * 5}
+            max={MAX_HEIGHT_PX}
             step={heightStepPx}
             value={brush.heightPx}
             suffix=" px"
@@ -1228,6 +1482,12 @@ export function App() {
             value={brush.kind}
             onChange={(kind) => updateBrush({ kind })}
           />
+          {brush.kind === 'slope' && (
+            <FacingField
+              value={brush.facing}
+              onChange={(facing) => updateBrush({ facing })}
+            />
+          )}
           <div className="two-up">
             <NumberField
               label="Width"
@@ -1244,84 +1504,17 @@ export function App() {
               onChange={(depthTiles) => updateBrush({ depthTiles })}
             />
           </div>
-          <button type="button" className="wide" onClick={() => updateSelected(brush)}>
+          <button
+            type="button"
+            className="wide"
+            onClick={applyBrushToSelection}
+            title="Apply brush to selection (Enter)"
+            aria-keyshortcuts="Enter"
+          >
             <Brush size={17} /> Apply brush to selection
           </button>
         </section>
 
-        <section>
-          <h2>Selection</h2>
-          <div className="stats-grid">
-            <span>Cells</span>
-            <strong>{selectedKeys.size}</strong>
-            <span>Blocks</span>
-            <strong>{selectedBoxes.length}</strong>
-          </div>
-          <div className="button-grid">
-            <button
-              type="button"
-              disabled={selectedBoxes.length === 0}
-              onClick={copySelection}
-              title="Copy selected blocks"
-            >
-              <Copy size={17} /> Copy
-            </button>
-            <button
-              type="button"
-              disabled={!copyBuffer}
-              onClick={pasteSelection}
-              title="Paste copied blocks"
-            >
-              <ClipboardPaste size={17} /> Paste
-            </button>
-          </div>
-          <div className="nudge-pad">
-            <button type="button" onClick={() => nudgeSelected(0, -1)}>Y-</button>
-            <button type="button" onClick={() => nudgeSelected(-1, 0)}>X-</button>
-            <button type="button" onClick={() => nudgeSelected(1, 0)}>X+</button>
-            <button type="button" onClick={() => nudgeSelected(0, 1)}>Y+</button>
-          </div>
-          <div className="button-grid">
-            <button
-              type="button"
-              disabled={selectedBoxes.length === 0}
-              onClick={() => resizeSelectedFootprint('x', -1)}
-              title="Shrink selected width"
-            >
-              <Minimize2 size={17} /> Width -
-            </button>
-            <button
-              type="button"
-              disabled={selectedBoxes.length === 0}
-              onClick={() => resizeSelectedFootprint('x', 1)}
-              title="Stretch selected width"
-            >
-              <StretchHorizontal size={17} /> Width +
-            </button>
-            <button
-              type="button"
-              disabled={selectedBoxes.length === 0}
-              onClick={() => resizeSelectedFootprint('y', -1)}
-              title="Shrink selected depth"
-            >
-              <Minimize2 size={17} /> Depth -
-            </button>
-            <button
-              type="button"
-              disabled={selectedBoxes.length === 0}
-              onClick={() => resizeSelectedFootprint('y', 1)}
-              title="Stretch selected depth"
-            >
-              <StretchVertical size={17} /> Depth +
-            </button>
-          </div>
-          <div className="button-grid">
-            <button type="button" onClick={mirrorSelected}>
-              <FlipHorizontal2 size={17} /> Mirror
-            </button>
-            <button type="button" onClick={randomizeSelected}>Randomize</button>
-          </div>
-        </section>
       </aside>
 
       <main className="stage">
@@ -1346,188 +1539,360 @@ export function App() {
           <span>Paint brush lines</span>
           <strong>{hoverCell ? `x ${hoverCell.x}, y ${hoverCell.y}` : 'no cell'}</strong>
         </div>
-        {popupAnchor && selectedBoxes.length > 0 && (
-          <div ref={popupRef} className="selection-popover" style={popupStyle}>
-            <div className="popover-head">
-              <strong>{selectedKeys.size} selected</strong>
-              <button type="button" onClick={() => setPopupAnchor(null)}>Close</button>
-            </div>
-            <RangeField
-              label="Cube height"
-              min={heightStepPx}
-              max={scene.tileSize * 5}
-              step={heightStepPx}
-              value={brush.heightPx}
-              suffix=" px"
-              onChange={previewSelectedHeight}
-              onCommit={commitSelectedHeightPreview}
-            />
-            <div className="preset-row">
-              {[0.5, 1, 1.5, 2, 3].map((tiles) => (
-                <button
-                  type="button"
-                  key={tiles}
-                  onClick={() => updateSelected({ heightPx: scene.tileSize * tiles })}
-                >
-                  {tiles}x
-                </button>
-              ))}
-            </div>
-            <div className="button-grid">
-              <button type="button" onClick={copySelection}>
-                <Copy size={17} /> Copy
-              </button>
-              <button type="button" disabled={!copyBuffer} onClick={pasteSelection}>
-                <ClipboardPaste size={17} /> Paste
-              </button>
-            </div>
-            <div className="button-grid">
-              <button type="button" onClick={() => resizeSelectedFootprint('x', -1)}>
-                <Minimize2 size={17} /> Width -
-              </button>
-              <button type="button" onClick={() => resizeSelectedFootprint('x', 1)}>
-                <StretchHorizontal size={17} /> Width +
-              </button>
-              <button type="button" onClick={() => resizeSelectedFootprint('y', -1)}>
-                <Minimize2 size={17} /> Depth -
-              </button>
-              <button type="button" onClick={() => resizeSelectedFootprint('y', 1)}>
-                <StretchVertical size={17} /> Depth +
-              </button>
-            </div>
-            {selectedCubeBoxes.length > 0 && (
-              <div className="hat-controls">
-                <label className="field">
-                  <span>Hat</span>
-                  <select
-                    value={selectedHatKind}
-                    onChange={(event) =>
-                      updateSelectedHat(
-                        event.target.value as HomeBackgroundHatKind | 'none',
-                      )
-                    }
-                  >
-                    {HAT_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                {selectedHatKind !== 'none' && (
-                  <RangeField
-                    label="Hat height"
-                    min={heightStepPx}
-                    max={scene.tileSize * 5}
-                    step={heightStepPx}
-                    value={selectedHatHeightPx}
-                    suffix=" px"
-                    onChange={previewSelectedHatHeight}
-                    onCommit={commitSelectedHatHeightPreview}
-                  />
-                )}
-              </div>
-            )}
-            <button
-              type="button"
-              className="wide danger"
-              disabled={selectedBoxes.length === 0}
-              onClick={() => eraseCells(selectedCells)}
-            >
-              <Trash2 size={17} /> Delete selected blocks
-            </button>
-          </div>
-        )}
       </main>
 
       <aside className="panel right-panel">
-        <section>
-          <h2>Scene File</h2>
-          <div className="stats-grid">
-            <span>Status</span>
-            <strong>{dirty ? 'Unsaved' : 'Saved'}</strong>
-            <span>Cubes</span>
-            <strong>{scene.boxes.length}</strong>
-            <span>Bounds</span>
-            <strong>{bounds}</strong>
-          </div>
-          <p className="status-line">{status}</p>
-          <div className="button-grid">
-            <button
-              type="button"
-              onClick={undo}
-              disabled={history.past.length === 0}
-              title="Undo (Ctrl+Z)"
-            >
-              <Undo2 size={17} /> Undo
-            </button>
-            <button
-              type="button"
-              onClick={redo}
-              disabled={history.future.length === 0}
-              title="Redo (Ctrl+Y or Ctrl+Shift+Z)"
-            >
-              <Redo2 size={17} /> Redo
-            </button>
-            <button type="button" onClick={() => navigator.clipboard.writeText(jsonForScene(scene))}>
-              <FileJson size={17} /> Copy JSON
-            </button>
-          </div>
-        </section>
+        <div className="side-tabs" role="tablist" aria-label="Editor details">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={rightPanelTab === 'selection'}
+            className={rightPanelTab === 'selection' ? 'active' : ''}
+            onClick={() => setRightPanelTab('selection')}
+            title="Selection details (T toggles panel)"
+            aria-keyshortcuts="T"
+          >
+            Selected
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={rightPanelTab === 'scene'}
+            className={rightPanelTab === 'scene' ? 'active' : ''}
+            onClick={() => setRightPanelTab('scene')}
+            title="Scene data (T toggles panel)"
+            aria-keyshortcuts="T"
+          >
+            Scene Data
+          </button>
+        </div>
 
-        <section>
-          <h2>Home Runtime</h2>
-          <NumberField
-            label="Tile px"
-            min={24}
-            max={128}
-            value={scene.tileSize}
-            onChange={(tileSize) => updateSceneSettings({ tileSize })}
-          />
-          <NumberField
-            label="Horizon gap"
-            min={0}
-            max={240}
-            value={scene.horizonGapPx}
-            onChange={(horizonGapPx) => updateSceneSettings({ horizonGapPx })}
-          />
-          <NumberField
-            label="Scroll factor"
-            min={0.02}
-            max={1}
-            step={0.01}
-            value={scene.groundScrollFactor}
-            onChange={(groundScrollFactor) =>
-              updateSceneSettings({ groundScrollFactor })
-            }
-          />
-          <NumberField
-            label="Cylinder angle"
-            min={0}
-            max={90}
-            value={scene.halfCylinderShellArcAngleDeg}
-            onChange={(halfCylinderShellArcAngleDeg) =>
-              updateSceneSettings({ halfCylinderShellArcAngleDeg })
-            }
-          />
-        </section>
+        {rightPanelTab === 'selection' ? (
+          <div className="tab-panel">
+            <section>
+              <h2>Selected Object</h2>
+              <div className="stats-grid">
+                <span>Cells</span>
+                <strong>{selectedKeys.size}</strong>
+                <span>Blocks</span>
+                <strong>{selectedBoxes.length}</strong>
+                <span>Cubes</span>
+                <strong>{selectedCubeBoxes.length}</strong>
+                <span>Slopes</span>
+                <strong>{selectedSlopeBoxes.length}</strong>
+              </div>
+              <p className="status-line">{status}</p>
+              <div className="button-grid">
+                <button
+                  type="button"
+                  disabled={selectedBoxes.length === 0}
+                  onClick={copySelection}
+                  title="Copy selected blocks (Ctrl+C)"
+                  aria-keyshortcuts="Control+C Meta+C"
+                >
+                  <Copy size={17} /> Copy
+                </button>
+                <button
+                  type="button"
+                  disabled={!copyBuffer}
+                  onClick={pasteSelection}
+                  title="Paste copied blocks (Ctrl+V)"
+                  aria-keyshortcuts="Control+V Meta+V"
+                >
+                  <ClipboardPaste size={17} /> Paste
+                </button>
+              </div>
+              {selectedBoxes.length === 0 && (
+                <p className="status-line">
+                  Select a block or drag-select an area in the viewport.
+                </p>
+              )}
+            </section>
 
-        <section>
-          <h2>Presets</h2>
-          <div className="button-grid">
-            <button type="button" onClick={() => loadPreset('default')}>
-              <RotateCcw size={17} /> Default lanes
-            </button>
-            <button type="button" onClick={() => loadPreset('canyon')}>Canyon</button>
-            <button type="button" onClick={() => loadPreset('wave')}>Wave</button>
-            <button type="button" onClick={() => loadPreset('clear')}>Clear</button>
+            {selectedBoxes.length > 0 && (
+              <>
+                <section>
+                  <h2>Shape</h2>
+                  <ShapeField
+                    value={brush.kind}
+                    onChange={(kind) =>
+                      updateSelected({ kind, facing: brushRef.current.facing })
+                    }
+                  />
+                  {brush.kind === 'slope' && (
+                    <FacingField
+                      value={brush.facing}
+                      onChange={(facing) => updateSelected({ facing })}
+                    />
+                  )}
+                  <RangeField
+                    label="Height"
+                    min={heightStepPx}
+                    max={MAX_HEIGHT_PX}
+                    step={heightStepPx}
+                    value={brush.heightPx}
+                    suffix=" px"
+                    onChange={previewSelectedHeight}
+                    onCommit={commitSelectedHeightPreview}
+                  />
+                  <div className="preset-row">
+                    {[0.5, 1, 1.5, 2, 3].map((tiles) => (
+                      <button
+                        type="button"
+                        key={tiles}
+                        onClick={() => updateSelected({ heightPx: scene.tileSize * tiles })}
+                      >
+                        {tiles}x
+                      </button>
+                    ))}
+                  </div>
+                  <div className="button-grid">
+                    <button
+                      type="button"
+                      onClick={() => resizeSelectedFootprint('x', -1)}
+                      title="Shrink selected width ([)"
+                      aria-keyshortcuts="["
+                    >
+                      <Minimize2 size={17} /> Width -
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => resizeSelectedFootprint('x', 1)}
+                      title="Stretch selected width (])"
+                      aria-keyshortcuts="]"
+                    >
+                      <StretchHorizontal size={17} /> Width +
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => resizeSelectedFootprint('y', -1)}
+                      title="Shrink selected depth (Shift+[)"
+                      aria-keyshortcuts="Shift+["
+                    >
+                      <Minimize2 size={17} /> Depth -
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => resizeSelectedFootprint('y', 1)}
+                      title="Stretch selected depth (Shift+])"
+                      aria-keyshortcuts="Shift+]"
+                    >
+                      <StretchVertical size={17} /> Depth +
+                    </button>
+                  </div>
+                </section>
+
+                <section>
+                  <h2>Transform</h2>
+                  <div className="nudge-pad">
+                    <button
+                      type="button"
+                      onClick={() => nudgeSelected(0, -1)}
+                      title="Move selection up (ArrowUp, Shift+ArrowUp x5)"
+                      aria-keyshortcuts="ArrowUp Shift+ArrowUp"
+                    >
+                      Y-
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => nudgeSelected(-1, 0)}
+                      title="Move selection left (ArrowLeft, Shift+ArrowLeft x5)"
+                      aria-keyshortcuts="ArrowLeft Shift+ArrowLeft"
+                    >
+                      X-
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => nudgeSelected(1, 0)}
+                      title="Move selection right (ArrowRight, Shift+ArrowRight x5)"
+                      aria-keyshortcuts="ArrowRight Shift+ArrowRight"
+                    >
+                      X+
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => nudgeSelected(0, 1)}
+                      title="Move selection down (ArrowDown, Shift+ArrowDown x5)"
+                      aria-keyshortcuts="ArrowDown Shift+ArrowDown"
+                    >
+                      Y+
+                    </button>
+                  </div>
+                  <div className="button-grid">
+                    <button
+                      type="button"
+                      onClick={mirrorSelected}
+                      title="Mirror selection (M)"
+                      aria-keyshortcuts="M"
+                    >
+                      <FlipHorizontal2 size={17} /> Mirror
+                    </button>
+                    <button
+                      type="button"
+                      onClick={randomizeSelected}
+                      title="Randomize selected heights +/-8 px (H)"
+                      aria-keyshortcuts="H"
+                    >
+                      Height +/-8 px
+                    </button>
+                  </div>
+                </section>
+
+                {selectedCubeBoxes.length > 0 && (
+                  <section>
+                    <h2>Hat</h2>
+                    <label className="field">
+                      <span>Hat</span>
+                      <select
+                        value={selectedHatValue}
+                        onChange={(event) =>
+                          updateSelectedHat(
+                            event.target.value as HatOptionValue,
+                          )
+                        }
+                      >
+                        {HAT_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    {selectedHatKind === 'slope' && (
+                      <FacingField
+                        label="Direction"
+                        value={selectedHatFacing}
+                        onChange={updateSelectedHatFacing}
+                      />
+                    )}
+                    {selectedHatKind !== 'none' && (
+                      <RangeField
+                        label="Hat height"
+                        min={heightStepPx}
+                        max={MAX_HEIGHT_PX}
+                        step={heightStepPx}
+                        value={selectedHatHeightPx}
+                        suffix=" px"
+                        onChange={previewSelectedHatHeight}
+                        onCommit={commitSelectedHatHeightPreview}
+                      />
+                    )}
+                  </section>
+                )}
+
+                <section>
+                  <button
+                    type="button"
+                    className="wide danger"
+                    disabled={selectedBoxes.length === 0}
+                    onClick={deleteSelected}
+                    title="Delete selected blocks (Delete or Backspace)"
+                    aria-keyshortcuts="Delete Backspace"
+                  >
+                    <Trash2 size={17} /> Delete selected blocks
+                  </button>
+                </section>
+              </>
+            )}
           </div>
-        </section>
+        ) : (
+          <div className="tab-panel">
+            <section>
+              <h2>Scene File</h2>
+              <div className="stats-grid">
+                <span>Status</span>
+                <strong>{dirty ? 'Unsaved' : 'Saved'}</strong>
+                <span>Cubes</span>
+                <strong>{scene.boxes.length}</strong>
+                <span>Bounds</span>
+                <strong>{bounds}</strong>
+              </div>
+              <p className="status-line">{status}</p>
+              <div className="button-grid">
+                <button
+                  type="button"
+                  onClick={undo}
+                  disabled={history.past.length === 0}
+                  title="Undo (Ctrl+Z)"
+                  aria-keyshortcuts="Control+Z Meta+Z"
+                >
+                  <Undo2 size={17} /> Undo
+                </button>
+                <button
+                  type="button"
+                  onClick={redo}
+                  disabled={history.future.length === 0}
+                  title="Redo (Ctrl+Y or Ctrl+Shift+Z)"
+                  aria-keyshortcuts="Control+Y Meta+Y Control+Shift+Z Meta+Shift+Z"
+                >
+                  <Redo2 size={17} /> Redo
+                </button>
+                <button
+                  type="button"
+                  onClick={() => runAction(copySceneJson)}
+                  title="Copy scene JSON (J)"
+                  aria-keyshortcuts="J"
+                >
+                  <FileJson size={17} /> Copy JSON
+                </button>
+              </div>
+            </section>
 
-        <section className="json-section">
-          <h2>Preview JSON</h2>
-          <pre>{jsonForScene(scene).slice(0, 1800)}</pre>
-        </section>
+            <section>
+              <h2>Home Runtime</h2>
+              <NumberField
+                label="Tile px"
+                min={24}
+                max={128}
+                value={scene.tileSize}
+                onChange={(tileSize) => updateSceneSettings({ tileSize })}
+              />
+              <NumberField
+                label="Horizon gap"
+                min={0}
+                max={240}
+                value={scene.horizonGapPx}
+                onChange={(horizonGapPx) => updateSceneSettings({ horizonGapPx })}
+              />
+              <NumberField
+                label="Scroll factor"
+                min={0.02}
+                max={1}
+                step={0.01}
+                value={scene.groundScrollFactor}
+                onChange={(groundScrollFactor) =>
+                  updateSceneSettings({ groundScrollFactor })
+                }
+              />
+              <NumberField
+                label="Cylinder angle"
+                min={0}
+                max={90}
+                value={scene.halfCylinderShellArcAngleDeg}
+                onChange={(halfCylinderShellArcAngleDeg) =>
+                  updateSceneSettings({ halfCylinderShellArcAngleDeg })
+                }
+              />
+            </section>
+
+            <section>
+              <h2>Presets</h2>
+              <div className="button-grid">
+                <button type="button" onClick={() => loadPreset('default')}>
+                  <RotateCcw size={17} /> Default lanes
+                </button>
+                <button type="button" onClick={() => loadPreset('canyon')}>Canyon</button>
+                <button type="button" onClick={() => loadPreset('wave')}>Wave</button>
+                <button type="button" onClick={() => loadPreset('clear')}>Clear</button>
+              </div>
+            </section>
+
+            <section className="json-section">
+              <h2>Preview JSON</h2>
+              <pre>{jsonForScene(scene).slice(0, 1800)}</pre>
+            </section>
+          </div>
+        )}
       </aside>
     </div>
   )

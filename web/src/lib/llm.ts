@@ -108,9 +108,9 @@ if (typeof BroadcastChannel !== 'undefined') {
 // timeouts. Strict matching surfaces a real error in the load banner
 // instead, so we notice when WebLLM stops shipping a tier.
 //
-// Only the 2B matcher is reached in practice today; the app auto-loads
-// '2b' on startup with no user choice. The 4B and 9B matchers stay
-// here because RAG-length prefill on 3-4B-class models on this
+// Only the 2B matcher is reached in practice today; the app loads '2b' when
+// the app shell opens with no user choice. The 4B and 9B matchers stay here
+// because RAG-length prefill on 3-4B-class models on this
 // hardware/Chrome/Dawn combo deterministically hangs the GPU
 // (DXGI_ERROR_DEVICE_HUNG); they're kept so re-enabling either tier
 // later is a one-line change in the loader.
@@ -275,7 +275,7 @@ export function unloadEngine() {
 
 /**
  * The model size the engine is currently loaded for, or null if no
- * engine is alive. Mostly vestigial now that the app auto-loads 2B,
+ * engine is alive. Mostly vestigial now that the app only loads 2B,
  * but still useful as a "has the engine finished initializing" check.
  */
 export function getActiveModelSize(): ModelSize | null {

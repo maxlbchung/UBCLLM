@@ -1,6 +1,6 @@
-// Background model-load progress + status. The picker is gone — the
-// app auto-loads Qwen3.5 2B (the only supported tier) on startup. This
-// store still exposes a `startLoad(size)` API because the internal
+// Background model-load progress + status. The picker is gone — the app loads
+// Qwen3.5 2B (the only supported tier) when the app shell opens. This store
+// still exposes a `startLoad(size)` API because the internal
 // machinery (lib/llm.ts MLCEngine worker, lib/retrieve.ts per-tier
 // budgets) is tier-aware; callers just always pass '2b'.
 //
@@ -20,9 +20,9 @@ import { playSfx } from '../lib/sfx'
 import type { ModelSize } from './settings'
 import type { ChatError } from './chat'
 
-// The only tier the picker-less app ever loads. Kept as a named
+// The only tier the picker-less app loads. Kept as a named
 // constant so the retry / cache-and-retry paths and the App-level
-// startup effect all refer to the same value.
+// app-shell route effect all refer to the same value.
 export const DEFAULT_MODEL_SIZE: ModelSize = '2b'
 
 // Same WebLLM progress-string heuristic the legacy ModelLoader used.

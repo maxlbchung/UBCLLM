@@ -806,7 +806,7 @@ export function Home() {
         <div
           ref={landscapeRef}
           aria-hidden
-          className="home-landscape pointer-events-none fixed inset-0 overflow-hidden"
+          className="home-landscape home-background-fade pointer-events-none fixed inset-0 overflow-hidden"
         >
           <div className="home-landscape-sun home-glow" />
           <HomeThreeBackground

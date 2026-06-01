@@ -24,7 +24,7 @@ export type Theme = 'dark' | 'light' | 'royal' | 'terminal'
 export type Zoom = 75 | 100 | 125
 // Tier label kept around for the internal model-loading machinery
 // (lib/llm.ts matchers, lib/retrieve.ts token-budget map). Only '2b'
-// is ever loaded today — the app auto-loads Qwen3.5 2B on startup
+// is ever loaded today — the app loads Qwen3.5 2B when the app shell opens
 // with no user choice. The union retains '4b' / '9b' so re-enabling a
 // tier later is a one-file change.
 export type ModelSize = '2b' | '4b' | '9b'
@@ -73,8 +73,8 @@ export const useSettings = create<State>()(
     {
       name: 'reodite-settings',
       storage: createJSONStorage(() => localStorage),
-      // v6 (v1.10.4): model picking removed — Qwen3.5 2B auto-loads on
-      //   startup. Drop the persisted `model` field on rehydrate so it
+      // v6 (v1.10.4): model picking removed — Qwen3.5 2B loads when
+      //   the app shell opens. Drop the persisted `model` field on rehydrate so it
       //   doesn't linger in localStorage forever.
       version: 6,
       migrate: (persistedState, _version) => {

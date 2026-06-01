@@ -743,6 +743,7 @@ body {
   --box-side-fill: var(--canvas);
   --home-tile-size: 64px;
   --home-tile-half: calc(var(--home-tile-size) / 2);
+  right: var(--home-scrollbar-gutter, 0px);
 }
 
 /* Sun/sky glow sitting on the horizon; its upper half bleeds up behind the
@@ -769,6 +770,18 @@ body {
   box-shadow:
     0 0 14px 2px var(--grid-glow),
     0 0 48px 8px var(--accent-soft);
+}
+
+.home-three-background {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.home-three-background__canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 /* Perspective viewport for the floor — from the horizon down. The top fades

@@ -3,13 +3,20 @@ export type HomeBackgroundObjectKind =
   | 'box'
   | 'pyramid'
   | 'tent'
-  | 'halfCylinder';
+  | 'halfCylinder'
+  | 'slope';
 
-export type HomeBackgroundHatKind = Exclude<HomeBackgroundObjectKind, 'cube' | 'box'>
+export type HomeBackgroundFacing = 'left' | 'right' | 'front' | 'back'
+
+export type HomeBackgroundHatKind = Exclude<
+  HomeBackgroundObjectKind,
+  'cube' | 'box'
+>
 
 export type HomeBackgroundHat = {
   kind: HomeBackgroundHatKind
   heightPx: number
+  facing?: HomeBackgroundFacing
 }
 
 export type HomeBackgroundBox = {
@@ -22,6 +29,7 @@ export type HomeBackgroundBox = {
   depthTiles?: number
   heightPx?: number
   opacity?: number
+  facing?: HomeBackgroundFacing
 }
 
 export type HomeBackgroundScene = {
@@ -44,6 +52,7 @@ type HomeBackgroundBoxStream = {
   depthTiles?: number
   heightPx?: number
   opacity?: number
+  facing?: HomeBackgroundFacing
   hat?: Partial<HomeBackgroundHat>
 }
 
@@ -108,14 +117,40 @@ function boundedNumber(
 }
 
 function normalizeKind(value: unknown): HomeBackgroundObjectKind {
-  if (value === 'pyramid' || value === 'tent' || value === 'halfCylinder') {
+  if (
+    value === 'pyramid' ||
+    value === 'tent' ||
+    value === 'halfCylinder' ||
+    value === 'slope'
+  ) {
     return value
   }
   return 'cube'
 }
 
+function defaultSlopeFacing(xTiles: number): HomeBackgroundFacing {
+  return xTiles <= 0 ? 'left' : 'right'
+}
+
+function normalizeFacing(
+  value: unknown,
+  fallback: HomeBackgroundFacing,
+): HomeBackgroundFacing {
+  return value === 'left' ||
+    value === 'right' ||
+    value === 'front' ||
+    value === 'back'
+    ? value
+    : fallback
+}
+
 function normalizeHatKind(value: unknown): HomeBackgroundHatKind | null {
-  if (value === 'pyramid' || value === 'tent' || value === 'halfCylinder') {
+  if (
+    value === 'pyramid' ||
+    value === 'tent' ||
+    value === 'halfCylinder' ||
+    value === 'slope'
+  ) {
     return value
   }
   return null
@@ -129,6 +164,7 @@ function normalizeHat(value: unknown): HomeBackgroundHat | undefined {
   return {
     kind,
     heightPx: positiveNumber(raw.heightPx, HOME_BACKGROUND_TILE * 0.75),
+    facing: kind === 'slope' ? normalizeFacing(raw.facing, 'right') : undefined,
   }
 }
 
@@ -153,6 +189,10 @@ function normalizeBox(raw: unknown, index: number): HomeBackgroundBox | null {
     depthTiles: positiveNumber(box.depthTiles, 1),
     heightPx: positiveNumber(box.heightPx, HOME_BACKGROUND_TILE),
     opacity: Math.max(0, Math.min(1, finiteNumber(box.opacity, 1))),
+    facing:
+      kind === 'slope'
+        ? normalizeFacing(box.facing, defaultSlopeFacing(xTiles))
+        : undefined,
   }
 }
 
@@ -184,9 +224,13 @@ function expandBoxStream(raw: unknown, index: number): HomeBackgroundBox[] {
     xTiles,
     yTiles: startYTiles + i * stepYTiles,
     widthTiles,
-    depthTiles,
-    heightPx,
-    opacity,
+      depthTiles,
+      heightPx,
+      opacity,
+      facing:
+        kind === 'slope'
+          ? normalizeFacing(stream.facing, defaultSlopeFacing(xTiles))
+          : undefined,
   }))
 }
 

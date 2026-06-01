@@ -1,12 +1,9 @@
 import {
   useEffect,
   useLayoutEffect,
-  useMemo,
   useRef,
   useState,
-  type CSSProperties,
   type ComponentType,
-  type WheelEvent,
 } from 'react'
 import { useConversations } from '../store/conversations'
 import { ROUTES, navigate } from '../lib/router'
@@ -14,8 +11,8 @@ import { playSfx } from '../lib/sfx'
 import {
   FALLBACK_HOME_BACKGROUND_SCENE,
   loadHomeBackgroundScene,
-  type HomeBackgroundBox,
 } from '../lib/homeBackground'
+import { HomeThreeBackground } from './HomeThreeBackground'
 import {
   CalendarIcon,
   ChatIcon,
@@ -109,11 +106,10 @@ const ICON_TILE_CLASS =
 const SCROLL_CUE_CLASS =
   'group flex flex-col items-center gap-1.5 text-fg-faint transition-colors hover:text-accent'
 
+const SECTION_JUMP_CUE_CLASS =
+  `${SCROLL_CUE_CLASS} absolute left-1/2 z-20 -translate-x-1/2 font-mono text-[0.625rem] uppercase tracking-[0.22em]`
+
 const DEAD_SCROLLSPACE_CLASS = 'min-h-[60vh]'
-const CUBE_RENDER_MARGIN_TILES = 2
-const INITIAL_CUBE_TILE_RANGE = { min: -14, max: 10 }
-const HALF_CYLINDER_SHELL_MAX_HEIGHT_PX = 248
-const HALF_CYLINDER_SHELL_MAX_ARC_ANGLE_DEG = 90
 
 const SOCIAL_LINKS = [
   { label: 'GitHub', href: 'https://github.com/maxlbchung' },
@@ -123,194 +119,6 @@ const SOCIAL_LINKS = [
   { label: 'LinkedIn', href: 'https://www.linkedin.com/in/max-li-bo-chung/' },
   { label: 'Email', href: 'mailto:reodite@libo.dev' },
 ]
-
-function getPyramidFaceVars(
-  widthPx: number,
-  depthPx: number,
-  heightPx: number,
-) {
-  const halfWidth = Math.max(1, widthPx / 2)
-  const halfDepth = Math.max(1, depthPx / 2)
-  const frontSlant = Math.hypot(heightPx, halfDepth)
-  const sideSlant = Math.hypot(heightPx, halfWidth)
-  const frontAngle = -(Math.atan2(heightPx, halfDepth) * 180) / Math.PI
-  const sideAngle = (Math.atan2(heightPx, halfWidth) * 180) / Math.PI
-
-  return {
-    '--pyramid-front-angle': `${frontAngle.toFixed(4)}deg`,
-    '--pyramid-front-slant': `${frontSlant.toFixed(3)}px`,
-    '--pyramid-side-left-angle': `${(-sideAngle).toFixed(4)}deg`,
-    '--pyramid-side-right-angle': `${sideAngle.toFixed(4)}deg`,
-    '--pyramid-side-slant': `${sideSlant.toFixed(3)}px`,
-  } as CSSProperties
-}
-
-function getHalfCylinderShellVars(
-  baseArcAngleDeg: number,
-  heightPx: number,
-) {
-  const t = Math.max(
-    0,
-    Math.min(1, heightPx / HALF_CYLINDER_SHELL_MAX_HEIGHT_PX),
-  )
-  const easedT = t * t * (3 - 2 * t)
-  const arcAngleDeg =
-    baseArcAngleDeg +
-    (HALF_CYLINDER_SHELL_MAX_ARC_ANGLE_DEG - baseArcAngleDeg) * easedT
-  const angleRad = (arcAngleDeg * Math.PI) / 180
-  // The shell pivots from the interior diameter edge, but its free edge
-  // should meet the cap at arcAngleDeg up from the exterior diameter edge.
-  const shellWidth = Math.hypot(1 + Math.cos(angleRad), Math.sin(angleRad))
-  const shellRotationDeg = 180 - arcAngleDeg / 2
-  const shellLineWidthRatio = 1 / Math.max(0.001, Math.cos(angleRad / 2))
-
-  return {
-    '--half-cylinder-shell-left-rotation': `${-shellRotationDeg.toFixed(4)}deg`,
-    '--half-cylinder-shell-right-rotation': `${shellRotationDeg.toFixed(4)}deg`,
-    '--half-cylinder-shell-line-width-ratio':
-      shellLineWidthRatio.toFixed(8),
-    '--half-cylinder-shell-width-ratio': shellWidth.toFixed(8),
-  } as CSSProperties
-}
-
-function GridBox({
-  box,
-  halfCylinderShellArcAngleDeg,
-  tileSize,
-}: {
-  box: HomeBackgroundBox
-  halfCylinderShellArcAngleDeg: number
-  tileSize: number
-}) {
-  const kind = box.kind === 'box' ? 'cube' : box.kind ?? 'cube'
-  const widthTiles = box.widthTiles ?? 1
-  const depthTiles = box.depthTiles ?? 1
-  const widthPx = widthTiles * tileSize
-  const depthPx = depthTiles * tileSize
-  const halfCylinderHeightPx = widthPx / 2
-  const heightPx =
-    kind === 'halfCylinder' ? halfCylinderHeightPx : box.heightPx ?? tileSize
-  const hat = kind === 'cube' ? box.hat : undefined
-  const hatHeightPx =
-    hat?.kind === 'halfCylinder'
-      ? halfCylinderHeightPx
-      : hat?.heightPx ?? 0
-  const opacity = box.opacity ?? 1
-  const sideFaceClass =
-    box.xTiles <= 0
-      ? 'home-grid-box__face--right'
-      : 'home-grid-box__face--left'
-  const pyramidSide = box.xTiles <= 0 ? 'right' : 'left'
-  const halfCylinderSideClass =
-    box.xTiles <= 0
-      ? 'home-grid-box__half-cylinder--left'
-      : 'home-grid-box__half-cylinder--right'
-  const renderFaces = (
-    renderKind: 'cube' | 'pyramid' | 'tent' | 'halfCylinder',
-    includeHalfShell = true,
-  ) => {
-    if (renderKind === 'pyramid') {
-      return (
-        <>
-          <span className="home-grid-box__pyramid-anchor home-grid-box__pyramid-anchor--front">
-            <span className="home-grid-box__pyramid-face home-grid-box__pyramid-face--front" />
-          </span>
-          <span
-            className={`home-grid-box__pyramid-anchor home-grid-box__pyramid-anchor--${pyramidSide}`}
-          >
-            <span
-              className={`home-grid-box__pyramid-face home-grid-box__pyramid-face--${pyramidSide}`}
-            />
-          </span>
-        </>
-      )
-    }
-    if (renderKind === 'tent') {
-      return (
-        <>
-          <span className="home-grid-box__triangle home-grid-box__triangle--front" />
-          <span
-            className={`home-grid-box__tent-plane-anchor home-grid-box__tent-plane-anchor--${pyramidSide}`}
-          >
-            <span
-              className={`home-grid-box__tent-plane home-grid-box__tent-plane--${pyramidSide}`}
-            />
-          </span>
-        </>
-      )
-    }
-    if (renderKind === 'halfCylinder') {
-      return (
-        <>
-          <span
-            className={`home-grid-box__half-cap home-grid-box__half-cap--front ${halfCylinderSideClass}`}
-          />
-          <span
-            className={`home-grid-box__half-cap home-grid-box__half-cap--back ${halfCylinderSideClass}`}
-          />
-          {includeHalfShell && (
-            <span
-              className={`home-grid-box__half-shell-anchor ${halfCylinderSideClass}`}
-            >
-              <span
-                className={`home-grid-box__half-shell ${halfCylinderSideClass}`}
-              />
-            </span>
-          )}
-        </>
-      )
-    }
-    return (
-      <>
-        <span className="home-grid-box__face home-grid-box__face--top" />
-        <span className="home-grid-box__face home-grid-box__face--front" />
-        <span className={`home-grid-box__face ${sideFaceClass}`} />
-      </>
-    )
-  }
-
-  const boxStyle = {
-    '--box-x': `${box.xTiles * tileSize}px`,
-    '--box-y': `${box.yTiles * tileSize}px`,
-    '--box-w': `${widthPx}px`,
-    '--box-d': `${depthPx}px`,
-    '--box-h': `${heightPx}px`,
-    '--base-h': `${heightPx}px`,
-    '--hat-h': `${hatHeightPx}px`,
-    '--ground-opacity': opacity,
-    ...getPyramidFaceVars(widthPx, depthPx, heightPx),
-    ...(kind === 'halfCylinder'
-      ? getHalfCylinderShellVars(halfCylinderShellArcAngleDeg, 0)
-      : {}),
-  } as CSSProperties
-  const boxNode = (
-    <div
-      className={`home-grid-box home-grid-box--${kind}${hat ? ' home-grid-box--with-hat' : ''}`}
-      data-ground-fade-y={box.yTiles * tileSize}
-      style={boxStyle}
-    >
-      {renderFaces(kind)}
-      {hat && (
-        <div
-          className={`home-grid-box__hat home-grid-box__hat--${hat.kind}`}
-          style={{
-            ...getPyramidFaceVars(widthPx, depthPx, hatHeightPx),
-            ...(hat.kind === 'halfCylinder'
-              ? getHalfCylinderShellVars(
-                  halfCylinderShellArcAngleDeg,
-                  heightPx,
-                )
-              : {}),
-          }}
-        >
-          {renderFaces(hat.kind)}
-        </div>
-      )}
-    </div>
-  )
-
-  return boxNode
-}
 
 function SocialIcon({ label }: { label: string }) {
   const common = {
@@ -424,7 +232,7 @@ function ToolWheel({ onSelect }: { onSelect: (item: WheelItem) => void }) {
       className="home-rise flex w-full max-w-5xl flex-col items-center gap-7 outline-none"
       style={{ animationDelay: '120ms' }}
     >
-      <div ref={stageRef} className="relative -mt-10 h-[20rem] w-full">
+      <div ref={stageRef} className="relative -mt-20 h-[20rem] w-full">
         {WHEEL_ITEMS.map((item, i) => {
           const o = offsetOf(i)
           const phi = o * stepAngle
@@ -530,6 +338,39 @@ function ToolWheel({ onSelect }: { onSelect: (item: WheelItem) => void }) {
   )
 }
 
+function SectionJumpCue({
+  direction,
+  label,
+  onClick,
+  position,
+}: {
+  direction: 'up' | 'down'
+  label: string
+  onClick: () => void
+  position: 'top' | 'bottom'
+}) {
+  const icon = (
+    <span className={`inline-flex ${direction === 'up' ? 'rotate-180' : ''}`}>
+      <ChevronDownIcon className="h-4 w-4 animate-bounce" />
+    </span>
+  )
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={`Go to ${label}`}
+      className={`${SECTION_JUMP_CUE_CLASS} ${
+        position === 'top' ? 'top-6 sm:top-8' : 'bottom-6 sm:bottom-8'
+      }`}
+    >
+      {direction === 'up' && icon}
+      <span>{label}</span>
+      {direction === 'down' && icon}
+    </button>
+  )
+}
+
 export function Home() {
   const newConversation = useConversations((s) => s.newConversation)
   const setView = useConversations((s) => s.setView)
@@ -538,26 +379,8 @@ export function Home() {
   const [backgroundScene, setBackgroundScene] = useState(
     FALLBACK_HOME_BACKGROUND_SCENE,
   )
-  const [visibleTileRange, setVisibleTileRange] = useState(
-    INITIAL_CUBE_TILE_RANGE,
-  )
-  const {
-    boxes,
-    groundScrollFactor,
-    halfCylinderShellArcAngleDeg,
-    horizonGapPx,
-    tileSize,
-  } = backgroundScene
-  const visibleBoxes = useMemo(
-    () =>
-      boxes.filter((box) => {
-        const depthTiles = box.depthTiles ?? 1
-        const boxMinY = box.yTiles
-        const boxMaxY = box.yTiles + depthTiles
-        return boxMaxY >= visibleTileRange.min && boxMinY <= visibleTileRange.max
-      }),
-    [boxes, visibleTileRange],
-  )
+  const [horizonY, setHorizonY] = useState(0)
+  const { horizonGapPx } = backgroundScene
 
   const blocksRef = useRef<HTMLElement>(null)
   const scrollerRef = useRef<HTMLDivElement>(null)
@@ -568,10 +391,11 @@ export function Home() {
   const aboutUiRef = useRef<HTMLDivElement>(null)
   const jumpNavRef = useRef<HTMLDivElement>(null)
   const landscapeRef = useRef<HTMLDivElement>(null)
-  const streamerRef = useRef<HTMLDivElement>(null)
   const descRef = useRef<HTMLParagraphElement>(null)
   const ctaRef = useRef<HTMLButtonElement>(null)
   const scrollAnimRef = useRef<number | null>(null)
+  const wheelScrollAnimRef = useRef<number | null>(null)
+  const wheelScrollVelocityRef = useRef(0)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -583,6 +407,100 @@ export function Home() {
         }
       })
     return () => controller.abort()
+  }, [])
+
+  useEffect(
+    () => () => {
+      if (scrollAnimRef.current !== null) {
+        cancelAnimationFrame(scrollAnimRef.current)
+        scrollAnimRef.current = null
+      }
+      if (wheelScrollAnimRef.current !== null) {
+        cancelAnimationFrame(wheelScrollAnimRef.current)
+        wheelScrollAnimRef.current = null
+      }
+      wheelScrollVelocityRef.current = 0
+    },
+    [],
+  )
+
+  useEffect(() => {
+    const overlays = [
+      jumpNavRef.current,
+      heroUiRef.current,
+      toolsUiRef.current,
+      aboutUiRef.current,
+    ].filter((el): el is HTMLDivElement => el !== null)
+    const onWheel = (event: WheelEvent) => {
+      const scroller = scrollerRef.current
+      if (!scroller) return
+
+      event.preventDefault()
+      if (scrollAnimRef.current !== null) {
+        cancelAnimationFrame(scrollAnimRef.current)
+        scrollAnimRef.current = null
+      }
+
+      const deltaUnit =
+        event.deltaMode === 1
+          ? 16
+          : event.deltaMode === 2
+            ? scroller.clientHeight
+            : 1
+      wheelScrollVelocityRef.current += event.deltaY * deltaUnit
+
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        scroller.scrollTop += wheelScrollVelocityRef.current
+        if (wheelScrollAnimRef.current !== null) {
+          cancelAnimationFrame(wheelScrollAnimRef.current)
+          wheelScrollAnimRef.current = null
+        }
+        wheelScrollVelocityRef.current = 0
+        return
+      }
+
+      if (wheelScrollAnimRef.current !== null) return
+
+      const step = () => {
+        const velocity = wheelScrollVelocityRef.current
+        if (Math.abs(velocity) < 0.5) {
+          wheelScrollAnimRef.current = null
+          wheelScrollVelocityRef.current = 0
+          return
+        }
+
+        const maxTop = Math.max(
+          0,
+          scroller.scrollHeight - scroller.clientHeight,
+        )
+        const nextTop = Math.max(
+          0,
+          Math.min(maxTop, scroller.scrollTop + velocity * 0.28),
+        )
+
+        if (nextTop === scroller.scrollTop) {
+          wheelScrollAnimRef.current = null
+          wheelScrollVelocityRef.current = 0
+          return
+        }
+
+        scroller.scrollTop = nextTop
+        wheelScrollVelocityRef.current = velocity * 0.72
+        wheelScrollAnimRef.current = requestAnimationFrame(step)
+      }
+
+      wheelScrollAnimRef.current = requestAnimationFrame(step)
+    }
+
+    for (const el of overlays) {
+      el.addEventListener('wheel', onWheel, { capture: true, passive: false })
+    }
+
+    return () => {
+      for (const el of overlays) {
+        el.removeEventListener('wheel', onWheel, { capture: true })
+      }
+    }
   }, [])
 
   // Pin the synthwave horizon just below the primary CTA rather than letting
@@ -614,11 +532,19 @@ export function Home() {
 
     const measure = () => {
       const ctaBottom = topWithin(cta, hero) + cta.offsetHeight
-      const horizonY = ctaBottom + horizonGapPx
-      landscape.style.setProperty('--horizon-y', `${horizonY}px`)
+      const nextHorizonY = ctaBottom + horizonGapPx
+      const scrollbarGutter = Math.max(0, scroller.offsetWidth - scroller.clientWidth)
+      landscape.style.setProperty(
+        '--home-scrollbar-gutter',
+        `${scrollbarGutter}px`,
+      )
+      landscape.style.setProperty('--horizon-y', `${nextHorizonY}px`)
+      setHorizonY((current) =>
+        Math.abs(current - nextHorizonY) < 0.5 ? current : nextHorizonY,
+      )
       scroller.style.setProperty(
         '--home-ui-bottom',
-        `${Math.max(240, Math.min(window.innerHeight, horizonY))}px`,
+        `${Math.max(240, Math.min(window.innerHeight, nextHorizonY))}px`,
       )
     }
 
@@ -632,14 +558,10 @@ export function Home() {
     }
   }, [horizonGapPx])
 
-  // Drive the floor forward as the page scrolls: scrolling down streams the
-  // grid toward the viewer (the floor has no idle motion of its own). The grid
-  // gets a one-tile modulo offset so its repeated texture wraps cleanly, while
-  // the visible ground props get the continuous offset so they do not snap back
-  // when the texture repeats.
+  // Fade the fixed UI groups in/out as their real scroll sections pass through
+  // the viewport. The WebGL background listens to the same scroller separately.
   useEffect(() => {
     const scroller = scrollerRef.current
-    const streamer = streamerRef.current
     const hero = heroRef.current
     const blocks = blocksRef.current
     const about = aboutRef.current
@@ -647,7 +569,7 @@ export function Home() {
     const toolsUi = toolsUiRef.current
     const aboutUi = aboutUiRef.current
     const jumpNav = jumpNavRef.current
-    if (!scroller || !streamer || !hero || !blocks || !about || !heroUi || !toolsUi || !aboutUi || !jumpNav) return
+    if (!scroller || !hero || !blocks || !about || !heroUi || !toolsUi || !aboutUi || !jumpNav) return
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
 
     let ticking = false
@@ -672,70 +594,10 @@ export function Home() {
       )
     }
 
-    const alignGroundGrid = () => {
-      const anchor = streamer.offsetWidth * 0.5
-      streamer.style.setProperty('--ground-grid-origin-x', `${anchor}px`)
-    }
-    const getFadeBounds = () => {
-      const streamerH = Math.max(1, streamer.clientHeight)
-      const horizonFadeStart = -tileSize
-      const horizonFadeEnd = tileSize * 1.5
-      const bottomFadeStart = Math.max(
-        horizonFadeEnd + tileSize * 4,
-        streamerH - tileSize * 6,
-      )
-      const bottomFadeEnd = bottomFadeStart + tileSize * 3
-      return {
-        bottomFadeEnd,
-        bottomFadeStart,
-        horizonFadeEnd,
-        horizonFadeStart,
-        streamerH,
-      }
-    }
-
-    const updateVisibleBoxRange = (groundOffset: number) => {
-      const { bottomFadeEnd, horizonFadeStart } = getFadeBounds()
-      const marginPx = tileSize * CUBE_RENDER_MARGIN_TILES
-      const min = Math.floor(
-        (-groundOffset + horizonFadeStart - marginPx) / tileSize,
-      )
-      const max = Math.ceil((-groundOffset + bottomFadeEnd + marginPx) / tileSize)
-      setVisibleTileRange((prev) =>
-        prev.min === min && prev.max === max ? prev : { min, max },
-      )
-    }
-
-    const updateGroundFades = (groundOffset: number) => {
-      const {
-        bottomFadeEnd,
-        bottomFadeStart,
-        horizonFadeEnd,
-        horizonFadeStart,
-        streamerH,
-      } = getFadeBounds()
-      const groundFaders = streamer.querySelectorAll<HTMLElement>(
-        '[data-ground-fade-y]',
-      )
-
-      for (const el of groundFaders) {
-        const rawY = Number(el.dataset.groundFadeY ?? 0)
-        const baseY =
-          el.dataset.groundFadeUnit === 'ratio' ? rawY * streamerH : rawY
-        const y = baseY + groundOffset
-        const fadeIn = smoothstep(horizonFadeStart, horizonFadeEnd, y)
-        const fadeOut = 1 - smoothstep(bottomFadeStart, bottomFadeEnd, y)
-        el.style.setProperty('--ground-fade', (fadeIn * fadeOut).toFixed(3))
-      }
-    }
-
     const update = () => {
       if (disposed) return
       ticking = false
       const actualScroll = scroller.scrollTop
-      const groundOffset = actualScroll * groundScrollFactor
-      const gridShift = (groundOffset % tileSize).toFixed(2)
-      const groundShift = groundOffset.toFixed(2)
       const viewportH = Math.max(1, scroller.clientHeight)
       const jumpIn = smoothstep(0.18, 0.32, actualScroll / viewportH)
       const sectionProgress = (section: HTMLElement) =>
@@ -759,10 +621,6 @@ export function Home() {
           : toolsOpacity >= heroOpacity
             ? 'tools'
             : 'hero'
-      streamer.style.setProperty('--scroll-shift', `${gridShift}px`)
-      streamer.style.setProperty('--ground-shift', `${groundShift}px`)
-      updateVisibleBoxRange(groundOffset)
-      updateGroundFades(groundOffset)
       setUi(heroUi, heroOpacity, groupScale(hero, heroOpacity), activeGroup === 'hero' ? 'auto' : 'none')
       setUi(toolsUi, toolsOpacity, groupScale(blocks, toolsOpacity), activeGroup === 'tools' ? 'auto' : 'none')
       setUi(aboutUi, aboutOpacity, groupScale(about, aboutOpacity), activeGroup === 'about' ? 'auto' : 'none')
@@ -794,16 +652,13 @@ export function Home() {
       }
     }
 
-    alignGroundGrid()
     scroller.addEventListener('scroll', onScroll, { passive: true })
-    window.addEventListener('resize', alignGroundGrid)
     update()
     return () => {
       disposed = true
       scroller.removeEventListener('scroll', onScroll)
-      window.removeEventListener('resize', alignGroundGrid)
     }
-  }, [groundScrollFactor, tileSize])
+  }, [])
 
   function startChat() {
     playSfx('click')
@@ -848,10 +703,8 @@ export function Home() {
     const scroller = scrollerRef.current
     if (!scroller) return
 
-    if (scrollAnimRef.current !== null) {
-      cancelAnimationFrame(scrollAnimRef.current)
-      scrollAnimRef.current = null
-    }
+    cancelScrollAnimation()
+    cancelSmoothWheelScroll()
 
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
       scroller.scrollTop = top
@@ -863,8 +716,9 @@ export function Home() {
     const targetY = Math.max(0, Math.min(maxTop, top))
     const distance = targetY - startY
     const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3)
-    const startTime = performance.now()
+    let startTime: number | null = null
     const step = (now: number) => {
+      startTime ??= now
       const t = Math.min(1, (now - startTime) / SCROLL_TO_TOOLS_MS)
       scroller.scrollTop = startY + distance * easeOutCubic(t)
       scrollAnimRef.current = t < 1 ? requestAnimationFrame(step) : null
@@ -892,19 +746,25 @@ export function Home() {
     scrollToSection(0)
   }
 
-  function forwardOverlayWheel(e: WheelEvent) {
-    const scroller = scrollerRef.current
-    if (!scroller) return
-    e.preventDefault()
-    scroller.scrollTop += e.deltaY
-    scroller.scrollLeft += e.deltaX
+  function cancelScrollAnimation() {
+    if (scrollAnimRef.current !== null) {
+      cancelAnimationFrame(scrollAnimRef.current)
+      scrollAnimRef.current = null
+    }
+  }
+
+  function cancelSmoothWheelScroll() {
+    if (wheelScrollAnimRef.current !== null) {
+      cancelAnimationFrame(wheelScrollAnimRef.current)
+      wheelScrollAnimRef.current = null
+    }
+    wheelScrollVelocityRef.current = 0
   }
 
   return (
     <div ref={scrollerRef} className="h-screen w-full min-h-0 overflow-y-auto">
       <div
         ref={jumpNavRef}
-        onWheelCapture={forwardOverlayWheel}
         className="home-jump-nav fixed left-5 top-1/2 z-30 hidden -translate-y-1/2 flex-col items-start gap-3 font-mono text-[0.625rem] uppercase tracking-[0.22em] text-fg-faint sm:flex"
       >
         <button
@@ -947,33 +807,13 @@ export function Home() {
           ref={landscapeRef}
           aria-hidden
           className="home-landscape pointer-events-none fixed inset-0 overflow-hidden"
-          style={
-            {
-              '--home-tile-size': `${tileSize}px`,
-            } as CSSProperties
-          }
         >
           <div className="home-landscape-sun home-glow" />
-          <div className="home-landscape-horizon" />
-          <div className="home-landscape-floor">
-            <div className="home-landscape-plane">
-              <div ref={streamerRef} className="home-landscape-streamer">
-                <div className="home-landscape-grid" />
-                <div className="home-grid-box-layer">
-                  {visibleBoxes.map((box) => (
-                    <GridBox
-                      key={box.id}
-                      box={box}
-                      halfCylinderShellArcAngleDeg={
-                        halfCylinderShellArcAngleDeg
-                      }
-                      tileSize={tileSize}
-                    />
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
+          <HomeThreeBackground
+            horizonY={horizonY}
+            scene={backgroundScene}
+            scrollerRef={scrollerRef}
+          />
         </div>
 
         {/* Hero copy + the cue that drops to the page-selection blocks,
@@ -981,7 +821,6 @@ export function Home() {
             logo and below the cue. */}
         <div
           ref={heroUiRef}
-          onWheelCapture={forwardOverlayWheel}
           className="home-scroll-layer fixed inset-0 z-10 flex flex-col items-center justify-center gap-16 px-6 sm:px-10"
         >
           <div className="flex max-w-2xl flex-col items-center gap-5 text-center">
@@ -1052,13 +891,24 @@ export function Home() {
       >
         <div
           ref={toolsUiRef}
-          onWheelCapture={forwardOverlayWheel}
           className="home-scroll-layer home-scroll-layer--hidden fixed inset-0 z-10 flex flex-col items-center justify-center gap-3 px-6 sm:px-10"
         >
+          <SectionJumpCue
+            direction="up"
+            label="Intro"
+            onClick={scrollToTop}
+            position="top"
+          />
           <p className="font-mono text-[0.6875rem] uppercase tracking-[0.22em] text-fg-faint">
             Choose where to start
           </p>
           <ToolWheel onSelect={selectWheelItem} />
+          <SectionJumpCue
+            direction="down"
+            label="About"
+            onClick={scrollToAbout}
+            position="bottom"
+          />
         </div>
       </section>
 
@@ -1070,9 +920,14 @@ export function Home() {
       >
         <div
           ref={aboutUiRef}
-          onWheelCapture={forwardOverlayWheel}
           className="home-scroll-layer home-scroll-layer--hidden fixed inset-0 z-10 flex flex-col items-center justify-center gap-8 px-6 text-center sm:px-10"
         >
+          <SectionJumpCue
+            direction="up"
+            label="Tools"
+            onClick={scrollToBlocks}
+            position="top"
+          />
           <div className="flex max-w-2xl flex-col items-center gap-5">
             <p className="font-mono text-[0.6875rem] uppercase tracking-[0.22em] text-fg-faint">
               About The Creator

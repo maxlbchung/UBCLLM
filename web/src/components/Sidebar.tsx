@@ -327,7 +327,7 @@ export function Sidebar() {
             >
               <t.Icon className="w-4 h-4 text-accent" />
               <span>{t.label}</span>
-              {t.view === 'chat' && (
+              {(t.view === 'chat' || t.view === 'planning') && (
                 <span className="ml-auto text-[0.5625rem] uppercase tracking-wider text-highlight font-mono">
                   BETA
                 </span>

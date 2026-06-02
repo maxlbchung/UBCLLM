@@ -42,3 +42,8 @@ Thumbs.db
 
 # Local scratch / personal notes
 random.txt
+
+# Local browser-automation profiles + debug captures (home-page screenshotting)
+.chrome-headless-profile*/
+.edge-*-profile*/
+home-debug.png

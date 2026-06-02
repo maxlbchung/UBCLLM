@@ -850,7 +850,7 @@ export function Home() {
               className="home-rise max-w-xl text-lg leading-relaxed text-fg-muted"
               style={{ animationDelay: '250ms' }}
             >
-              Your personal academic advisor for UBC Vancouver — one place to
+              Your personal digital assistant for UBC Vancouver — one place to
               explore courses, untangle prerequisites, and plan your degree. 
             </p>
               <p

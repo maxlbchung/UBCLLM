@@ -51,8 +51,8 @@ export function CourseBlock({
   const borderClass = !validation.ok
     ? 'border-danger-fg'
     : fulfillsRequirement
-      ? 'border-line hover:border-line-soft'
-      : 'border-white hover:border-white'
+      ? 'border-white hover:border-white'
+      : 'border-line hover:border-line-soft'
 
   // Parse prereq/coreq trees once per block so the popup can render
   // them with clause-level highlighting against the snapshot completed

@@ -27,6 +27,28 @@ canvas-colored scrim with masked/feathered edges. It is there to keep cube faces
 from visually obscuring those buttons while preserving a soft transition back
 into the animated background.
 
+## Home Section Layout
+
+The feature/about fold scroll buttons must stay inside their active
+`.home-scroll-layer` UI block. Anchor them with `SectionJumpCue`'s
+`position="top"` / `position="bottom"` props inside that block, not in a
+separate viewport-edge overlay, so they respect the block's measured
+`--home-ui-bottom` bounds. Keep enough vertical padding on those UI blocks so
+the centered content cannot cover the scroll buttons.
+
+The `Explore Features` title and `ToolWheel` carousel are one centered content
+cluster. Do not use negative margins to push the title into the carousel:
+`ToolWheel` already uses an internal `-mt-20` stage offset, so compressing the
+wrapper makes the cards feel crowded. Use the wrapper's gap classes for
+title-to-carousel spacing and block padding for scroll-cue clearance. For
+card-to-card spacing, adjust
+the `WHEEL_RADIUS_*` constants in `Home.tsx`; keep the wrapper `w-full` so the
+wheel measures the full stage width, and do not fake spacing by squeezing the
+wrapper. The carousel uses a dot-only progress indicator; keep it close to the
+cards with `ToolWheel`'s own vertical gap, not by moving the outer wrapper.
+Avoid downward translates on the feature cluster because they can cover the
+bottom scroll cue inside the measured UI block.
+
 ## Coordinate System
 
 Current constants:

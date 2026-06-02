@@ -1,0 +1,5 @@
+# Cloudflare Pages SPA fallback. Static assets (hashed JS/CSS, /data/*, the
+# favicon, etc.) are matched and served first; this rule only catches paths
+# that don't map to a built file, rewriting them to the app shell with a 200 so
+# client-side routes like /app survive a hard refresh or a direct hit.
+/*    /index.html   200

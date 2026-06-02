@@ -2,7 +2,7 @@
 
 Browser-native UBC academic-advisor chatbot. Qwen3.5 2B runs in the user's browser via WebGPU, answering academic questions grounded in a RAG corpus scraped from UBC's official course calendar. No backend inference, no API keys.
 
-- **Live:** https://maxlbchung.github.io/UBCLLM/
+- **Live:** https://reodite.com
 - **Repo:** https://github.com/maxlbchung/UBCLLM (deploys on push to `master`)
 - **Latest version:** see `web/src/version.ts` (`APP_VERSION`); shown bottom-left in the running app.
 

@@ -1,21 +1,22 @@
-name: Deploy to GitHub Pages
+name: Deploy to Cloudflare Pages
 
 on:
   push:
     branches: [master, main]
   workflow_dispatch:
 
+# Deployment auth is the Cloudflare API token (repo secret), not GitHub's
+# OIDC/Pages tokens, so contents:read is all we need.
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
+# Serialize deploys so two quick pushes don't race to publish.
 concurrency:
-  group: pages
+  group: cloudflare-pages
   cancel-in-progress: true
 
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -67,24 +68,34 @@ jobs:
         working-directory: web
         run: npm run build
         env:
-          VITE_BASE_PATH: /${{ github.event.repository.name }}/
+          # Served at the root of the custom domain (https://reodite.com/) on
+          # Cloudflare Pages, not a GitHub Pages sub-path, so the Vite base is
+          # "/". This matches the default in web/vite.config.ts; set explicitly
+          # so the deploy never silently regresses if the default changes.
+          VITE_BASE_PATH: /
 
-      - uses: actions/configure-pages@v5
-        with:
-          # Auto-enable Pages with GitHub Actions as the source if it ever
-          # gets disabled in repo settings (otherwise this step 404s with
-          # "Get Pages site failed" and the whole deploy aborts).
-          enablement: true
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: web/dist
+      # ---- Publish to Cloudflare Pages (Direct Upload) ----
+      # The heavy Python/torch embedding build above stays in GitHub Actions
+      # (with HF caching); we hand the finished web/dist to Cloudflare. Requires
+      # repo secrets CLOUDFLARE_API_TOKEN (scope: Account › Cloudflare Pages ›
+      # Edit) and CLOUDFLARE_ACCOUNT_ID.
 
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
+      # First run creates the project and pins its production branch to `master`
+      # so the `--branch=master` deploy below counts as a PRODUCTION deploy (the
+      # one the custom domain serves). On every later run this command fails
+      # with "project already exists" — continue-on-error swallows that; the
+      # deploy step is the real gate.
+      - name: Ensure Pages project exists
+        continue-on-error: true
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages project create reodite --production-branch master
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy web/dist --project-name=reodite --branch=master

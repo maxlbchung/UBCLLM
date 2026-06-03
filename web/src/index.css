@@ -594,6 +594,10 @@ body {
 }
 
 .home-scroll-layer {
+  --home-scroll-cue-top-offset: 1.5rem;
+  --home-scroll-cue-bottom-offset: 0rem;
+  --home-scroll-cue-block-size: 2.75rem;
+  --home-scroll-cue-content-gap: clamp(1rem, 3dvh, 2rem);
   bottom: calc(100dvh - var(--home-ui-bottom, 100dvh));
   opacity: var(--home-ui-opacity, 1);
   pointer-events: none;
@@ -605,6 +609,46 @@ body {
 
 .home-scroll-layer > * {
   pointer-events: var(--home-ui-pointer-events, auto);
+}
+
+.home-scroll-cue {
+  position: absolute;
+  left: 50%;
+  translate: -50% 0;
+}
+
+.home-scroll-cue--top {
+  top: var(--home-scroll-cue-top-offset);
+}
+
+.home-scroll-cue--bottom {
+  bottom: var(--home-scroll-cue-bottom-offset);
+}
+
+.home-scroll-layer--intro {
+  padding-bottom: calc(
+    var(--home-scroll-cue-bottom-offset) +
+      var(--home-scroll-cue-block-size)
+  );
+}
+
+.home-scroll-layer--balanced {
+  padding-bottom: calc(
+    var(--home-scroll-cue-bottom-offset) +
+      var(--home-scroll-cue-block-size) +
+      var(--home-scroll-cue-content-gap)
+  );
+  padding-top: calc(
+    var(--home-scroll-cue-top-offset) +
+      var(--home-scroll-cue-block-size) +
+      var(--home-scroll-cue-content-gap)
+  );
+}
+
+@media (min-width: 40rem) {
+  .home-scroll-layer {
+    --home-scroll-cue-top-offset: 2rem;
+  }
 }
 
 .home-scroll-layer--hidden {
@@ -743,10 +787,10 @@ body {
    writes the repeated grid offset and the continuous ground-object offset once
    per animation frame.
 
-   The horizon (sun + line + floor origin) is pinned to var(--horizon-y) — the
-   pixel midpoint of the gap between the hero description and the CTA, measured
-   in Home.tsx. The 60% fallback matches the pre-measurement default so there's
-   no flash before the layout effect runs. */
+   The horizon (sun + line + floor origin) is pinned to var(--horizon-y) at
+   85% of the viewport height, so it always starts the bottom 15% of the
+   screen. The 85% fallback matches the runtime position before React writes the
+   measured pixel value. */
 .home-landscape {
   --grid-line: var(--accent);
   --grid-glow: var(--accent-hover);
@@ -782,7 +826,7 @@ body {
 .home-landscape-sun {
   position: absolute;
   left: 50%;
-  top: var(--horizon-y, 60%);
+  top: var(--horizon-y, 85%);
   width: 42rem;
   height: 42rem;
   transform: translate(-50%, -50%);
@@ -794,7 +838,7 @@ body {
   position: absolute;
   left: 0;
   right: 0;
-  top: var(--horizon-y, 60%);
+  top: var(--horizon-y, 85%);
   height: 2px;
   background: var(--grid-glow);
   opacity: 0.65;
@@ -822,7 +866,7 @@ body {
   position: absolute;
   left: 0;
   right: 0;
-  top: var(--horizon-y, 60%);
+  top: var(--horizon-y, 85%);
   bottom: 0;
   perspective: 900px;
   perspective-origin: 50% 0%;

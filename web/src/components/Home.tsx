@@ -107,9 +107,17 @@ const SCROLL_CUE_CLASS =
   'group flex flex-col items-center gap-1.5 text-fg-faint transition-colors hover:text-accent'
 
 const SECTION_JUMP_CUE_CLASS =
-  `${SCROLL_CUE_CLASS} absolute left-1/2 z-20 -translate-x-1/2 font-mono text-[0.625rem] uppercase tracking-[0.22em]`
+  `${SCROLL_CUE_CLASS} home-scroll-cue z-20 font-mono text-[0.625rem] uppercase tracking-[0.22em]`
 
 const DEAD_SCROLLSPACE_CLASS = 'min-h-[60vh]'
+
+const HOME_HORIZON_VIEWPORT_RATIO = 0.85
+
+// Tailwind's `sm` breakpoint (40rem at the 16px media-query base = 640px).
+// Below it the home background is dropped entirely: the landscape layer is
+// display:none (`hidden sm:block`) and this query gates the WebGL scene so
+// phones never boot Three.js for a canvas they can't see.
+const HOME_BACKGROUND_MEDIA_QUERY = '(min-width: 40rem)'
 
 const SOCIAL_LINKS = [
   { label: 'GitHub', href: 'https://github.com/maxlbchung' },
@@ -232,7 +240,7 @@ function ToolWheel({ onSelect }: { onSelect: (item: WheelItem) => void }) {
       className="home-rise flex w-full max-w-5xl flex-col items-center gap-7 outline-none"
       style={{ animationDelay: '120ms' }}
     >
-      <div ref={stageRef} className="relative -mt-20 h-[20rem] w-full">
+      <div ref={stageRef} className="relative -mt-28 h-[20rem] w-full">
         {WHEEL_ITEMS.map((item, i) => {
           const o = offsetOf(i)
           const phi = o * stepAngle
@@ -361,7 +369,7 @@ function SectionJumpCue({
       onClick={onClick}
       aria-label={`Go to ${label}`}
       className={`${SECTION_JUMP_CUE_CLASS} ${
-        position === 'top' ? 'top-6 sm:top-8' : 'bottom-6 sm:bottom-8'
+        position === 'top' ? 'home-scroll-cue--top' : 'home-scroll-cue--bottom'
       }`}
     >
       {direction === 'up' && icon}
@@ -380,7 +388,9 @@ export function Home() {
     FALLBACK_HOME_BACKGROUND_SCENE,
   )
   const [horizonY, setHorizonY] = useState(0)
-  const { horizonGapPx } = backgroundScene
+  const [showBackground, setShowBackground] = useState(() =>
+    window.matchMedia(HOME_BACKGROUND_MEDIA_QUERY).matches,
+  )
 
   const blocksRef = useRef<HTMLElement>(null)
   const scrollerRef = useRef<HTMLDivElement>(null)
@@ -397,7 +407,18 @@ export function Home() {
   const wheelScrollAnimRef = useRef<number | null>(null)
   const wheelScrollVelocityRef = useRef(0)
 
+  // Track the background media query live so rotating / resizing across the
+  // sm breakpoint mounts (or tears down) the WebGL scene without a reload.
   useEffect(() => {
+    const mq = window.matchMedia(HOME_BACKGROUND_MEDIA_QUERY)
+    const onChange = () => setShowBackground(mq.matches)
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+
+  // Scene JSON is only worth fetching when the background can actually show.
+  useEffect(() => {
+    if (!showBackground) return
     const controller = new AbortController()
     loadHomeBackgroundScene(controller.signal)
       .then(setBackgroundScene)
@@ -407,7 +428,7 @@ export function Home() {
         }
       })
     return () => controller.abort()
-  }, [])
+  }, [showBackground])
 
   useEffect(
     () => () => {
@@ -503,36 +524,20 @@ export function Home() {
     }
   }, [])
 
-  // Pin the synthwave horizon just below the primary CTA rather than letting
-  // decorative scene content influence layout. The whole hero stack is vertically centered, so the
-  // gap's screen position depends on the copy's height — measure it instead of
-  // hardcoding a percentage. offsetTop/offsetHeight are immune to the entrance
-  // animation's translateY (unlike getBoundingClientRect), so we read true
-  // resting positions even mid-cascade. Re-measure on any hero reflow/resize.
+  // Keep the synthwave horizon at the start of the bottom 15% of the
+  // viewport. CSS uses --horizon-y for the sun/line/floor; Three.js also needs
+  // the same pixel value for its projection origin.
   useLayoutEffect(() => {
-    const hero = heroRef.current
     const scroller = scrollerRef.current
     const landscape = landscapeRef.current
-    const desc = descRef.current
-    const cta = ctaRef.current
-    if (!hero || !scroller || !landscape || !desc || !cta) return
-
-    // Sum offsetTop up the offsetParent chain until we reach the hero section,
-    // giving a position relative to the hero regardless of intervening
-    // unpositioned wrappers.
-    const topWithin = (el: HTMLElement, ancestor: HTMLElement) => {
-      let y = 0
-      let node: HTMLElement | null = el
-      while (node && node !== ancestor) {
-        y += node.offsetTop
-        node = node.offsetParent as HTMLElement | null
-      }
-      return y
-    }
+    if (!scroller || !landscape) return
 
     const measure = () => {
-      const ctaBottom = topWithin(cta, hero) + cta.offsetHeight
-      const nextHorizonY = ctaBottom + horizonGapPx
+      const viewportHeight = Math.max(
+        1,
+        landscape.clientHeight || window.innerHeight,
+      )
+      const nextHorizonY = viewportHeight * HOME_HORIZON_VIEWPORT_RATIO
       const scrollbarGutter = Math.max(0, scroller.offsetWidth - scroller.clientWidth)
       landscape.style.setProperty(
         '--home-scrollbar-gutter',
@@ -544,19 +549,19 @@ export function Home() {
       )
       scroller.style.setProperty(
         '--home-ui-bottom',
-        `${Math.max(240, Math.min(window.innerHeight, nextHorizonY))}px`,
+        `${Math.max(240, Math.min(viewportHeight, nextHorizonY))}px`,
       )
     }
 
     measure()
     const ro = new ResizeObserver(measure)
-    ro.observe(hero)
+    ro.observe(landscape)
     window.addEventListener('resize', measure)
     return () => {
       ro.disconnect()
       window.removeEventListener('resize', measure)
     }
-  }, [horizonGapPx])
+  }, [])
 
   // Fade the fixed UI groups in/out as their real scroll sections pass through
   // the viewport. The WebGL background listens to the same scroller separately.
@@ -798,30 +803,36 @@ export function Home() {
         {/* Neon wireframe landscape: a synthwave perspective grid floor
             receding to a glowing horizon, with a soft sun behind it. Fixed to
             the viewport so the scene stays put while the page scrolls past it.
-            The horizon (sun + line + floor) is pinned to the gap between the
-            description and CTA via --horizon-y (set in a layout effect). The
+            The horizon (sun + line + floor) is pinned 85% down the viewport
+            via --horizon-y (set in a layout effect). The
             floor has no idle motion — it only streams forward as you scroll,
             via a compositor-only transform (see .home-landscape-* in
-            index.css). Recolors per theme off --accent. */}
+            index.css). Recolors per theme off --accent.
+
+            Mobile (< sm) gets no background at all: the layer is display:none
+            and the Three.js scene is unmounted via showBackground. The div
+            itself stays mounted so the horizon layout effect's ref / observer
+            survive breakpoint flips (clientHeight reads 0 while hidden and
+            measure() falls back to window.innerHeight). */}
         <div
           ref={landscapeRef}
           aria-hidden
-          className="home-landscape home-background-fade pointer-events-none fixed inset-0 overflow-hidden"
+          className="home-landscape home-background-fade pointer-events-none fixed inset-0 hidden overflow-hidden sm:block"
         >
           <div className="home-landscape-sun home-glow" />
-          <HomeThreeBackground
-            horizonY={horizonY}
-            scene={backgroundScene}
-            scrollerRef={scrollerRef}
-          />
+          {showBackground && (
+            <HomeThreeBackground
+              horizonY={horizonY}
+              scene={backgroundScene}
+              scrollerRef={scrollerRef}
+            />
+          )}
         </div>
 
-        {/* Hero copy + the cue that drops to the page-selection blocks,
-            grouped so the whole stack centers as one — even space above the
-            logo and below the cue. */}
+        {/* Hero copy centers in the space above the downscroll cue. */}
         <div
           ref={heroUiRef}
-          className="home-scroll-layer fixed inset-0 z-10 flex flex-col items-center justify-center gap-16 px-6 sm:px-10"
+          className="home-scroll-layer home-scroll-layer--intro fixed inset-0 z-10 flex flex-col items-center justify-center gap-16 px-6 sm:px-10"
         >
           <div className="flex max-w-2xl flex-col items-center gap-5 text-center">
             <img
@@ -850,7 +861,7 @@ export function Home() {
               className="home-rise max-w-xl text-lg leading-relaxed text-fg-muted"
               style={{ animationDelay: '250ms' }}
             >
-              Your personal digital assistant for UBC Vancouver — one place to
+              Your personal digital assistant for University — one place to
               explore courses, untangle prerequisites, and plan your degree. 
             </p>
               <p
@@ -868,7 +879,7 @@ export function Home() {
             onClick={scrollToBlocks}
             aria-label="Scroll to tools"
             style={{ animationDelay: '340ms' }}
-            className={`home-rise ${SCROLL_CUE_CLASS}`}
+            className={`home-rise home-scroll-cue home-scroll-cue--bottom z-20 ${SCROLL_CUE_CLASS}`}
           >
             <span className="font-mono text-[0.6875rem] uppercase tracking-[0.22em]">
               Get started
@@ -891,7 +902,7 @@ export function Home() {
       >
         <div
           ref={toolsUiRef}
-          className="home-scroll-layer home-scroll-layer--hidden fixed inset-0 z-10 flex flex-col items-center justify-center gap-3 px-6 sm:px-10"
+          className="home-scroll-layer home-scroll-layer--balanced home-scroll-layer--hidden fixed inset-0 z-10 flex flex-col items-center justify-center gap-3 px-6 sm:px-10"
         >
           <SectionJumpCue
             direction="up"
@@ -899,7 +910,7 @@ export function Home() {
             onClick={scrollToTop}
             position="top"
           />
-          <p className="font-mono text-[0.6875rem] uppercase tracking-[0.22em] text-fg-faint">
+          <p className="-translate-y-3 font-mono text-[0.6875rem] uppercase tracking-[0.22em] text-white">
             Choose where to start
           </p>
           <ToolWheel onSelect={selectWheelItem} />
@@ -920,7 +931,7 @@ export function Home() {
       >
         <div
           ref={aboutUiRef}
-          className="home-scroll-layer home-scroll-layer--hidden fixed inset-0 z-10 flex flex-col items-center justify-center gap-8 px-6 text-center sm:px-10"
+          className="home-scroll-layer home-scroll-layer--balanced home-scroll-layer--hidden fixed inset-0 z-10 flex flex-col items-center justify-center gap-8 px-6 text-center sm:px-10"
         >
           <SectionJumpCue
             direction="up"
@@ -929,7 +940,7 @@ export function Home() {
             position="top"
           />
           <div className="flex max-w-2xl flex-col items-center gap-5">
-            <p className="font-mono text-[0.6875rem] uppercase tracking-[0.22em] text-fg-faint">
+            <p className="font-mono text-[0.6875rem] uppercase tracking-[0.22em] text-white">
               About The Creator
             </p>
             <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">

@@ -602,7 +602,13 @@ body {
   opacity: var(--home-ui-opacity, 1);
   pointer-events: none;
   visibility: var(--home-ui-visibility, visible);
-  transform: scale(var(--home-ui-scale, 1));
+  /* Scroll-driven group scale × width-fit scale (Home.tsx writes
+     --home-fit-scale < 1 when the viewport is narrower than the group's
+     natural span, so content shrinks instead of clipping at the screen
+     edge). */
+  transform: scale(
+    calc(var(--home-ui-scale, 1) * var(--home-fit-scale, 1))
+  );
   transform-origin: 50% 50%;
   will-change: transform, opacity;
 }

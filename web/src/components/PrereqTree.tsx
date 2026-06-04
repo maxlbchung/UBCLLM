@@ -56,6 +56,26 @@ function normalize(query: string): string {
   return `${m[1]} ${m[2]}`
 }
 
+// Turn the raw query into a canonical "SUBJ" / "SUBJ NUM" prefix for the
+// type-ahead dropdown. Mirrors normalize()'s folding (case, optional _V
+// suffix, optional space) but tolerates partial input — a bare subject
+// ("CPSC") or a partial number ("CPSC 1") both yield a usable prefix.
+// Returns null when the input is empty / too short / not code-shaped, in
+// which case no suggestions render.
+function suggestionPrefix(query: string): string | null {
+  const q = query.toUpperCase().replace(/\s+/g, ' ').trim()
+  if (q.length < 2) return null
+  const m = q.match(/^([A-Z]{2,4})(?:_V)?(?:\s*(\d{1,4}[A-Z]?))?$/)
+  if (!m) return null
+  return m[2] ? `${m[1]} ${m[2]}` : m[1]
+}
+
+// Cap on rendered type-ahead rows. A bare two-letter prefix ("MA") can
+// match several hundred codes across subjects; the list is scrollable but
+// rendering the full tail buys nothing — a footer row tells the user to
+// keep typing instead.
+const SUGGESTION_CAP = 100
+
 interface Graph {
   nodes: Node[]
   edges: Edge[]
@@ -1292,6 +1312,14 @@ export function PrereqTree() {
   const [index, setIndex] = useState<Map<string, Chunk> | null>(null)
   const [query, setQuery] = useState('COGS 300')
   const [activeCode, setActiveCode] = useState<string | null>('COGS 300')
+  // Type-ahead dropdown for the course-code input. `suggestOpen` gates
+  // visibility (typing / focusing opens, Escape / outside click / pick /
+  // submit closes); `highlightIdx` is the keyboard-navigation cursor
+  // (-1 = nothing highlighted, Enter falls through to form submit).
+  const [suggestOpen, setSuggestOpen] = useState(false)
+  const [highlightIdx, setHighlightIdx] = useState(-1)
+  const suggestBoxRef = useRef<HTMLDivElement | null>(null)
+  const suggestListRef = useRef<HTMLDivElement | null>(null)
   // Per-disjunction selection map. Keys are `${ownerCourseCode}::${path}`
   // — stable across re-renders so toggling one selection doesn't disturb
   // unrelated ones. Defaults are option 0 when a key is absent, so the
@@ -1370,6 +1398,110 @@ export function PrereqTree() {
     void getCourseIndex().then(setIndex)
   }, [])
 
+  // Sorted course codes for the type-ahead. Same derivation CourseLookup
+  // uses — lexicographic order keeps numbers grouped under each subject.
+  const codes = useMemo(
+    () => (index ? Array.from(index.keys()).sort() : []),
+    [index],
+  )
+
+  const suggestions = useMemo(() => {
+    if (!index) return []
+    const prefix = suggestionPrefix(query)
+    if (!prefix) return []
+    const out: { code: string; title: string }[] = []
+    for (const code of codes) {
+      if (!code.startsWith(prefix)) continue
+      out.push({ code, title: index.get(code)?.title ?? '' })
+    }
+    return out
+  }, [codes, index, query])
+
+  const shownSuggestions = useMemo(
+    () => suggestions.slice(0, SUGGESTION_CAP),
+    [suggestions],
+  )
+
+  // Hide the dropdown when its only row is the code already typed — it
+  // adds nothing and just covers the graph header (notably right after a
+  // pick writes the full code back into the input… except pick also
+  // closes the dropdown; this covers the focus-reopen case).
+  const suggestVisible =
+    suggestOpen &&
+    shownSuggestions.length > 0 &&
+    !(
+      shownSuggestions.length === 1 &&
+      shownSuggestions[0].code === normalize(query)
+    )
+
+  // Outside click / Escape close the dropdown. Same listener pattern as
+  // CourseLookup's level-filter menu.
+  useEffect(() => {
+    if (!suggestOpen) return
+    function onPointerDown(e: PointerEvent) {
+      const target = e.target
+      if (target instanceof Node && suggestBoxRef.current?.contains(target)) {
+        return
+      }
+      setSuggestOpen(false)
+      setHighlightIdx(-1)
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        setSuggestOpen(false)
+        setHighlightIdx(-1)
+      }
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [suggestOpen])
+
+  // Keep the keyboard-highlighted row in view while arrowing through a
+  // list longer than the dropdown's max height.
+  useEffect(() => {
+    if (highlightIdx < 0) return
+    const el = suggestListRef.current?.querySelector(
+      `[data-idx="${highlightIdx}"]`,
+    )
+    el?.scrollIntoView({ block: 'nearest' })
+  }, [highlightIdx])
+
+  const pickSuggestion = useCallback((code: string) => {
+    // Same chime as submit — picking a row launches the lookup, it isn't
+    // just a selection.
+    playSfx('send')
+    setQuery(code)
+    setActiveCode(code)
+    setSuggestOpen(false)
+    setHighlightIdx(-1)
+  }, [])
+
+  function onQueryKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      if (shownSuggestions.length === 0) return
+      e.preventDefault()
+      setSuggestOpen(true)
+      setHighlightIdx((i) => {
+        const last = shownSuggestions.length - 1
+        if (e.key === 'ArrowDown') return i >= last ? 0 : i + 1
+        return i <= 0 ? last : i - 1
+      })
+      return
+    }
+    if (e.key === 'Enter') {
+      // With a highlighted row, Enter picks it; otherwise it falls
+      // through to the form's regular submit.
+      if (suggestVisible && highlightIdx >= 0 && highlightIdx < shownSuggestions.length) {
+        e.preventDefault()
+        pickSuggestion(shownSuggestions[highlightIdx].code)
+      }
+    }
+  }
+
   const graph = useMemo(() => {
     if (!index || !activeCode)
       return {
@@ -1423,6 +1555,8 @@ export function PrereqTree() {
     // result is synchronous, so we deliberately don't tack on a
     // success/error follow-up.
     playSfx('send')
+    setSuggestOpen(false)
+    setHighlightIdx(-1)
     const code = normalize(query)
     if (index.has(code)) setActiveCode(code)
     else setActiveCode(null)
@@ -1438,12 +1572,58 @@ export function PrereqTree() {
       </header>
 
       <form onSubmit={submit} className="flex gap-2 max-w-md">
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value.toUpperCase())}
-          placeholder="e.g. CPSC 320"
-          className="flex-1 rounded bg-input border border-line-soft text-fg px-3 py-2 text-sm focus:outline-none focus:border-fg-faint"
-        />
+        <div ref={suggestBoxRef} className="relative flex-1">
+          <input
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value.toUpperCase())
+              setSuggestOpen(true)
+              setHighlightIdx(-1)
+            }}
+            onFocus={() => setSuggestOpen(true)}
+            onKeyDown={onQueryKeyDown}
+            placeholder="e.g. CPSC 320"
+            role="combobox"
+            aria-expanded={suggestVisible}
+            aria-autocomplete="list"
+            aria-controls="prereq-suggestions"
+            className="w-full rounded bg-input border border-line-soft text-fg px-3 py-2 text-sm focus:outline-none focus:border-fg-faint"
+          />
+          {suggestVisible && (
+            <div
+              ref={suggestListRef}
+              id="prereq-suggestions"
+              role="listbox"
+              className="absolute left-0 right-0 top-[calc(100%+0.25rem)] z-20 max-h-72 overflow-y-auto rounded border border-line-soft bg-surface shadow-lg"
+            >
+              {shownSuggestions.map((s, i) => (
+                <button
+                  key={s.code}
+                  type="button"
+                  data-idx={i}
+                  role="option"
+                  aria-selected={i === highlightIdx}
+                  onClick={() => pickSuggestion(s.code)}
+                  onMouseEnter={() => setHighlightIdx(i)}
+                  className={`flex w-full items-baseline gap-2 px-3 py-1.5 text-left text-sm ${
+                    i === highlightIdx ? 'bg-surface-raised' : ''
+                  }`}
+                >
+                  <span className="font-mono text-fg shrink-0">{s.code}</span>
+                  <span className="truncate text-fg-muted text-xs">
+                    {s.title}
+                  </span>
+                </button>
+              ))}
+              {suggestions.length > SUGGESTION_CAP && (
+                <p className="px-3 py-1.5 text-xs text-fg-faint border-t border-line-soft">
+                  +{(suggestions.length - SUGGESTION_CAP).toLocaleString()}{' '}
+                  more — keep typing to narrow
+                </p>
+              )}
+            </div>
+          )}
+        </div>
         <button
           type="submit"
           className="rounded bg-accent hover:bg-accent-hover text-accent-fg px-3 py-2 text-sm"

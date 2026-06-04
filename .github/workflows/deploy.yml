@@ -80,19 +80,6 @@ jobs:
       # repo secrets CLOUDFLARE_API_TOKEN (scope: Account › Cloudflare Pages ›
       # Edit) and CLOUDFLARE_ACCOUNT_ID.
 
-      # First run creates the project and pins its production branch to `master`
-      # so the `--branch=master` deploy below counts as a PRODUCTION deploy (the
-      # one the custom domain serves). On every later run this command fails
-      # with "project already exists" — continue-on-error swallows that; the
-      # deploy step is the real gate.
-      - name: Ensure Pages project exists
-        continue-on-error: true
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages project create reodite --production-branch master
-
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:

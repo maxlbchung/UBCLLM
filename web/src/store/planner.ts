@@ -10,11 +10,11 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 
-export type TermSeason = 'fall' | 'spring' | 'summer'
-// Default 2-term year = Term 1 (Sep-Dec) + Term 2 (Jan-Apr). The third
-// slot is Summer (May-Aug); only present when the user bumps a column to
-// 3 terms.
-const SEASON_ORDER: TermSeason[] = ['fall', 'spring', 'summer']
+export type TermSeason = 'fall' | 'spring' | 'summer' | 'term4'
+// Default 2-term year = Term 1 (Sep-Dec) + Term 2 (Jan-Apr). Additional
+// slots are Term 3 and Term 4. Keep the persisted `summer` key for
+// compatibility with existing saved plans.
+const SEASON_ORDER: TermSeason[] = ['fall', 'spring', 'summer', 'term4']
 
 export interface PlannedBlock {
   id: string
@@ -101,7 +101,7 @@ interface PlannerState {
 export const MIN_YEARS = 3
 export const MAX_YEARS = 6
 export const MIN_TERMS = 1
-export const MAX_TERMS = 3
+export const MAX_TERMS = 4
 export const DEFAULT_YEARS = 4
 export const DEFAULT_TERMS = 2
 function newId(): string {

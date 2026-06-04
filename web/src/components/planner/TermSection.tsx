@@ -12,7 +12,8 @@ import type { Term, TermSeason } from '../../store/planner'
 const SEASON_LABEL: Record<TermSeason, string> = {
   fall: 'Term 1',
   spring: 'Term 2',
-  summer: 'Summer',
+  summer: 'Term 3',
+  term4: 'Term 4',
 }
 
 interface TermSectionProps {

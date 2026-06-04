@@ -846,7 +846,6 @@ body {
   --box-side-fill: var(--canvas);
   --home-tile-size: 64px;
   --home-tile-half: calc(var(--home-tile-size) / 2);
-  right: var(--home-scrollbar-gutter, 0px);
 }
 
 .home-landscape::after {

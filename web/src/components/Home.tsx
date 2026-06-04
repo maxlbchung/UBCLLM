@@ -531,11 +531,6 @@ export function Home() {
         landscape.clientHeight || window.innerHeight,
       )
       const nextHorizonY = viewportHeight * HOME_HORIZON_VIEWPORT_RATIO
-      const scrollbarGutter = Math.max(0, scroller.offsetWidth - scroller.clientWidth)
-      landscape.style.setProperty(
-        '--home-scrollbar-gutter',
-        `${scrollbarGutter}px`,
-      )
       landscape.style.setProperty('--horizon-y', `${nextHorizonY}px`)
       setHorizonY((current) =>
         Math.abs(current - nextHorizonY) < 0.5 ? current : nextHorizonY,

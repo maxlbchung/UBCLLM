@@ -599,21 +599,10 @@ body {
   --home-scroll-cue-block-size: 2.75rem;
   --home-scroll-cue-content-gap: clamp(1rem, 3dvh, 2rem);
   bottom: calc(100dvh - var(--home-ui-bottom, 100dvh));
-  /* Continuous zoom-out (overrides the inset-0 utility's left/right).
-     Home.tsx holds the layout box at viewport / --home-fit-scale
-     (--home-fit-width) and the transform scales it back down to exactly
-     viewport width, so narrow windows render the group's full-width
-     composition smaller instead of re-wrapping it at full size.
-     translateX(-50%) re-centers the widened box; the scroll-driven
-     --home-ui-scale multiplies on top. */
-  left: 50%;
-  right: auto;
-  width: var(--home-fit-width, 100%);
   opacity: var(--home-ui-opacity, 1);
   pointer-events: none;
   visibility: var(--home-ui-visibility, visible);
-  transform: translateX(-50%)
-    scale(calc(var(--home-ui-scale, 1) * var(--home-fit-scale, 1)));
+  transform: scale(var(--home-ui-scale, 1));
   transform-origin: 50% 50%;
   will-change: transform, opacity;
 }

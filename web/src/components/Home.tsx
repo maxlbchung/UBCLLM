@@ -85,11 +85,11 @@ const WHEEL_ITEMS: WheelItem[] = [
 // Wheel geometry. Cards orbit a circle whose front slot (nearest, lowest) is
 // the focused one; depth (cos of the slot angle) drives scale + opacity + blur
 // + z, so receding cards shrink and fade — a pseudo-3D turntable whose face
-// tips toward the viewer. The radius is FIXED: the wheel keeps its desktop
-// arrangement at every viewport and the layer zoom-out (--home-fit-scale)
-// shrinks the whole group uniformly instead of compressing the orbit. The
-// resulting span — 2 × (sin 72° × RADIUS_X + 160px half-card × 0.845 side
-// scale) ≈ 917px — is what HOME_UI_FIT.tools.designWidth must accommodate.
+// tips toward the viewer. The radius is FIXED by design (the user prefers a
+// constant arrangement): the wheel spans ≈917px — 2 × (sin 72° × RADIUS_X +
+// 160px half-card × 0.845 side scale) — so on viewports narrower than that
+// the side cards intentionally run past the screen edge rather than pulling
+// inward or scaling down.
 const RADIUS_X = 340 // orbit half-width (px)
 const RADIUS_Y = RADIUS_X * 0.22 // shallow arc: the "face down" tilt
 const MIN_SCALE = 0.55 // scale of the farthest visible card
@@ -124,25 +124,6 @@ const HOME_HORIZON_VIEWPORT_RATIO = 0.85
 // Three.js. The landscape layer's cheap CSS glows (horizon sun + bottom
 // accent ellipse) stay visible at every width.
 const HOME_BACKGROUND_MEDIA_QUERY = '(min-width: 40rem)'
-
-// Continuous zoom-out for the fixed UI groups. Each group has a design width
-// (px): the narrowest viewport its full composition is meant for. Below it
-// the group keeps that composition and shrinks — the layer's layout box is
-// held at viewport / scale and the whole thing is scaled back down to fit
-// edge-to-edge — so a narrow window shows the same arrangement smaller
-// instead of re-wrapping it at full size. minScale floors the zoom so phone
-// text stays legible; once the floor binds, the layout box narrows again and
-// content re-wraps at the floored zoom. The tools group has NO floor: its
-// wheel keeps a fixed orbit radius (see RADIUS_X) and never re-wraps, so the
-// only alternative to scaling further down would be clipping the side cards.
-// Its designWidth must hold the wheel's ≈917px span. Written per group as
-// --home-fit-scale / --home-fit-width, applied by .home-scroll-layer in
-// index.css.
-const HOME_UI_FIT = {
-  hero: { designWidth: 820, minScale: 0.6 },
-  tools: { designWidth: 940, minScale: 0 },
-  about: { designWidth: 820, minScale: 0.6 },
-}
 
 const SOCIAL_LINKS = [
   { label: 'GitHub', href: 'https://github.com/maxlbchung' },
@@ -213,8 +194,7 @@ const SCROLL_TO_TOOLS_MS = 1400
 // at the front (nearest/lowest, the only clickable one); the rest orbit up and
 // back, shrinking + fading by depth. Left/right arrows (and ← →, and the dots)
 // rotate which item is up front. The orbit radius is fixed (RADIUS_X) — on
-// narrow viewports the layer zoom-out shrinks the whole wheel uniformly
-// rather than pulling the cards inward.
+// narrow viewports the side cards run offscreen rather than pulling inward.
 function ToolWheel({ onSelect }: { onSelect: (item: WheelItem) => void }) {
   const N = WHEEL_ITEMS.length
   const [active, setActive] = useState(0)
@@ -538,9 +518,7 @@ export function Home() {
 
   // Keep the synthwave horizon at the start of the bottom 15% of the
   // viewport. CSS uses --horizon-y for the sun/line/floor; Three.js also needs
-  // the same pixel value for its projection origin. The same measure pass
-  // writes each UI group's zoom-out vars so groups scale down once the
-  // viewport is narrower than their design width (see HOME_UI_DESIGN_WIDTH).
+  // the same pixel value for its projection origin.
   useLayoutEffect(() => {
     const scroller = scrollerRef.current
     const landscape = landscapeRef.current
@@ -551,7 +529,6 @@ export function Home() {
         1,
         landscape.clientHeight || window.innerHeight,
       )
-      const viewportWidth = Math.max(1, scroller.clientWidth)
       const nextHorizonY = viewportHeight * HOME_HORIZON_VIEWPORT_RATIO
       const scrollbarGutter = Math.max(0, scroller.offsetWidth - scroller.clientWidth)
       landscape.style.setProperty(
@@ -566,25 +543,6 @@ export function Home() {
         '--home-ui-bottom',
         `${Math.max(240, Math.min(viewportHeight, nextHorizonY))}px`,
       )
-      const setFitScale = (
-        el: HTMLElement | null,
-        fit: { designWidth: number; minScale: number },
-      ) => {
-        if (!el) return
-        const scale = Math.min(
-          1,
-          Math.max(fit.minScale, viewportWidth / fit.designWidth),
-        )
-        el.style.setProperty('--home-fit-scale', scale.toFixed(4))
-        // Layout box wide enough that × scale === viewport (edge-to-edge).
-        el.style.setProperty(
-          '--home-fit-width',
-          `${(viewportWidth / scale).toFixed(1)}px`,
-        )
-      }
-      setFitScale(heroUiRef.current, HOME_UI_FIT.hero)
-      setFitScale(toolsUiRef.current, HOME_UI_FIT.tools)
-      setFitScale(aboutUiRef.current, HOME_UI_FIT.about)
     }
 
     measure()

@@ -85,8 +85,13 @@ const WHEEL_ITEMS: WheelItem[] = [
 // Wheel geometry. Cards orbit a circle whose front slot (nearest, lowest) is
 // the focused one; depth (cos of the slot angle) drives scale + opacity + blur
 // + z, so receding cards shrink and fade — a pseudo-3D turntable whose face
-// tips toward the viewer. radiusX is measured from the stage at runtime;
-// radiusY is a fraction of it so the arc stays shallow (the "face down" tilt).
+// tips toward the viewer. The radius is FIXED: the wheel keeps its desktop
+// arrangement at every viewport and the layer zoom-out (--home-fit-scale)
+// shrinks the whole group uniformly instead of compressing the orbit. The
+// resulting span — 2 × (sin 72° × RADIUS_X + 160px half-card × 0.845 side
+// scale) ≈ 917px — is what HOME_UI_FIT.tools.designWidth must accommodate.
+const RADIUS_X = 340 // orbit half-width (px)
+const RADIUS_Y = RADIUS_X * 0.22 // shallow arc: the "face down" tilt
 const MIN_SCALE = 0.55 // scale of the farthest visible card
 const BLUR_MAX = 4 // px blur on the farthest visible card
 const BANK = 0 // banking rotation applied per degree of orbit (0 = upright)
@@ -124,13 +129,19 @@ const HOME_BACKGROUND_MEDIA_QUERY = '(min-width: 40rem)'
 // the group keeps that composition and shrinks — the layer's layout box is
 // held at viewport / scale and the whole thing is scaled back down to fit
 // edge-to-edge — so a narrow window shows the same arrangement smaller
-// instead of re-wrapping it at full size. HOME_UI_MIN_FIT_SCALE floors the
-// zoom so phone text stays legible; once the floor binds, the layout box
-// narrows again and content re-wraps at the floored zoom. Written per group
-// as --home-fit-scale / --home-fit-width, applied by .home-scroll-layer in
+// instead of re-wrapping it at full size. minScale floors the zoom so phone
+// text stays legible; once the floor binds, the layout box narrows again and
+// content re-wraps at the floored zoom. The tools group has NO floor: its
+// wheel keeps a fixed orbit radius (see RADIUS_X) and never re-wraps, so the
+// only alternative to scaling further down would be clipping the side cards.
+// Its designWidth must hold the wheel's ≈917px span. Written per group as
+// --home-fit-scale / --home-fit-width, applied by .home-scroll-layer in
 // index.css.
-const HOME_UI_DESIGN_WIDTH = { hero: 820, tools: 880, about: 820 }
-const HOME_UI_MIN_FIT_SCALE = 0.6
+const HOME_UI_FIT = {
+  hero: { designWidth: 820, minScale: 0.6 },
+  tools: { designWidth: 940, minScale: 0 },
+  about: { designWidth: 820, minScale: 0.6 },
+}
 
 const SOCIAL_LINKS = [
   { label: 'GitHub', href: 'https://github.com/maxlbchung' },
@@ -200,26 +211,13 @@ const SCROLL_TO_TOOLS_MS = 1400
 // The tool wheel: a pseudo-3D carousel of WHEEL_ITEMS. The focused card sits
 // at the front (nearest/lowest, the only clickable one); the rest orbit up and
 // back, shrinking + fading by depth. Left/right arrows (and ← →, and the dots)
-// rotate which item is up front. radiusX tracks the stage width so the side
-// cards stay on-screen as it narrows.
+// rotate which item is up front. The orbit radius is fixed (RADIUS_X) — on
+// narrow viewports the layer zoom-out shrinks the whole wheel uniformly
+// rather than pulling the cards inward.
 function ToolWheel({ onSelect }: { onSelect: (item: WheelItem) => void }) {
   const N = WHEEL_ITEMS.length
   const [active, setActive] = useState(0)
-  const stageRef = useRef<HTMLDivElement>(null)
-  const [radiusX, setRadiusX] = useState(320)
 
-  useEffect(() => {
-    const stage = stageRef.current
-    if (!stage) return
-    const measure = () =>
-      setRadiusX(Math.max(140, Math.min(stage.clientWidth * 0.3, 340)))
-    measure()
-    const ro = new ResizeObserver(measure)
-    ro.observe(stage)
-    return () => ro.disconnect()
-  }, [])
-
-  const radiusY = radiusX * 0.22
   const stepAngle = (2 * Math.PI) / N
 
   const spin = (dir: number) => {
@@ -253,7 +251,7 @@ function ToolWheel({ onSelect }: { onSelect: (item: WheelItem) => void }) {
       className="home-rise flex w-full max-w-5xl flex-col items-center gap-7 outline-none"
       style={{ animationDelay: '120ms' }}
     >
-      <div ref={stageRef} className="relative -mt-28 h-[20rem] w-full">
+      <div className="relative -mt-28 h-[20rem] w-full">
         {WHEEL_ITEMS.map((item, i) => {
           const o = offsetOf(i)
           const phi = o * stepAngle
@@ -263,8 +261,8 @@ function ToolWheel({ onSelect }: { onSelect: (item: WheelItem) => void }) {
           const isFront = o === 0
           const hidden = cos < -0.3 // tuck the back arc away entirely
           const scale = MIN_SCALE + depth * (1 - MIN_SCALE)
-          const x = sin * radiusX
-          const y = cos * radiusY // front (cos 1) sits lowest
+          const x = sin * RADIUS_X
+          const y = cos * RADIUS_Y // front (cos 1) sits lowest
           const blur = (1 - depth) * BLUR_MAX
           const rot = ((phi * 180) / Math.PI) * BANK
           return (
@@ -567,11 +565,14 @@ export function Home() {
         '--home-ui-bottom',
         `${Math.max(240, Math.min(viewportHeight, nextHorizonY))}px`,
       )
-      const setFitScale = (el: HTMLElement | null, designWidth: number) => {
+      const setFitScale = (
+        el: HTMLElement | null,
+        fit: { designWidth: number; minScale: number },
+      ) => {
         if (!el) return
         const scale = Math.min(
           1,
-          Math.max(HOME_UI_MIN_FIT_SCALE, viewportWidth / designWidth),
+          Math.max(fit.minScale, viewportWidth / fit.designWidth),
         )
         el.style.setProperty('--home-fit-scale', scale.toFixed(4))
         // Layout box wide enough that × scale === viewport (edge-to-edge).
@@ -580,9 +581,9 @@ export function Home() {
           `${(viewportWidth / scale).toFixed(1)}px`,
         )
       }
-      setFitScale(heroUiRef.current, HOME_UI_DESIGN_WIDTH.hero)
-      setFitScale(toolsUiRef.current, HOME_UI_DESIGN_WIDTH.tools)
-      setFitScale(aboutUiRef.current, HOME_UI_DESIGN_WIDTH.about)
+      setFitScale(heroUiRef.current, HOME_UI_FIT.hero)
+      setFitScale(toolsUiRef.current, HOME_UI_FIT.tools)
+      setFitScale(aboutUiRef.current, HOME_UI_FIT.about)
     }
 
     measure()

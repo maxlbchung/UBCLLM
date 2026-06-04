@@ -856,7 +856,7 @@ export function Home() {
             </p>
             <p
               ref={descRef}
-              className="home-rise font-mono text-[0.6875rem] uppercase tracking-[0.22em] text-blue-500"
+              className="home-rise font-mono text-[0.6875rem] uppercase tracking-[0.22em] text-accent"
               style={{ animationDelay: '350ms' }}
             >
               (BETA)

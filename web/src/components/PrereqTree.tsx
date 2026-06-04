@@ -3,6 +3,7 @@ import ReactFlow, {
   Background,
   Controls,
   useReactFlow,
+  useStoreApi,
   type Edge,
   type Node,
 } from 'reactflow'
@@ -1243,58 +1244,81 @@ function buildGraph(
   return { nodes, edges, depthCount, isLongestEaster, bbox }
 }
 
-// Horizontal-only auto-fit. ReactFlow's built-in `fitView` fits both axes,
-// so a tall narrow tree leaves big horizontal margins because the vertical
-// extent becomes the limiting factor. Spec: leftmost and rightmost blocks
-// stay in view at all times, even if that means the chart overflows
-// vertically and the user pans to reach lower courses. We feed `fitBounds`
-// a bbox with the chart's true horizontal extent and a 1-pixel height so
-// the horizontal axis always wins the zoom calculation.
+// Auto-fit tuning. The fit is horizontal-first: the full-width zoom is
+// always honored (leftmost and rightmost blocks stay in view no matter
+// how deep the chain is), and within that bound the camera zooms out
+// further — down to FIT_VERTICAL_FLOOR — to fit the full height too.
+// Below the floor the blocks get too small to read, so a pathologically
+// tall tree overflows vertically and the user pans instead. FIT_MAX_ZOOM
+// keeps tiny graphs (a no-prereq course is a single block) from blowing
+// up to the manual-zoom ceiling.
+const FIT_PADDING = 0.05
+const FIT_MAX_ZOOM = 1
+const FIT_VERTICAL_FLOOR = 0.5
+// Instance-wide zoom-out limit (the `minZoom` prop). setViewport clamps
+// to the instance's scale extent, so this must sit below the zoom the
+// deepest corpus tree needs for its horizontal fit (FNH 483's 15 columns
+// ≈ 0.2 on a desktop viewport, less on narrow screens) — ReactFlow's
+// default of 0.5 was exactly the bug: deep trees clamped mid-fit and the
+// camera landed on a middle slice of the chain with the root off-screen.
+const MIN_ZOOM = 0.05
+
+// Auto-fit on root-course change / view open. ReactFlow's own fitBounds
+// clamps to the instance min/maxZoom and offers no per-axis policy, so
+// the transform is computed by hand from the layout bbox (see the
+// constants above for the zoom policy).
 //
 // Important: `nodes` deliberately does NOT live in this effect's deps,
 // because every selection-change rebuilds the nodes array (new object
 // identity, new positions for some items) and we don't want to re-fit
 // the camera on every dropdown toggle. The effect re-runs only when
 // `fitKey` flips (initial mount, root-course lookup), and reads the
-// latest `nodes` via a ref so fitBounds always sees the current bbox.
-function HorizontalFitOnChange({
+// latest bbox via a ref so the fit always sees the current graph.
+function FitOnChange({
   bbox,
   fitKey,
 }: {
   bbox: Graph['bbox']
   fitKey: string
 }) {
-  const { fitBounds } = useReactFlow()
+  const { setViewport } = useReactFlow()
+  const store = useStoreApi()
   const bboxRef = useRef(bbox)
   bboxRef.current = bbox
   useEffect(() => {
     // Defer the fit to the next animation frame. When this effect fires
     // on a tab-switch into the prereq view, ReactFlow's ResizeObserver
     // hasn't yet propagated the post-`display:none` wrapper size into
-    // its internal store, so width/height are still 0. fitBounds then
-    // computes `height / (bounds.height * (1 + padding)) = 0 / 1.05 = 0`
-    // and clamps to `minZoom`, which manifests as the camera snapping
-    // all the way out instead of in. One rAF is enough for the resize
-    // callback + state update to land before we call fitBounds.
+    // its internal store, so width/height are still 0. One rAF is enough
+    // for the resize callback + state update to land first.
     const id = requestAnimationFrame(() => {
       const b = bboxRef.current
       if (!b) return
-      // The bbox already accounts for each node's full vertical extent
-      // (top + estimated height), so (minY + maxY) / 2 is the true visual
-      // center. A 1-pixel-tall bounds keeps the horizontal axis the
-      // limiting factor for the zoom calculation.
-      fitBounds(
-        {
-          x: b.minX,
-          y: (b.minY + b.maxY) / 2,
-          width: b.maxX - b.minX,
-          height: 1,
-        },
-        { padding: 0.05, duration: 200 },
+      const { width, height } = store.getState()
+      // Still unmeasured (container hidden behind display:none). Skip
+      // rather than compute a garbage transform — the viewOpens bump in
+      // fitKey re-fires this effect once the view is actually visible.
+      if (!width || !height) return
+      const bw = Math.max(1, b.maxX - b.minX)
+      const bh = Math.max(1, b.maxY - b.minY)
+      const zoomX = width / (bw * (1 + FIT_PADDING))
+      const zoomY = height / (bh * (1 + FIT_PADDING))
+      const zoom = Math.min(
+        zoomX,
+        Math.max(zoomY, FIT_VERTICAL_FLOOR),
+        FIT_MAX_ZOOM,
+      )
+      // The bbox accounts for each node's full vertical extent (top +
+      // estimated height), so the midpoints are the true visual center.
+      const cx = (b.minX + b.maxX) / 2
+      const cy = (b.minY + b.maxY) / 2
+      setViewport(
+        { x: width / 2 - cx * zoom, y: height / 2 - cy * zoom, zoom },
+        { duration: 200 },
       )
     })
     return () => cancelAnimationFrame(id)
-  }, [fitKey, fitBounds])
+  }, [fitKey, setViewport, store])
   return null
 }
 
@@ -1665,6 +1689,7 @@ export function PrereqTree() {
             edgeTypes={EDGE_TYPES}
             nodesDraggable={false}
             nodesConnectable={false}
+            minZoom={MIN_ZOOM}
             proOptions={{ hideAttribution: true }}
           >
             {/* ReactFlow's Background renders SVG <circle> dots whose
@@ -1673,7 +1698,7 @@ export function PrereqTree() {
                 in dark, zinc-300 in light. */}
             <Background color="var(--line-soft)" gap={16} />
             <Controls showInteractive={false} />
-            <HorizontalFitOnChange
+            <FitOnChange
               bbox={graph.bbox}
               fitKey={`${activeCode ?? ''}::${viewOpens}`}
             />

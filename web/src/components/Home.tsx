@@ -8,6 +8,7 @@ import {
 import { useConversations } from '../store/conversations'
 import { ROUTES, navigate } from '../lib/router'
 import { playSfx } from '../lib/sfx'
+import { APP_VERSION } from '../version'
 import {
   FALLBACK_HOME_BACKGROUND_SCENE,
   loadHomeBackgroundScene,
@@ -788,6 +789,9 @@ export function Home() {
       </div>
       {/* ── Hero fold — fills the viewport on its own; everything else is
           below the fold ── */}
+      <div className="home-version-badge fixed bottom-4 left-4 z-30 font-mono text-[0.625rem] uppercase tracking-[0.22em] text-fg-faint sm:bottom-5 sm:left-5">
+        v{APP_VERSION}
+      </div>
       <section
         ref={heroRef}
         className="relative flex min-h-screen flex-col items-center justify-center px-6 sm:px-10"

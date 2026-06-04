@@ -119,9 +119,10 @@ const DEAD_SCROLLSPACE_CLASS = 'min-h-[60vh]'
 const HOME_HORIZON_VIEWPORT_RATIO = 0.85
 
 // Tailwind's `sm` breakpoint (40rem at the 16px media-query base = 640px).
-// Below it the home background is dropped entirely: the landscape layer is
-// display:none (`hidden sm:block`) and this query gates the WebGL scene so
-// phones never boot Three.js for a canvas they can't see.
+// Below it the WebGL wireframe scene is dropped: this query gates
+// HomeThreeBackground (and its scene-JSON fetch) so phones never boot
+// Three.js. The landscape layer's cheap CSS glows (horizon sun + bottom
+// accent ellipse) stay visible at every width.
 const HOME_BACKGROUND_MEDIA_QUERY = '(min-width: 40rem)'
 
 // Continuous zoom-out for the fixed UI groups. Each group has a design width
@@ -842,15 +843,14 @@ export function Home() {
             via a compositor-only transform (see .home-landscape-* in
             index.css). Recolors per theme off --accent.
 
-            Mobile (< sm) gets no background at all: the layer is display:none
-            and the Three.js scene is unmounted via showBackground. The div
-            itself stays mounted so the horizon layout effect's ref / observer
-            survive breakpoint flips (clientHeight reads 0 while hidden and
-            measure() falls back to window.innerHeight). */}
+            Mobile (< sm) keeps the cheap CSS glows (the horizon sun + the
+            bottom accent ellipse from .home-landscape::after) but drops the
+            WebGL wireframe scene — HomeThreeBackground is unmounted via
+            showBackground so phones never boot Three.js. */}
         <div
           ref={landscapeRef}
           aria-hidden
-          className="home-landscape home-background-fade pointer-events-none fixed inset-0 hidden overflow-hidden sm:block"
+          className="home-landscape home-background-fade pointer-events-none fixed inset-0 overflow-hidden"
         >
           <div className="home-landscape-sun home-glow" />
           {showBackground && (

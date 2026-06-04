@@ -119,16 +119,18 @@ const HOME_HORIZON_VIEWPORT_RATIO = 0.85
 // phones never boot Three.js for a canvas they can't see.
 const HOME_BACKGROUND_MEDIA_QUERY = '(min-width: 40rem)'
 
-// Viewport widths (px) below which each fixed UI group scales down to fit
-// rather than letting content clip at the screen edge. Written per group as
-// --home-fit-scale = min(1, viewport / fitWidth), multiplied into the
-// scroll-driven --home-ui-scale in index.css. The tools value is the tool
-// wheel's widest narrow-viewport span: the ±1 side cards at the 140px minimum
-// orbit radius — 2 × (sin 72° × 140 + 160px half-card × 0.845 depth scale)
-// ≈ 537px — plus breathing room (the span peaks ≈ 556px just before the
-// radius clamps). Hero/about copy wraps on its own, so those only kick in on
-// very narrow screens.
-const HOME_UI_FIT_WIDTH = { hero: 380, tools: 560, about: 380 }
+// Continuous zoom-out for the fixed UI groups. Each group has a design width
+// (px): the narrowest viewport its full composition is meant for. Below it
+// the group keeps that composition and shrinks — the layer's layout box is
+// held at viewport / scale and the whole thing is scaled back down to fit
+// edge-to-edge — so a narrow window shows the same arrangement smaller
+// instead of re-wrapping it at full size. HOME_UI_MIN_FIT_SCALE floors the
+// zoom so phone text stays legible; once the floor binds, the layout box
+// narrows again and content re-wraps at the floored zoom. Written per group
+// as --home-fit-scale / --home-fit-width, applied by .home-scroll-layer in
+// index.css.
+const HOME_UI_DESIGN_WIDTH = { hero: 820, tools: 880, about: 820 }
+const HOME_UI_MIN_FIT_SCALE = 0.6
 
 const SOCIAL_LINKS = [
   { label: 'GitHub', href: 'https://github.com/maxlbchung' },
@@ -538,8 +540,8 @@ export function Home() {
   // Keep the synthwave horizon at the start of the bottom 15% of the
   // viewport. CSS uses --horizon-y for the sun/line/floor; Three.js also needs
   // the same pixel value for its projection origin. The same measure pass
-  // writes each UI group's --home-fit-scale so groups shrink to fit once the
-  // viewport is narrower than their natural span (see HOME_UI_FIT_WIDTH).
+  // writes each UI group's zoom-out vars so groups scale down once the
+  // viewport is narrower than their design width (see HOME_UI_DESIGN_WIDTH).
   useLayoutEffect(() => {
     const scroller = scrollerRef.current
     const landscape = landscapeRef.current
@@ -565,14 +567,22 @@ export function Home() {
         '--home-ui-bottom',
         `${Math.max(240, Math.min(viewportHeight, nextHorizonY))}px`,
       )
-      const setFitScale = (el: HTMLElement | null, fitWidth: number) =>
-        el?.style.setProperty(
-          '--home-fit-scale',
-          Math.min(1, viewportWidth / fitWidth).toFixed(4),
+      const setFitScale = (el: HTMLElement | null, designWidth: number) => {
+        if (!el) return
+        const scale = Math.min(
+          1,
+          Math.max(HOME_UI_MIN_FIT_SCALE, viewportWidth / designWidth),
         )
-      setFitScale(heroUiRef.current, HOME_UI_FIT_WIDTH.hero)
-      setFitScale(toolsUiRef.current, HOME_UI_FIT_WIDTH.tools)
-      setFitScale(aboutUiRef.current, HOME_UI_FIT_WIDTH.about)
+        el.style.setProperty('--home-fit-scale', scale.toFixed(4))
+        // Layout box wide enough that × scale === viewport (edge-to-edge).
+        el.style.setProperty(
+          '--home-fit-width',
+          `${(viewportWidth / scale).toFixed(1)}px`,
+        )
+      }
+      setFitScale(heroUiRef.current, HOME_UI_DESIGN_WIDTH.hero)
+      setFitScale(toolsUiRef.current, HOME_UI_DESIGN_WIDTH.tools)
+      setFitScale(aboutUiRef.current, HOME_UI_DESIGN_WIDTH.about)
     }
 
     measure()
@@ -883,15 +893,15 @@ export function Home() {
               className="home-rise max-w-xl text-lg leading-relaxed text-fg-muted"
               style={{ animationDelay: '250ms' }}
             >
-              Your personal digital assistant for University — one place to
+              Your personal digital assistant for University  ✦  One place to
               explore courses, untangle prerequisites, and plan your degree. 
             </p>
-              <p
+            <p
               ref={descRef}
-              className="home-rise max-w-xl text-lg leading-relaxed text-fg-muted"
+              className="home-rise font-mono text-[0.6875rem] uppercase tracking-[0.22em] text-blue-500"
               style={{ animationDelay: '350ms' }}
             >
-              And guess what — its completely free
+              (BETA)
             </p>
           </div>
 

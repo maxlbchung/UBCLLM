@@ -36,7 +36,14 @@ export type Expr =
 // Course-code canonicalization — same shape `extractCourseCodes` in
 // retrieve.ts produces ("CPSC 110", uppercased, no `_V` suffix). Keys built
 // from this string are looked up in the same `getCourseIndex()` Map.
-const CODE_RE = /^([A-Z]{3,5})(?:_V)?\s*(\d{2,4}[A-Z]?)\b/i
+//
+// Subjects are 2–4 letters ("AI 322", "BA 561", "CPSC 110" — same bounds as
+// every other code matcher in the app). The negative lookahead keeps the
+// joiner keywords from being eaten as subjects: the tokenizer tries CODE
+// before keywords, so without it "…KIN_V 131 (or 190)" would tokenize the
+// "or 190" as CODE "OR 190" instead of OR + a bare-number continuation
+// (and "and 221" as CODE "AND 221" likewise).
+const CODE_RE = /^(?!(?:and|or|one|all)\b)([A-Z]{2,4})(?:_V)?\s*(\d{2,4}[A-Z]?)\b/i
 
 function canonicalizeCode(subject: string, number: string): string {
   return `${subject.toUpperCase()} ${number.toUpperCase()}`
@@ -283,14 +290,16 @@ function tokenize(input: string): Token[] {
         // start-of-input it's more often prose ("30 credits required"),
         // and DOT clears the inherited subject entirely. Pattern matches
         // 2-4 digits with optional uppercase suffix — same shape as
-        // CODE_RE's number capture.
+        // CODE_RE's number capture. The (?!-) lookahead rejects level
+        // descriptors like "and 100-level PHYS_V" (CAPS 205/206), which
+        // would otherwise expand into a phantom course number.
         if (
           lastCodeSubject &&
           (lastTokenType === 'COMMA' ||
             lastTokenType === 'OR' ||
             lastTokenType === 'AND')
         ) {
-          const numMatch = input.slice(i).match(/^(\d{2,4}[A-Z]?)\b/i)
+          const numMatch = input.slice(i).match(/^(\d{2,4}[A-Z]?)\b(?!-)/i)
           if (numMatch) {
             pushToken({
               type: 'CODE',
@@ -1157,6 +1166,15 @@ function stripGradePrefix(input: string): string {
 // is not eligible…" → "…BIOL 12)").
 const TRAILING_NOISE_RES: RegExp[] = [
   /\s*[.,;]?\s*This course is not eligible for Credit\/D\/Fail grading\.?\s*$/i,
+  // Trailing credit-exclusion note ("FNH 160 and 161 together are
+  // credit-excluded with BIOL 153 and 155" — FNH 160/161). It reads as
+  // prose but tokenizes as codes ("FNH 160 and 161" → CODE + continuation),
+  // turning the note into hard self-referencing conjuncts that can never
+  // be satisfied in the planner. Sentence-bounded ([^.;]*) so the real
+  // prereq clauses before it survive; courses whose prereqs *reference*
+  // credit-exclusion lists as options (CPSC 320, STAT 200) say "credit
+  // exclusion list" and don't match this phrasing.
+  /\s*[.,;]?\s*[^.;]*\b(?:is|are)\s+credit-excluded\b[^.;]*$/i,
 ]
 
 function stripTrailingNoise(input: string): string {

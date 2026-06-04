@@ -1031,14 +1031,21 @@ function buildGraph(
     return a.id.localeCompare(b.id)
   }
 
-  // Lay out columns shallowest-first (d0, d1, d2, …) so each deeper
-  // column can read its successors' y's from `yByItem` when sorting.
-  // Coreq column goes last — it's an independent bottom-up stack and
-  // doesn't feed any prereq column.
+  // Lay out columns shallowest-first (d0, then the coreq stack, then d1,
+  // d2, …) so each deeper column can read its successors' y's from
+  // `yByItem` when sorting. The coreq column slots in right after the
+  // root: its blocks stack at fixed positions above the root (tiebreak
+  // order, no barycenter), but their y's must be recorded BEFORE d1
+  // sorts — a coreq's own prereqs live in d1+, and sorting d1 without
+  // those y's lumped them in with the root's children at bary 0, where
+  // the alphabetical tiebreak interleaved the two families (PHYS 106:
+  // the root's "=…" glossary note sorted above MATH 100's prereq notes).
+  // With the coreq y's placed first, a coreq's children inherit its
+  // above-root position and sort to the top of their column, mirroring
+  // the coreq stack sitting above the root.
   const sortedColKeys = [...byColumn.keys()].sort((a, b) => {
-    if (a === 'coreq') return 1
-    if (b === 'coreq') return -1
-    return Number(a.slice(1)) - Number(b.slice(1))
+    const rank = (k: string) => (k === 'coreq' ? 0.5 : Number(k.slice(1)))
+    return rank(a) - rank(b)
   })
 
   for (const colKey of sortedColKeys) {

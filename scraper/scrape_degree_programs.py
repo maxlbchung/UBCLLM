@@ -52,6 +52,7 @@ from selectolax.parser import HTMLParser, Node
 
 from common import (
     BASE_URL,
+    CRAWL_DELAY,
     OUTPUT_DIR,
     RateLimitedClient,
     configure_logging,
@@ -720,8 +721,9 @@ def main() -> None:
     ap.add_argument(
         "--rate",
         type=float,
-        default=1.0,
-        help="Minimum seconds between requests (default 1.0)",
+        default=CRAWL_DELAY,
+        help=f"Minimum seconds between requests (default {CRAWL_DELAY}, "
+        "per the calendar's robots.txt Crawl-delay)",
     )
     ap.add_argument("--output", type=Path, default=OUTPUT_FILE)
     ap.add_argument("--verbose", "-v", action="store_true")

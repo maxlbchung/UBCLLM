@@ -67,6 +67,7 @@ The full v1 stack from the original plan is shipped and live. Highlights:
 - **Same MiniLM both sides**: `pipeline/chunk_and_embed.py` uses `sentence-transformers/all-MiniLM-L6-v2`; `web/src/lib/embed.ts` uses `Xenova/all-MiniLM-L6-v2`. Same weights, different distributions — both must be normalized so dot product == cosine.
 - **CI uses `npm install`, not `npm ci`**: the lockfile is generated on Windows and skips Linux-only platform-optional packages (e.g. `@tailwindcss/oxide-linux-x64-gnu` and its `@emnapi/*` transitives), so `npm ci` on the Ubuntu runner fails. `npm install` resolves them on the runner.
 - **`scraper/output/*.json` is committed.** Re-running the scraper hits UBC servers; the corpus snapshot in git is the source of truth that CI feeds to the pipeline.
+- **Scrapers must honour `Crawl-delay: 10`.** `vancouver.calendar.ubc.ca/robots.txt` declares `Crawl-delay: 10` and Disallows nothing we crawl (course pages and `/jsonapi` are both permitted) — so honouring the delay is the whole of our robots obligation, and we do. `common.py` exports `CRAWL_DELAY = 10.0`; **every scraper's `--rate` default must stay bound to that constant**, not a literal. This bit us once: the CLI defaults (1.0, and 0.5 in `scrape_courses.py`) silently shadowed `RateLimitedClient`'s default, so the crawler ran 10–20× over policy while the shared default looked correct. Because the limiter throttles **per client instance**, a full refresh must also run the scrapers **sequentially** — two in parallel halve the effective gap against the same host. `hr.ubc.ca` (holidays) is a different host with its own robots.txt, but it's a single request, so it inherits the same constant for simplicity.
 - **`web/public/data/{chunks.json, embeddings.bin, calendar.json}` are regenerated in CI**, not committed. Locally, run `cd pipeline && uv run chunk_and_embed.py && uv run build_calendar.py` once after pulling, then `npm run dev`. `calendar.json` is a separate pipeline from the RAG corpus — it normalizes the calendar-source scrapers (academic_dates / holidays) into one date-sorted JSON for the home-page widget; do not merge it into `chunks.json`.
 - **Prereq AST parser** (`web/src/lib/prereqAst.ts`): recursive-descent over a small token alphabet (`one of`, `all of`, `either`, `and`, `or`, `;`, `.`, `,`, parens, branch labels, course codes, free text). Emits `Expr = And | Or-dropdown | Or-stacked | Code | Literal`. `parsePrereq` is null-safe for empty/whitespace input; unknown tokens collapse into `Literal` so the parser never throws on weird strings. `displayExpr` flattens an expression to a label string for dropdown / radio options. Top-level literals are dropped from the prereq tree (preserved as text in chat). Selection state in `PrereqTree` is keyed by `${ownerCourseCode}::${pathInExpr}` so toggling one disjunction doesn't perturb others, and selections persist across root-course switches.
 
@@ -107,11 +108,13 @@ cd pipeline && uv run build_calendar.py      # generates web/public/data/calenda
 # Day-to-day:
 cd web      && npm run dev                    # local dev server (http://localhost:5173/UBCLLM/)
 cd web      && npm run build                  # static build → web/dist/
-cd scraper  && uv run scrape_courses.py            # full crawl, ~10 min at 1 req/s
-cd scraper  && uv run scrape_faculties.py          # shallow hubs (depth 2, cap 300), ~3-5 min
-cd scraper  && uv run scrape_degree_programs.py    # all degree subtrees (BA/MSc/PhD/cert), ~30-60 min cold
-cd scraper  && uv run scrape_academic_dates.py     # /dates-and-deadlines tables, < 5 s
-cd scraper  && uv run scrape_holidays.py           # hr.ubc.ca/statutory-holidays, < 5 s
+# Scrapers hit the on-disk cache by default (instant). Timings below are for a
+# cold/--refresh run at the mandated 10 s crawl-delay. Run them SEQUENTIALLY.
+cd scraper  && uv run scrape_courses.py            # JSON:API, ~193 reqs, ~32 min
+cd scraper  && uv run scrape_faculties.py          # shallow hubs (depth 2, cap 300), ~50 min
+cd scraper  && uv run scrape_degree_programs.py    # all degree subtrees (BA/MSc/PhD/cert), ~5-6 h
+cd scraper  && uv run scrape_academic_dates.py     # /dates-and-deadlines tables, 1 req
+cd scraper  && uv run scrape_holidays.py           # hr.ubc.ca/statutory-holidays, 1 req
 cd scraper  && uv run scrape_courses.py --subject CPSC --limit 1   # debug
 cd scraper  && uv run scrape_degree_programs.py --only "Master of"  # one level, debug
 

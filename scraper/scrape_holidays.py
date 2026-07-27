@@ -31,6 +31,7 @@ from pathlib import Path
 from selectolax.parser import HTMLParser
 
 from common import (
+    CRAWL_DELAY,
     OUTPUT_DIR,
     RateLimitedClient,
     configure_logging,
@@ -170,8 +171,9 @@ def main() -> None:
     ap.add_argument(
         "--rate",
         type=float,
-        default=1.0,
-        help="Minimum seconds between requests (default 1.0)",
+        default=CRAWL_DELAY,
+        help=f"Minimum seconds between requests (default {CRAWL_DELAY}; "
+        "hr.ubc.ca is a different host, but this is a single request)",
     )
     ap.add_argument("--output", type=Path, default=OUTPUT_FILE)
     ap.add_argument("--verbose", "-v", action="store_true")

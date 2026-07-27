@@ -22,6 +22,14 @@ USER_AGENT = (
     "UBCLLM-Scraper/0.1 (educational; "
     "https://github.com/maxlbchung/ubcllm; contact: maxlbchung@gmail.com)"
 )
+
+# https://vancouver.calendar.ubc.ca/robots.txt declares `Crawl-delay: 10`.
+# Every scraper defaults its --rate to this so we stay inside the site's
+# stated policy; nothing we crawl is Disallow-ed, so honouring the delay is
+# the whole of our robots obligation. Only lower it with a real reason —
+# and note the scrapers must then also be run SEQUENTIALLY, since the rate
+# limiter is per-client and two concurrent scrapers halve the effective gap.
+CRAWL_DELAY = 10.0
 DEFAULT_TIMEOUT = httpx.Timeout(30.0, connect=10.0)
 
 CACHE_DIR = Path(__file__).parent / "cache"
@@ -43,7 +51,7 @@ class RateLimitedClient:
     and retries transient failures with exponential backoff.
     """
 
-    def __init__(self, client: httpx.AsyncClient, min_interval: float = 1.0):
+    def __init__(self, client: httpx.AsyncClient, min_interval: float = CRAWL_DELAY):
         self._client = client
         self._min_interval = min_interval
         self._last_request = 0.0

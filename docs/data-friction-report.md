@@ -177,7 +177,27 @@ and URL-slug heuristics, and **248 of 576 (43%)** program pages fall through to 
 falls back to a flat list of course codes mentioned anywhere on the page, which is not a
 checklist and cannot track progress.
 
-### 2.4 Requirements arrive as flattened HTML tables
+### 2.4 Per-course fields the planner needs and cannot get
+
+Separate from the requirements problem: the planner places individual courses into a
+year/term grid and validates them. These are the per-course fields it asks for, and how
+much of the catalogue actually supplies them.
+
+| Field the planner needs | Coverage | What breaks without it |
+|---|---|---|
+| **Which term(s) the course is offered** | **0.5%** | The planner's entire layout is Term 1–4. A student can place a course in a term it is never offered in and nothing warns them. |
+| **Which requirement category the course satisfies** | **0%** | Can't auto-fill "Electives", "Technical Elective", etc. The other half of §2.2. |
+| **Credits as a single number** | 75.0% | 25% are ranges (`3-6`, `12-18`, `1.5-3`), so every credit total is approximate. |
+| **Registration restrictions** (year standing, program-restricted) | 10.9%, prose only | Can't tell a student they're ineligible to register, only that they lack a prereq. |
+| **Exclusions** ("credit will not be given for both X and Y") | ~8.1%, and mixed | The `equivalency` field mostly holds cross-listings (`AFST 256 → HIST 256`), not exclusions. Double-counted credits go undetected. |
+| **Corequisites** | 2.9% | Almost certainly under-reported rather than genuinely rare. |
+| **Description** | 78.3% | 21.7% have none — and since prerequisites live *inside* the description, a missing description also means unknowable prerequisites. |
+
+The first two are the ones that matter. Term availability is the single missing field that
+most limits the planner as a planning tool, and requirement-category tagging is what would
+close the gap in §2.2 from the course side rather than the program side.
+
+### 2.5 Requirements arrive as flattened HTML tables
 
 Requirements reach us as alternating lines — a label, then a bare number:
 
@@ -227,19 +247,21 @@ does the elective vocabulary.**
 ## 4. Asks, highest value first
 
 1. **Publish which courses satisfy each named requirement category** ("Communication
-   Requirement", "Restricted Electives", "Technical Electives"), per program. Unlocks a
-   third of the degree planner. Nothing else in this document comes close in value per
-   unit of effort.
-2. **Populate `field_course_prerequisite`.** The field exists and is empty; the data exists
+   Requirement", "Restricted Electives", "Technical Electives"), per program — or tag it
+   on the course. Unlocks a third of the degree planner. Nothing else in this document
+   comes close in value per unit of effort.
+2. **Publish which term(s) each course is offered in.** Currently derivable for 0.5% of
+   courses. The planner is built on a term grid it cannot validate against.
+3. **Populate `field_course_prerequisite`.** The field exists and is empty; the data exists
    as prose beside it. Failing that, publish the prerequisite *grammar* as a spec so we can
    verify our parser rather than guess.
-3. **Give program pages a content type or `page_kind` term.** Eliminates the 43%
+4. **Give program pages a content type or `page_kind` term.** Eliminates the 43%
    classification failure and lets the planner know which page to read.
-4. **Fix or flag retired course references** in prerequisite text (526 known dead edges —
+5. **Fix or flag retired course references** in prerequisite text (526 known dead edges —
    list available on request).
-5. **Expose faculty/school as a field on program nodes**, so hierarchy stops depending on
+6. **Expose faculty/school as a field on program nodes**, so hierarchy stops depending on
    rendered breadcrumbs.
-6. **Document `/jsonapi` as a supported interface with a stated rate limit.** It is
+7. **Document `/jsonapi` as a supported interface with a stated rate limit.** It is
    currently undocumented, so every consumer discovers it by accident and guesses at
    acceptable usage.
 

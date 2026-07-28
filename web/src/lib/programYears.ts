@@ -76,8 +76,13 @@ const YEAR_TOTAL_RE = /^total\s+credits$/i
 // Whole-row choice markers. A bare "or" is handled between adjacent codes so
 // mixed rows like "MATH 221 (or 223), 215" don't become one giant pick-one.
 const WHOLE_ROW_CHOICE_RE = /\b(one|any)\s+of\b|\beither\b/i
-// A course-subject token (CPSC, CPSC_V, AI) or a 3-digit course number.
-const TOKEN_RE = /[A-Z]{2,4}(?:_V)?|\d{3}[A-Z]?/g
+// A course-subject token (CPSC, CPSC_V, AI) or a 3-digit course number. The
+// campus suffix is captured rather than baked in so a non-Vancouver code can
+// be told apart from a Vancouver one — see extractCodeMentions. Without the
+// capture, "HES_O 120" tokenized as subject "HES" + number "120" and yielded
+// the Vancouver code "HES 120", silently converting a UBC Okanagan reference
+// into a local one (and inventing a code that doesn't exist here).
+const TOKEN_RE = /([A-Z]{2,4})(_[A-Z])?|\d{3}[A-Z]?/g
 // Trailing footnote markers: " 1", " 2", " 4,5" at the end of a label. Course
 // numbers are always 3 digits, so a trailing 1-2 digit run is always a marker.
 const FOOTNOTE_RE = /\s+\d{1,2}(\s*,\s*\d{1,2})*$/
@@ -127,6 +132,15 @@ function extractCodeMentions(label: string): CodeMention[] {
         pendingSubjectStart = null
       }
     } else {
+      // A non-Vancouver campus suffix ("HES_O") makes this subject
+      // out of scope: clear it so the bare number that follows is
+      // dropped rather than re-homed onto a Vancouver code.
+      const campus = match[2]
+      if (campus && campus !== '_V') {
+        subject = null
+        pendingSubjectStart = null
+        continue
+      }
       subject = tok.replace(/_V$/, '')
       pendingSubjectStart = start
     }

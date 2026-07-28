@@ -45,6 +45,48 @@ export type Expr =
 // (and "and 221" as CODE "AND 221" likewise).
 const CODE_RE = /^(?!(?:and|or|one|all)\b)([A-Z]{2,4})(?:_V)?\s*(\d{2,4}[A-Z]?)\b/i
 
+// ---------- Other-campus (non-Vancouver) codes ----------
+//
+// As of the 2026-07-27 corpus refresh the Vancouver calendar cites UBC
+// Okanagan courses inside Vancouver prerequisites ("KIN_V 110 or HES_O 120",
+// "POLI_V 100 or POLI_O 100"). This app is Vancouver-only, so an `_O` code is
+// not an actionable prerequisite here and must not become a tree node.
+//
+// Leaving them in is actively harmful rather than merely useless: CODE_RE
+// accepts an optional `_V` and nothing else, so `HES_O 120` matches no code
+// pattern, falls through to TEXT, and drags the whole surrounding expression
+// down with it. Measured against the refresh, that collapsed 12 courses to a
+// bare literal (empty prereq tree — "POLI_V 100 or POLI_O 100." lost its
+// POLI 100 edge outright) and cost another 14 courses some of their nodes.
+//
+// So strip other-campus codes — along with whichever joiner attaches them —
+// before tokenizing, leaving the Vancouver-only expression the parser can
+// actually model. Matches any `_X` suffix that isn't `_V`, so a future
+// campus code is handled without another edit.
+const OFF_CAMPUS = String.raw`[A-Z]{2,4}_(?!V\b)[A-Z]\s*\d{2,4}[A-Z]?`
+const JOIN = String.raw`(?:[Oo][Rr]|[Aa][Nn][Dd])`
+// Order matters: consume the attaching joiner/comma first so removing the
+// code doesn't strand "… or" or ", ," behind it. Bare removal is the last
+// resort for a code that stands alone.
+const OFF_CAMPUS_PATTERNS: RegExp[] = [
+  new RegExp(String.raw`\s*,?\s*\b${JOIN}\s+${OFF_CAMPUS}\b`, 'g'),
+  new RegExp(String.raw`\s*,\s*${OFF_CAMPUS}\b`, 'g'),
+  new RegExp(String.raw`\b${OFF_CAMPUS}\s*,?\s+${JOIN}\s+`, 'g'),
+  new RegExp(String.raw`\b${OFF_CAMPUS}\b`, 'g'),
+]
+
+function stripOffCampusCodes(s: string): string {
+  let out = s
+  for (const re of OFF_CAMPUS_PATTERNS) out = out.replace(re, '')
+  // Removal can leave doubled separators or a dangling one before a closing
+  // delimiter ("one of A, , B", "(a) A or ) ").
+  return out
+    .replace(/\s*,\s*(?=,)/g, '')
+    .replace(/,\s*(?=[).;]|$)/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+}
+
 function canonicalizeCode(subject: string, number: string): string {
   return `${subject.toUpperCase()} ${number.toUpperCase()}`
 }
@@ -1285,7 +1327,10 @@ export function parsePrereq(raw: string | null | undefined): Expr | null {
   // render" — without this short-circuit it would parse to a literal
   // info block that just says "None".
   if (/^\s*none\s*\.?\s*$/i.test(raw)) return null
-  const noNoise = stripTrailingNoise(raw.trim())
+  const noNoise = stripTrailingNoise(stripOffCampusCodes(raw.trim()))
+  // Stripping can empty the string outright (a prereq that named only
+  // other-campus courses) — same "nothing to render" case as bare "none".
+  if (!noNoise) return null
   const { hard, soft } = splitRecommended(noNoise)
   const hardExpr = hard ? parseClause(hard) : null
   const softExpr = soft ? parseClause(soft) : null

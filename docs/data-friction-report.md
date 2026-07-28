@@ -113,7 +113,7 @@ cannot satisfy, with nothing explaining why.
 ### 1.5 A fifth of prerequisites aren't course requirements at all
 
 **20.3%** (628) include conditions that are not courses — year standing, instructor
-permission, grade minimums, "or equivalent". For **8.5%** (264 courses) the prerequisite
+permission, grade minimums, "or equivalent". For **8.5%** (263 courses) the prerequisite
 contains **no course code whatsoever**, so there is no graph to draw. Those render as a
 block of text and the student is on their own.
 

@@ -1,6 +1,6 @@
 # UBC Vancouver Calendar Data — Where It Breaks Student-Facing Tools
 
-**Author:** Max Chung · **Date:** 2026-07-27
+**Author:** Max Chung · **Date:** 2026-07-27 (corpus refreshed 2026-07-27)
 **Context:** Field notes from building [Reodite](https://reodite.com), a student-facing
 academic assistant built entirely on UBC's public course calendar.
 
@@ -10,7 +10,7 @@ existing published data is shaped. Each section names the tool, the concrete fai
 student sees, and the measurement behind it.
 
 All figures measured against the committed corpus as of 2026-07-27 (9,489 courses /
-576 program pages / 198 faculty hub pages). JSON:API observations verified 2026-05-29.
+572 program pages / 198 faculty hub pages). JSON:API observations verified 2026-05-29.
 
 ---
 
@@ -19,10 +19,10 @@ All figures measured against the committed corpus as of 2026-07-27 (9,489 course
 | Tool | Failure a student actually hits | Scale |
 |---|---|---|
 | **Prerequisite tree** | Prerequisites must be parsed out of English prose | **0 of 9,603** courses expose a structured prerequisite |
-| **Prerequisite tree** | Tree draws an edge to a course that doesn't exist | **526** dead references across **304** courses |
+| **Prerequisite tree** | Tree draws an edge to a course that doesn't exist | **657** dead references across **358** courses |
 | **Prerequisite tree** | Requirement can't be graphed at all | **8.5%** of prerequisites contain no course code |
-| **Degree planner** | Requirement can't be checked off automatically | **33.9%** of all listed degree credits |
-| **Degree planner** | Program has no machine-readable requirements at all | **135 of 205** requirement-bearing pages |
+| **Degree planner** | Requirement can't be checked off automatically | **33.8%** of all listed degree credits |
+| **Degree planner** | Program has no machine-readable requirements at all | **137 of 207** requirement-bearing pages |
 
 ---
 
@@ -47,13 +47,13 @@ we have no way to detect that it happened.
 
 ### 1.2 The prose encodes real boolean algebra
 
-Across 3,098 courses with prerequisite text (mean 50 chars, max 381):
+Across 3,098 courses with prerequisite text (mean 52 chars, max 477):
 
 | Construct | Share |
 |---|---|
 | `one of …` (disjunction) | 34.5% |
-| `and` | 30.7% |
-| `or` | 26.6% |
+| `and` | 20.3% |
+| `or` | 23.3% |
 | `all of …` (conjunction) | 16.8% |
 | Year-standing conditions | 14.0% |
 | `Either (a) … or (b) …` labelled branches | 6.9% |
@@ -74,8 +74,8 @@ that actually matters — not the engineering cost.
 
 ### 1.3 Two course-code conventions, no signal which you'll get
 
-Within prerequisite text: **1,585** strings use `_V`-suffixed codes (`STAT_V 200`),
-**1,074** use bare codes (`STAT 200`), and only **2** mix both. A clean ~60/40 per-record
+Within prerequisite text: **1,647** strings use `_V`-suffixed codes (`STAT_V 200`),
+**1,013** use bare codes (`STAT 200`), and only **3** mix both. A clean ~60/40 per-record
 split, with no field indicating which convention a record uses.
 
 Every edge in the tree is a join from "code mentioned in prose" to "course record", so
@@ -85,14 +85,27 @@ unsafe against historical snapshots — the prior corpus retained it, and stripp
 
 ### 1.4 Prerequisites cite courses that no longer exist
 
-**526 course references inside prerequisite text (6.2%) do not resolve to any course in
-the calendar.** These affect **304 courses**, each of which renders a tree with at least
-one dead edge.
+**657 of 8,721 course references inside prerequisite text (7.5%) do not resolve to any
+course in the Vancouver calendar.** These affect **358 courses**, each of which renders a
+tree with at least one dead edge. They split into two distinct causes.
 
-These are not parse errors. `ENGL 112` is cited 16 times, but the ENGL subject has 152
-courses and no 112. Likewise `COMM 291` (COMM has 191 courses, no 291), `SPPH 400`,
-`PSYC 304`, `STAT 241`. These are retired courses still named as prerequisites of active
-ones — a referential integrity gap inside the calendar's own data.
+**Retired courses (526 references).** These are not parse errors. `ENGL 112` is cited 16
+times, but the ENGL subject has 152 courses and no 112. Likewise `COMM 291` (COMM has 191
+courses, no 291), `SPPH 400`, `PSYC 304`, `STAT 241`. These are retired courses still named
+as prerequisites of active ones — a referential integrity gap inside the calendar's own
+data.
+
+**Cross-campus references (131 references).** A refresh of our corpus on 2026-07-27
+surfaced a change: Vancouver prerequisites now cite **UBC Okanagan** courses by campus
+suffix — `POLI_O 100`, `HES_O 120`, `APSC_O 176`, `MATH_O 200`. There are 262 such
+references, of which 131 name a course with no Vancouver counterpart.
+
+This is reasonable data, but it is undocumented and it silently breaks consumers. Nothing
+announces that the `_V`/`_O` namespace is now load-bearing in prerequisite text, and a
+Vancouver-only dataset has no way to resolve the other half. (It broke our tooling too:
+our code parsers accept an optional `_V` and nothing else, so `_O` references match no
+pattern at all and disappear rather than erroring — the kind of failure a consumer only
+notices by accident.)
 
 **Consequence:** the student sees a prerequisite they cannot click, cannot look up, and
 cannot satisfy, with nothing explaining why.
@@ -118,7 +131,7 @@ The planner classifies each requirement row by one rule: does it name a course c
 yes it is checkable; if no it is advisory text the student must tick by hand, and it never
 counts toward progress automatically.
 
-**33.9% of all listed degree credits fall on the wrong side of that line.**
+**33.8% of all listed degree credits fall on the wrong side of that line.**
 
 - Median program: **30.8%** of credits unresolvable
 - Worst program: **90.7%**
@@ -134,8 +147,8 @@ enumerated. The most frequent, by count of requirement rows:
 
 | Label | Rows |
 |---|---|
-| Electives | 284 |
-| Additional Communication Requirement | 68 |
+| Electives | 286 |
+| Additional Communication Requirement | 67 |
 | Complementary Studies Electives | 32 |
 | Elective | 30 |
 | Restricted Electives | 29 |
@@ -163,14 +176,14 @@ document — it converts a third of the planner from decoration into function.
 
 ### 2.3 Two-thirds of programs have no parseable requirements at all
 
-Of the **205** program pages that plausibly should carry requirements
+Of the **207** program pages that plausibly should carry requirements
 (`degree_overview`, `degree_requirements`, `major`, `minor`, `honours`, `specialization`,
 `curriculum`), only **70 (34%)** yield a parseable year table.
 
 The rest state their requirements in prose, in tables with a different shape, or by
 referring the reader elsewhere. There is no content type or field distinguishing "this page
 contains the requirements" from "this page is about admissions" — we infer it from title
-and URL-slug heuristics, and **248 of 576 (43%)** program pages fall through to an
+and URL-slug heuristics, and **246 of 572 (43%)** program pages fall through to an
 `other` bucket we can't classify at all.
 
 **Consequence:** the planner silently supports about a third of programs. For the rest it
@@ -258,7 +271,10 @@ does the elective vocabulary.**
 4. **Give program pages a content type or `page_kind` term.** Eliminates the 43%
    classification failure and lets the planner know which page to read.
 5. **Fix or flag retired course references** in prerequisite text (526 known dead edges —
-   list available on request).
+   list available on request), and **document the `_V`/`_O` campus-suffix convention** now
+   that Vancouver prerequisites cite Okanagan courses (262 references, 131 unresolvable
+   from Vancouver data alone). The convention is currently undocumented and silently breaks
+   consumers rather than erroring.
 6. **Expose faculty/school as a field on program nodes**, so hierarchy stops depending on
    rendered breadcrumbs.
 7. **Document `/jsonapi` as a supported interface with a stated rate limit.** It is

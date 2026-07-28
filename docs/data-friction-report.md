@@ -19,7 +19,7 @@ All figures measured against the committed corpus as of 2026-07-27 (9,489 course
 | Tool | Failure a student actually hits | Scale |
 |---|---|---|
 | **Prerequisite tree** | Prerequisites must be parsed out of English prose | **0 of 9,603** courses expose a structured prerequisite |
-| **Prerequisite tree** | Tree draws an edge to a course that doesn't exist | **657** dead references across **358** courses |
+| **Prerequisite tree** | Tree draws an edge to a course that doesn't exist | **526** dead references across **304** courses |
 | **Prerequisite tree** | Requirement can't be graphed at all | **8.5%** of prerequisites contain no course code |
 | **Degree planner** | Requirement can't be checked off automatically | **33.8%** of all listed degree credits |
 | **Degree planner** | Program has no machine-readable requirements at all | **137 of 207** requirement-bearing pages |
@@ -85,30 +85,26 @@ unsafe against historical snapshots — the prior corpus retained it, and stripp
 
 ### 1.4 Prerequisites cite courses that no longer exist
 
-**657 of 8,721 course references inside prerequisite text (7.5%) do not resolve to any
-course in the Vancouver calendar.** These affect **358 courses**, each of which renders a
-tree with at least one dead edge. They split into two distinct causes.
+**526 of 8,459 Vancouver course references inside prerequisite text (6.2%) do not resolve
+to any course in the calendar.** These affect **304 courses**, each of which renders a tree
+with at least one dead edge.
 
-**Retired courses (526 references).** These are not parse errors. `ENGL 112` is cited 16
-times, but the ENGL subject has 152 courses and no 112. Likewise `COMM 291` (COMM has 191
-courses, no 291), `SPPH 400`, `PSYC 304`, `STAT 241`. These are retired courses still named
-as prerequisites of active ones — a referential integrity gap inside the calendar's own
-data.
-
-**Cross-campus references (131 references).** A refresh of our corpus on 2026-07-27
-surfaced a change: Vancouver prerequisites now cite **UBC Okanagan** courses by campus
-suffix — `POLI_O 100`, `HES_O 120`, `APSC_O 176`, `MATH_O 200`. There are 262 such
-references, of which 131 name a course with no Vancouver counterpart.
-
-This is reasonable data, but it is undocumented and it silently breaks consumers. Nothing
-announces that the `_V`/`_O` namespace is now load-bearing in prerequisite text, and a
-Vancouver-only dataset has no way to resolve the other half. (It broke our tooling too:
-our code parsers accept an optional `_V` and nothing else, so `_O` references match no
-pattern at all and disappear rather than erroring — the kind of failure a consumer only
-notices by accident.)
+These are not parse errors. `ENGL 112` is cited 16 times, but the ENGL subject has 152
+courses and no 112. Likewise `COMM 291` (COMM has 191 courses, no 291), `SPPH 400`,
+`PSYC 304`, `STAT 241`. These are retired courses still named as prerequisites of active
+ones — a referential integrity gap inside the calendar's own data.
 
 **Consequence:** the student sees a prerequisite they cannot click, cannot look up, and
 cannot satisfy, with nothing explaining why.
+
+> **Scope note.** Counts above are Vancouver-only. A corpus refresh on 2026-07-27 surfaced
+> Vancouver prerequisites newly citing UBC Okanagan courses by campus suffix (`POLI_O 100`,
+> `HES_O 120`) — 262 references. This tool covers Vancouver, so those are excluded from the
+> figures rather than counted as defects. Worth flagging for a different reason: the
+> convention change was undocumented, and it broke our parsers **silently** rather than
+> loudly. One path dropped the surrounding expression to plain text; another re-homed
+> `HES_O 120` onto Vancouver as `HES 120`, a code that doesn't exist here. Both failed
+> without erroring, which is the failure mode a data consumer catches only by accident.
 
 ### 1.5 A fifth of prerequisites aren't course requirements at all
 
@@ -271,10 +267,9 @@ does the elective vocabulary.**
 4. **Give program pages a content type or `page_kind` term.** Eliminates the 43%
    classification failure and lets the planner know which page to read.
 5. **Fix or flag retired course references** in prerequisite text (526 known dead edges —
-   list available on request), and **document the `_V`/`_O` campus-suffix convention** now
-   that Vancouver prerequisites cite Okanagan courses (262 references, 131 unresolvable
-   from Vancouver data alone). The convention is currently undocumented and silently breaks
-   consumers rather than erroring.
+   list available on request), and **announce cross-campus code conventions before they
+   ship**. The `_V`/`_O` change landed undocumented and broke downstream parsers silently
+   rather than loudly — a changelog entry would have cost nothing and saved the guesswork.
 6. **Expose faculty/school as a field on program nodes**, so hierarchy stops depending on
    rendered breadcrumbs.
 7. **Document `/jsonapi` as a supported interface with a stated rate limit.** It is

@@ -1,7 +1,7 @@
 {
   "name": "web",
   "private": true,
-  "version": "1.17.20",
+  "version": "1.18.0",
   "license": "SEE LICENSE IN ../LICENSE",
   "type": "module",
   "scripts": {
@@ -11,10 +11,14 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@deck.gl/core": "^9.3.10",
+    "@deck.gl/layers": "^9.3.10",
+    "@deck.gl/mapbox": "^9.3.10",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@mlc-ai/web-llm": "^0.2.83",
     "@xenova/transformers": "^2.17.2",
+    "maplibre-gl": "^5.24.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "react-markdown": "^10.1.0",
@@ -26,6 +30,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@tailwindcss/vite": "^4.2.4",
+    "@types/geojson": "^7946.0.16",
     "@types/node": "^24.12.2",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",

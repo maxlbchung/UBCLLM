@@ -17,6 +17,7 @@ import {
   ChevronRightIcon,
   GradCapIcon,
   GraphIcon,
+  MapIcon,
   PencilIcon,
   PlusIcon,
   SearchIcon,
@@ -36,6 +37,7 @@ const TOOLS: {
   { view: 'lookup', label: 'Course Finder', Icon: SearchIcon },
   { view: 'prereq', label: 'Prerequisite Visualizer', Icon: GraphIcon },
   { view: 'planning', label: 'Degree Planner', Icon: GradCapIcon },
+  { view: 'map', label: 'Campus Map', Icon: MapIcon },
   { view: 'calendar', label: 'Calendar', Icon: CalendarIcon },
 ]
 

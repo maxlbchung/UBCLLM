@@ -9,13 +9,21 @@ import { useChat, type Message } from './chat'
 // The landing page is its own route now (see lib/router + App.tsx). This
 // `view` only selects which tool panel shows inside the app shell, so it no
 // longer carries a 'home' member.
-export type View = 'chat' | 'lookup' | 'prereq' | 'planning' | 'calendar' | 'other'
+export type View =
+  | 'chat'
+  | 'lookup'
+  | 'prereq'
+  | 'planning'
+  | 'map'
+  | 'calendar'
+  | 'other'
 
 const VALID_VIEWS: View[] = [
   'chat',
   'lookup',
   'prereq',
   'planning',
+  'map',
   'calendar',
   'other',
 ]

@@ -5,6 +5,7 @@ import { Chat } from './components/Chat'
 import { CourseLookup } from './components/CourseLookup'
 import { PrereqTree } from './components/PrereqTree'
 import { Planning } from './components/Planning'
+import { CampusMapPage } from './components/map/CampusMapPage'
 import { CalendarPage } from './components/CalendarPage'
 import { OtherPage } from './components/OtherPage'
 import { EasterEggToast } from './components/EasterEggToast'
@@ -19,6 +20,7 @@ const PAGE_TITLES: Record<View, string> = {
   lookup: 'Course Finder',
   prereq: 'Prerequisite Visualizer',
   planning: 'Degree Planner',
+  map: 'Campus Map',
   calendar: 'Calendar',
   other: 'Settings',
 }
@@ -96,6 +98,9 @@ function Shell() {
         </div>
         <div className={view === 'planning' ? 'flex-1 min-h-0 flex flex-col' : 'hidden'}>
           <Planning />
+        </div>
+        <div className={view === 'map' ? 'flex-1 min-h-0 flex flex-col' : 'hidden'}>
+          <CampusMapPage />
         </div>
         <div className={view === 'calendar' ? 'flex-1 min-h-0 flex flex-col' : 'hidden'}>
           <CalendarPage />

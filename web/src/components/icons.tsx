@@ -285,3 +285,73 @@ export const RedoIcon = (p: IconProps) => (
     <path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H14" />
   </Icon>
 )
+
+// — Campus map —
+
+// Folded trail map with a route pin line.
+export const MapIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M9 3 3.6 4.8a1 1 0 0 0-.6.9v13.6a.6.6 0 0 0 .8.6L9 18l6 3 5.4-1.8a1 1 0 0 0 .6-.9V4.7a.6.6 0 0 0-.8-.6L15 6 9 3Z" />
+    <path d="M9 3v15" />
+    <path d="M15 6v15" />
+  </Icon>
+)
+
+// Simple building facade with windows.
+export const BuildingIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <rect x="5" y="3" width="14" height="18" rx="1" />
+    <path d="M9 7h.01M15 7h.01M9 11h.01M15 11h.01M9 15h.01M15 15h.01" />
+    <path d="M10.5 21v-3h3v3" />
+  </Icon>
+)
+
+// Circular refresh arrows.
+export const RefreshIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+    <path d="M21 3v5h-5" />
+  </Icon>
+)
+
+export const MinusIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M5 12h14" />
+  </Icon>
+)
+
+// Stacked layers — toggles the walking-path overlay.
+export const LayersIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="m12 3 9 5-9 5-9-5 9-5Z" />
+    <path d="m3 12.5 9 5 9-5" />
+    <path d="m3 17 9 5 9-5" />
+  </Icon>
+)
+
+// Crosshair / re-center reticle.
+export const CrosshairIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <circle cx="12" cy="12" r="7" />
+    <path d="M12 2v4M12 18v4M2 12h4M18 12h4" />
+  </Icon>
+)
+
+// Walking figure — route highlights.
+export const WalkIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <circle cx="13" cy="4.5" r="1.5" />
+    <path d="m10.5 21 1.8-5.2-2-2.3.7-4.5" />
+    <path d="m8 10.5 3-2.5 2.5.5 2 2.8 2.5 1" />
+    <path d="m13.5 13.5 1.7 2.5 1.3 5" />
+    <path d="M8 21l1.5-4" />
+  </Icon>
+)
+
+// Map location pin — place results.
+export const PinIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+    <circle cx="12" cy="10" r="3" />
+  </Icon>
+)

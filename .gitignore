@@ -25,6 +25,10 @@ web/public/data/*.bin
 web/public/data/chunks.json
 web/public/data/calendar.json
 
+# Campus-map data (regenerated in CI from Reodite/ubc-unified-data)
+web/public/data/map/
+pipeline/.map_cache/
+
 # Editor / OS
 .DS_Store
 Thumbs.db

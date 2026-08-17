@@ -22,9 +22,11 @@ UBCLLM/
 ├── web/                Vite + React 19 + TS app (the only thing deployed)
 │   ├── src/
 │   │   ├── lib/        embed.ts · retrieve.ts · llm.ts · prompts.ts · router.ts
+│   │   │   └── map/    campus-map data layer (geo · routing · buildings · places · details)
 │   │   ├── store/      chat.ts (Zustand) · conversations.ts (localStorage-persisted)
 │   │   ├── components/ Sidebar · Chat · ChatMessage · ModelLoader
 │   │   │               · CourseLookup · PrereqTree
+│   │   │   └── map/    CampusMapPage · CampusMap · BuildingPopup
 │   │   ├── App.tsx     route switcher: /home (no sidebar) vs /app (sidebar + tool views)
 │   │   └── version.ts  APP_VERSION (mirrored in package.json)
 │   └── public/data/    chunks.json + embeddings.bin (regenerated in CI)
@@ -35,7 +37,8 @@ UBCLLM/
 │   ├── scrape_degree_programs.py    every degree subtree — BA/BSc/MSc/PhD/cert
 │   └── output/         courses.json + faculties.json + degree_programs.json
 ├── pipeline/           Python 3.12 (pinned) — chunks + embeds (output regen in CI)
-│   └── chunk_and_embed.py
+│   ├── chunk_and_embed.py
+│   └── build_map_data.py   campus-map data from Reodite/ubc-unified-data (stdlib-only)
 ├── smoke-test/         Standalone HTML — WebGPU + Qwen3.5 2B verification
 └── .github/workflows/deploy.yml   pipeline → npm install → vite build → Pages
 ```
@@ -58,6 +61,7 @@ The full v1 stack from the original plan is shipped and live. Highlights:
 - **Conversation persistence** — `localStorage` key `ubcllm-conversations` via `zustand/middleware/persist`; on reload the active conversation rehydrates into `useChat`.
 - **Citation surfacing** — `buildSystemPrompt('default')` requires `[N]` citations matching the bracketed numbering in `buildContext`; `ChatMessage` parses them, renders inline superscript chips linking to the chunk's UBC URL, and splits the sources panel into "Sources used" vs "Other retrieved context."
 - **Model-load error recovery** — `ModelLoader` distinguishes network/cache errors from WebGPU/capability errors. Network failures (the usual "corrupted cached shard from an interrupted download" case) get a "Clear cache and try again" button that wipes `webllm/*` Cache Storage entries + IndexedDB databases and re-runs the load, plus a plain "Try again" fallback. Capability errors keep the original "needs WebGPU + ~2.5 GB GPU memory" message.
+- **Campus Map** (v1.18.0) — the Reogent campus map (github.com/Reodite/reogent) ported in as a tool tab, minus the agentic parts: its `walking_distance` / `find_building` / `find_places` LLM tools became hand-driven controls (Buildings / Walking route / Places) on `CampusMapPage`. Everything runs client-side: MapLibre GL basemap (CARTO Positron/Dark Matter, tinted to the app palette) + deck.gl v9 extruded footprints with a height-gradient shader, elastic convex-hull pan boundary with rubber-band physics, hover tooltip, click → `BuildingPopup` (Find-a-Space room carousel, LibCal study-room availability snapshot with as-of date, POIs joined by point-in-footprint), Dijkstra walking routes over the pedestrian network with door-to-door entrance snapping + animated draw-on trace, walking-path overlay toggle, zoom/reset controls, 15 s load timeout with retry + text fallback. Building search resolves exact code → acronym alias ("IKB" → IBLC) → fuzzy name. Data comes from **Reodite/ubc-unified-data**: `pipeline/build_map_data.py` (stdlib-only) downloads the geospatial/learning-spaces/room-bookings files (cached in `pipeline/.map_cache/`, or `--source <checkout>`) and derives `web/public/data/map/*` (~3 MB, gitignored, regenerated in CI). maplibre/deck import dynamically so they stay out of the initial bundle. Reogent's server-side og:image preview proxy has no static equivalent, so cards use stored photo/thumbnail URLs directly (placeholder covers stale ones).
 - **Calendar widget** (Home page) — read-only `CalendarWidget` showing academic deadlines / statutory holidays. Two independent filter chips, side-by-side mini-grid + upcoming list on desktop (stacks on mobile), prev/next month navigation, click month header to jump back to today. Fed by two scrapers (`scrape_academic_dates.py`, `scrape_holidays.py`) → normalized in `pipeline/build_calendar.py` → consumed as `web/public/data/calendar.json`. Calendar data is **not** in the RAG corpus on purpose (date-keyed facts don't belong in semantic retrieval).
 
 **Important runtime contracts (don't break these silently):**
@@ -104,6 +108,7 @@ Single source of truth: `web/src/version.ts` (`APP_VERSION`). Mirror it in `web/
 # First-time setup after a fresh clone (pipeline output is .gitignored):
 cd pipeline && uv run chunk_and_embed.py     # generates web/public/data/{chunks.json, embeddings.bin}
 cd pipeline && uv run build_calendar.py      # generates web/public/data/calendar.json
+cd pipeline && uv run build_map_data.py      # generates web/public/data/map/* (downloads Reodite/ubc-unified-data; --source <dir> for a local checkout)
 
 # Day-to-day:
 cd web      && npm run dev                    # local dev server (http://localhost:5173/UBCLLM/)
